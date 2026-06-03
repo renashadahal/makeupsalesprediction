@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width: 1000px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+
+    <div style="margin-bottom: 30px; border-bottom: 2px solid #eae2e2; padding-bottom: 15px;">
+        <h2 style="color: #3a2226; margin: 0 0 5px 0; font-size: 26px; font-weight: 600;">Inventory Ledger</h2>
+        <p style="color: #8c7e7e; font-size: 14px; margin: 0;">Log new shipments and monitor store stock balances.</p>
+    </div>
+
+    <div style="background: #ffffff; padding: 30px; border-radius: 8px; border: 1px solid #e6dede; box-shadow: 0 2px 8px rgba(0,0,0,0.03); margin-bottom: 35px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+            <h3 style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.8px; color: #705e61; margin: 0;">Log Shipments</h3>
+        </div>
+        
+        <form action="{{ url_for('inventory_view') }}" method="POST" style="display: flex; flex-direction: column; gap: 20px;">
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Select Brand</label>
+                    <select id="brand_select" name="brand" onchange="handleBrandChange()" required style="padding: 10px; border: 1px solid #cccccc; border-radius: 4px; background-color: #faf9f9; font-size: 14px; height: 42px; width: 100%;">
+                        <option value="">-- Choose Existing Brand --</option>
+                        {% for brand in brands %}
+                        <option value="{{ brand }}">{{ brand }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Select Product</label>
+                    <select id="product_select" name="product" onchange="handleProductChange()" required style="padding: 10px; border: 1px solid #cccccc; border-radius: 4px; background-color: #faf9f9; font-size: 14px; height: 42px; width: 100%;">
+                        <option value="">-- Select Brand First --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: end;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Unit Price ($)</label>
+                    <input type="text" id="price_input" name="price" placeholder="0.00" readonly style="padding: 10px; border: 1px solid #cccccc; border-radius: 4px; font-size: 14px; height: 42px; background-color: #f1eeee; color: #555555; box-sizing: border-box; width: 100%;">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Quantity Received</label>
+                    <input type="text" id="quantity_received" name="quantity_received" placeholder="e.g. 10" required style="padding: 10px; border: 1px solid #cccccc; border-radius: 4px; font-size: 14px; height: 42px; box-sizing: border-box; width: 100%;">
+                </div>
+                <div>
+                    <button type="submit" style="background: #4a2e35; color: white; border: none; padding: 0 24px; border-radius: 4px; font-size: 14px; font-weight: 600; height: 42px; width: 100%; cursor: pointer;">Log Stock Intake</button>
+                </div>
+            </div>
+
+        </form>
+    </div>
+
+    <div style="background: #ffffff; border-radius: 8px; border: 1px solid #e6dede; box-shadow: 0 2px 8px rgba(0,0,0,0.03); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+            <thead>
+                <tr style="background: #faf9f9; border-bottom: 2px solid #e6dede;">
+                    <th style="padding: 15px 20px; font-weight: 600; color: #4a3b3d; width: 25%;">Brand</th>
+                    <th style="padding: 15px 20px; font-weight: 600; color: #4a3b3d; width: 45%;">Product Description</th>
+                    <th style="padding: 15px 20px; font-weight: 600; color: #4a3b3d; width: 15%;">Stock Balance</th>
+                    <th style="padding: 15px 20px; font-weight: 600; color: #4a3b3d; width: 15%;">Alert Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in inventory_items %}
+                <tr style="border-bottom: 1px solid #f0eae1;">
+                    <td style="padding: 15px 20px; font-weight: bold; color: #3a2226;">{{ item.brand }}</td>
+                    <td style="padding: 15px 20px; color: #555555;">{{ item.product_name }}</td>
+                    <td style="padding: 15px 20px; font-weight: 600; color: #3a2226;">{{ item.stock }} units</td>
+                    <td style="padding: 15px 20px;">
+                        {% if item.stock|int < 10 %}
+                            <span style="color: #c92a2a; background: #fff5f5; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block;">⚠️ Low Stock</span>
+                        {% else %}
+                            <span style="color: #2b8a3e; background: #f4fbf7; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block;">✓ In Stock</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="padding: 30px; text-align: center; color: #8c7e7e; font-style: italic; background: #faf9f9;">
+                        No stock ledger records found. Fill the form above to add inventory.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+const catalogMap = {{ catalog_map | tojson | safe }};
+
+function handleBrandChange() {
+    const brandSelect = document.getElementById('brand_select');
+    const productSelect = document.getElementById('product_select');
+    const selectedBrand = brandSelect.value;
+    
+    // Clear out current variations cascading dropdown state elements
+    productSelect.innerHTML = '<option value="">-- Choose Existing Product --</option>';
+    document.getElementById('price_input').value = '';
+    
+    if (selectedBrand && catalogMap[selectedBrand]) {
+        catalogMap[selectedBrand].forEach(prod => {
+            const opt = document.createElement('option');
+            opt.value = prod.name;
+            opt.textContent = prod.name;
+            productSelect.appendChild(opt);
+        });
+    }
+}
+
+function handleProductChange() {
+    const brandSelect = document.getElementById('brand_select');
+    const productSelect = document.getElementById('product_select');
+    const priceInput = document.getElementById('price_input');
+    
+    const selectedBrand = brandSelect.value;
+    const selectedProduct = productSelect.value;
+    
+    if (selectedBrand && selectedProduct && catalogMap[selectedBrand]) {
+        const productMatch = catalogMap[selectedBrand].find(p => p.name === selectedProduct);
+        if (productMatch) {
+            priceInput.value = productMatch.price.toFixed(2);
+        }
+    } else {
+        priceInput.value = '';
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-8 max-w-7xl mx-auto pb-12 px-4">
+    
+    <!-- Top Header Title Matrix -->
+    <div class="border-b border-noireText/10 pb-4">
+        <h2 class="text-3xl text-noireText font-serif">Branch Analytics Control Panel</h2>
+        <p class="text-xs text-noireText/60 font-light mt-1">Real-time analytical trends generated directly from active branch catalog ledgers.</p>
+    </div>
+
+    <!-- KPI Metric Card Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <!-- Today's Transactions -->
+        <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-sm flex flex-col justify-between">
+            <div>
+                <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Volume Today</span>
+                <h3 class="text-4xl font-mono font-bold text-noireText mt-2">{{ today_sales_count if today_sales_count is not none else 0 }}</h3>
+            </div>
+            <p class="text-[11px] text-emerald-700 font-medium mt-3 flex items-center gap-1">
+                <span>Active operational baseline steady</span>
+            </p>
+        </div>
+
+        <!-- Low Stock Alert -->
+        <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-sm flex flex-col justify-between">
+            <div>
+                <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Inventory Alerts</span>
+                <h3 class="text-4xl font-mono font-bold text-noireText mt-2">{{ low_stock_count if low_stock_count is not none else 0 }}</h3>
+            </div>
+            <p class="text-[11px] {% if low_stock_count and low_stock_count > 0 %}text-amber-700 font-medium{% else %}text-noireText/40{% endif %} mt-3">
+                {% if low_stock_count and low_stock_count > 0 %} SKU units running below minimum threshold !!{% else %}All product shelves optimized{% endif %}
+            </p>
+        </div>
+
+        <!-- Model Mode Context Card -->
+        <div class="bg-deepWine text-velvet p-6 rounded-2xl border border-noireText/10 shadow-sm flex flex-col justify-between">
+            <div>
+                <span class="block text-[10px] font-bold tracking-widest uppercase text-velvet/60">Predictive Engine Context</span>
+                <h3 class="text-lg font-serif mt-2 leading-snug">{{ forecast_mode if forecast_mode is not none else "Inference Pipeline Offline" }}</h3>
+            </div>
+            <p class="text-[11px] text-velvet/50 mt-3">Pipeline sync active</p>
+        </div>
+
+    </div>
+
+    <!-- Analytics Charts Grid System -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- 30-Day Trend Timeline (Spans 2 columns) -->
+        <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-sm lg:col-span-2">
+            <h4 class="text-sm font-serif tracking-wide text-noireText mb-4">30-Day Sales Volumetric Trend Line</h4>
+            <div class="h-64 relative">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Sales Distribution by Brand (Pie / Doughnut Chart) -->
+        <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-sm col-span-1">
+            <h4 class="text-sm font-serif tracking-wide text-noireText mb-4">Brand Volume Share</h4>
+            <div class="h-64 relative flex items-center justify-center">
+                <canvas id="brandChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Sales Distribution by Subcategory (Horizontal Bar Chart) -->
+        <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-sm lg:col-span-3">
+            <h4 class="text-sm font-serif tracking-wide text-noireText mb-4">Product Category Volume Performance</h4>
+            <div class="h-64 relative">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Dynamic Charts Rendering Engine -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // Shared color configuration mappings mirroring Noire design parameters
+    const wineColor = '#582c3e'; // Muted Deep Wine
+    const roseColor = '#bd8c9b'; // Soft Dusty Rose
+    const grayText = '#2b2929';  // Muted Charcoal Dark Text
+    const lineFill = 'rgba(189, 140, 155, 0.15)'; 
+
+    // Safety Fallbacks: Ensures empty arrays instead of throwing Javascript 'undefined' breaks
+    const dateLabels = {{ date_labels | tojson }} || [];
+    const trendData = {{ thirty_day_sales_data | tojson }} || [];
+    const brandLabels = {{ brand_labels | tojson }} || [];
+    const brandData = {{ brand_sales_data | tojson }} || [];
+    const catLabels = {{ subcategory_labels | tojson }} || [];
+    const catData = {{ subcategory_sales_data | tojson }} || [];
+
+    // --- CHART 1: 30-DAY SALES LINE TREND ---
+    const ctxTrend = document.getElementById('trendChart');
+    if (ctxTrend) {
+        new Chart(ctxTrend, {
+            type: 'line',
+            data: {
+                labels: dateLabels,
+                datasets: [{
+                    label: 'Units Transacted',
+                    data: trendData,
+                    borderColor: roseColor,
+                    backgroundColor: lineFill,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: wineColor
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 10 }, color: grayText } },
+                    x: { grid: { display: false }, ticks: { font: { size: 9 }, color: grayText, maxTicksLimit: 10 } }
+                }
+            }
+        });
+    }
+
+    // --- CHART 2: BRAND DISTRIBUTION (DOUGHNUT) ---
+    const ctxBrand = document.getElementById('brandChart');
+    if (ctxBrand) {
+        new Chart(ctxBrand, {
+            type: 'doughnut',
+            data: {
+                labels: brandLabels,
+                datasets: [{
+                    data: brandData,
+                    backgroundColor: [wineColor, roseColor, '#825666', '#d9b6c0', '#421d2b'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, font: { size: 10 }, color: grayText }
+                    }
+                }
+            }
+        });
+    }
+
+    // --- CHART 3: SUBCATEGORY BAR DISPLAY ---
+    const ctxCat = document.getElementById('categoryChart');
+    if (ctxCat) {
+        new Chart(ctxCat, {
+            type: 'bar',
+            data: {
+                labels: catLabels,
+                datasets: [{
+                    label: 'Units Shipped',
+                    data: catData,
+                    backgroundColor: wineColor,
+                    hoverBackgroundColor: roseColor,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 10 }, color: grayText } },
+                    x: { grid: { display: false }, ticks: { font: { size: 11 }, color: grayText } }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

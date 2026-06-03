@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Authentication Portal</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Centering Layout Canvas using Flexbox over global pearl backdrop */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #4a2e35 0%, #2b161a 100%); /* Radiant Berry Gradient */
+            margin: 0;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 440px; /* Scaled up card footprint */
+            background: #ffffff;
+            padding: 45px 40px; /* Increased internal padding spacing */
+            border-radius: 16px; /* Softer rounded borders */
+            box-shadow: 0 10px 30px rgba(43, 22, 26, 0.35);
+            box-sizing: border-box;
+            border: 1px solid #e2d4d4;
+        }
+
+        .login-card h2 {
+            margin: 0 0 8px 0;
+            font-size: 28px; /* Bigger Title Typography */
+            color: #3a2226;
+            text-align: center;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .login-card .subtitle {
+            text-align: center;
+            color: #705a5d;
+            font-size: 15px;
+            margin-bottom: 30px;
+            margin-top: 0;
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 13px;
+            color: #5c4d50;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        /* Upscaling Interactive Input Heights */
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px; /* Larger text padding bounds */
+            font-size: 15px;
+            border: 1px solid #e2d4d4;
+            border-radius: 8px;
+            box-sizing: border-box;
+            background-color: #fff;
+            color: #2d3748;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #e5a9a9;
+            box-shadow: 0 0 0 4px rgba(229, 169, 169, 0.3);
+        }
+
+        /* Upscaled Button Component */
+        .login-btn {
+            width: 100%;
+            padding: 14px; /* Taller tactile click target */
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background-color: #b57c7c; /* Desert Rose Pink */
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.15s ease-in-out, transform 0.1s ease;
+            margin-top: 10px;
+        }
+
+        .login-btn:hover {
+            background-color: #966161;
+        }
+
+        .login-btn:active {
+            transform: scale(0.99);
+        }
+
+        /* Fixed Flush Alert Formatting Block */
+        .flash-alert {
+            background-color: #fceeed;
+            border-left: 4px solid #cd5c5c;
+            color: #7a4f52;
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            font-weight: 500;
+            box-sizing: border-box;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2>Inventory Platform</h2>
+        <p class="subtitle">Enter your credential tokens to authenticate</p>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="flash-alert">
+                    {{ messages[0] }}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('login') }}" method="POST">
+            <div class="form-group">
+                <label for="username">Username ID</label>
+                <input type="text" id="username" name="username" placeholder="e.g., staff" required autocomplete="username">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Security Password</label>
+                <input type="password" id="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            
+            <button type="submit" class="login-btn">Authenticate Session</button>
+        </form>
+        
+        <div style="margin-top: 30px; background: #fffaf9; padding: 14px; border-radius: 8px; border: 1px dashed #e2d4d4;">
+            <p style="font-size: 11px; color: #8a7a7c; text-align: center; margin: 0; line-height: 1.6;">
+                <strong>Academic Verification Credentials:</strong><br>
+                Admin Panel Access: <span style="font-family: monospace; color:#4a2e35; font-weight:bold;">admin</span> / <span style="font-family: monospace; color:#4a2e35; font-weight:bold;">admin</span><br>
+                Staff Panel Access: <span style="font-family: monospace; color:#4a2e35; font-weight:bold;">staff</span> / <span style="font-family: monospace; color:#4a2e35; font-weight:bold;">staff</span>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

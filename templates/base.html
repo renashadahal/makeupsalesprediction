@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noire | Advanced Retail Intelligence</title>
+    <!-- Premium Editorial Typography Stack -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN Engine -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        velvet: '#f3e9e9',       /* Muted Rose-Tinted Cream Backdrop */
+                        parchment: '#eae0e0',    /* Darker, richer element plates */
+                        noireText: '#2e2528',    /* Vintage Charcoal Wine Accent */
+                        dustyRose: '#a88189',    /* Muted Rose Accent Tone */
+                        deepWine: '#423338'      /* True Navbar Palette Dark */
+                    },
+                    fontFamily: {
+                        serif: ['Cormorant Garamond', 'serif'],
+                        sans: ['Space Grotesk', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #f3e9e9; color: #2e2528; }
+        h1, h2, h3, .brand-font { font-family: 'Cormorant Garamond', serif; font-weight: 600; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="min-h-screen flex flex-col bg-velvet">
+
+    <!-- Fully Responsive Global Header -->
+    <header class="bg-deepWine text-velvet shadow-md w-full border-b border-noireText/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            
+            <!-- System Branding Node -->
+            <div class="flex items-center justify-between">
+<!-- Clickable Brand Identity Header Module -->
+<a href="{{ url_for('dashboard') }}" class="group block select-none focus:outline-none transition-all duration-200">
+    <!-- Brand Title -->
+    <h1 class="text-3xl font-serif tracking-wide text-dustyRose group-hover:text-white transition-colors duration-200">
+        Noire
+    </h1>
+
+</a>
+                <div class="text-right lg:hidden">
+                    <span class="text-[10px] text-dustyRose uppercase tracking-wider block">Operator</span>
+                    <strong class="text-xs text-velvet">{{ session.get('username', 'Guest') }}</strong>
+                </div>
+            </div>
+
+            <!-- Fully Responsive Links Container -->
+            <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-4 text-xs font-medium tracking-wide">
+                <nav class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 md:gap-2">
+                    <a href="{{ url_for('dashboard') }}" class="px-3 py-2 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center">Dashboard</a>
+                    <a href="{{ url_for('record_sale') }}" class="px-3 py-2 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center">Record Sale</a>
+                    <a href="{{ url_for('inventory_view') }}" class="px-3 py-2 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center">Inventory Ledger</a>
+                    <a href="{{ url_for('forecast') }}" class="px-3 py-2 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center">AI Forecast</a>
+                    
+                    {% if session.get('role') == 'admin' %}
+                        <a href="{{ url_for('manage_users') }}" class="px-3 py-2 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20">Users</a>
+                        <a href="{{ url_for('update_catalog') }}" class="px-3 py-2 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20">Catalog</a>
+                    {% endif %}
+                </nav>
+
+                <!-- Operator Session Utilities -->
+                <div class="flex items-center justify-between md:justify-end gap-4 border-t border-velvet/10 pt-3 md:pt-0 md:border-t-0 pl-1">
+                    <div class="hidden lg:block text-right">
+                        <span class="text-[9px] text-dustyRose/60 uppercase tracking-widest block">Active Node</span>
+                        <strong class="text-velvet text-xs">{{ session.get('username', 'Guest') }}</strong>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="w-full md:w-auto bg-dustyRose/20 hover:bg-dustyRose/30 text-dustyRose text-center font-bold text-[10px] tracking-widest uppercase px-4 py-2 rounded-lg transition-colors border border-dustyRose/30">
+                        Exit
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Flash Notification Pipeline -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="bg-parchment border border-dustyRose/40 text-noireText px-4 py-3 rounded-xl text-sm shadow-inner">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Main Viewport Context -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer System -->
+    <footer class="py-4 text-center text-[10px] text-noireText/40 uppercase tracking-widest border-t border-parchment/40 bg-parchment/10 mt-auto">
+        &copy; 2026 Noire Intelligence Module Matrix.
+    </footer>
+
+</body>
+</html>

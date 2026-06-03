@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-10 max-w-4xl mx-auto pb-12">
+    
+    <div class="border-b border-noireText/10 pb-4 text-center">
+        <h2 class="text-4xl text-noireText font-serif">Prediction Module</h2>
+    </div>
+
+    <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md max-w-2xl mx-auto">
+        <form id="forecastForm" class="space-y-6">
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs tracking-wide">
+                
+                <div>
+                    <label for="brand" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Target Brand</label>
+                    <select id="brand" name="brand" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                        <option value="" disabled selected>-- Choose Brand --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="product_name" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Product Item</label>
+                    <select id="product_name" name="product_name" required disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <option value="" disabled selected>-- Select Brand First --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="price" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Base Retail Price ($)</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-2.5 text-noireText/50 font-medium">$</span>
+                        <input type="text" id="price" name="price" readonly class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-velvet/20 border border-noireText/10 text-noireText font-mono font-medium focus:outline-none cursor-not-allowed">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="stock" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Current Stock On-Hand</label>
+                    <input type="text" id="stock" name="stock" readonly class="w-full px-4 py-2.5 rounded-xl bg-velvet/20 border border-noireText/10 text-noireText font-mono font-medium focus:outline-none cursor-not-allowed">
+                </div>
+
+                <div class="sm:col-span-2 bg-velvet/40 p-4 rounded-xl border border-noireText/5 space-y-3">
+                    <label class="block font-semibold uppercase text-noireText/80 tracking-widest text-[11px]">Active Calendar Event Context</label>
+                    <select id="holiday_context" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                        <option value="none">Regular Season Framework (No Active Promo)</option>
+                        <option value="valentines">Valentine's Day Week (High Cosmetic Gift Demand)</option>
+                        <option value="festive">Festive / Holiday Season Flash Sale (Store-Wide Discount)</option>
+                        <option value="clearance">End-of-Season Inventory Clearance Campaign</option>
+                    </select>
+                </div>
+
+            </div>
+
+            <div class="flex justify-center pt-4 border-t border-noireText/5">
+                <button type="submit" class="w-full sm:w-auto px-10 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md">
+                    Run Demand Forecast
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div id="forecastResult" class="hidden max-w-2xl mx-auto bg-white p-6 rounded-2xl border border-noireText/10 shadow-lg transition-all duration-300">
+        <div class="border-b border-noireText/10 pb-3 mb-4 text-center">
+            <h4 class="text-xl text-noireText font-serif">Demand Forecast Output</h4>
+            <span id="res_holiday" class="text-[10px] font-bold tracking-widest uppercase block mt-1">Checking Temporal Conditions</span>
+        </div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 text-center py-2">
+            <div class="bg-velvet/30 p-4 rounded-xl border border-noireText/5">
+                <span class="block text-[10px] uppercase tracking-widest text-noireText/50 font-semibold mb-1">Predicted Unit Demand</span>
+                <span id="res_units" class="text-4xl font-mono font-bold text-noireText">0</span>
+                <span class="block text-[10px] text-noireText/40 mt-1">Units next period</span>
+            </div>
+            
+            <div class="bg-velvet/30 p-4 rounded-xl border border-noireText/5 flex flex-col justify-center items-center">
+                <span class="block text-[10px] uppercase tracking-widest text-noireText/50 font-semibold mb-1">Inventory Strategy Advisory</span>
+                <span id="res_strategy" class="text-xs font-medium text-deepWine block mt-1 px-2 leading-relaxed">No Strategy Computed</span>
+            </div>
+        </div>
+
+        <div class="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200/60 text-center text-amber-900 text-xs font-medium" id="context_explanation_block">
+            </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+    const brandSel = document.getElementById('brand');
+    const prodSel = document.getElementById('product_name');
+    const priceInput = document.getElementById('price');
+    const stockInput = document.getElementById('stock');
+    const holidayContext = document.getElementById('holiday_context');
+    const forecastForm = document.getElementById('forecastForm');
+    const resultCard = document.getElementById('forecastResult');
+    const contextExplanation = document.getElementById('context_explanation_block');
+    let activeProductId = "";
+
+    // Step 1: Ingest brand names instantly
+    try {
+        const res = await fetch('/api/catalog/brands');
+        const brands = await res.json();
+        brandSel.innerHTML = '<option value="" disabled selected>-- Choose Brand --</option>' + 
+            brands.map(b => `<option value="${b}">${b}</option>`).join('');
+    } catch(e) {
+        brandSel.innerHTML = '<option value="" disabled>Error loading brands</option>';
+    }
+
+    // Step 2: Cascade products on brand changes
+    brandSel.addEventListener('change', async () => {
+        prodSel.innerHTML = '<option value="" disabled selected>-- Loading items --</option>';
+        prodSel.disabled = false;
+        priceInput.value = '';
+        stockInput.value = '';
+
+        try {
+            const res = await fetch(`/api/catalog/products?brand=${encodeURIComponent(brandSel.value)}`);
+            const products = await res.json();
+            
+            if (products.length === 0) {
+                prodSel.innerHTML = '<option value="" disabled>No items tracked here</option>';
+                prodSel.disabled = true;
+            } else {
+                prodSel.innerHTML = '<option value="" disabled selected>-- Choose Product --</option>' + 
+                    products.map(p => `<option value="${p}">${p}</option>`).join('');
+            }
+        } catch (err) {
+            prodSel.innerHTML = '<option value="" disabled>Error loading products</option>';
+        }
+    });
+
+    // Step 3: Auto-populate BOTH Base Price and Mock Stock values instantly
+    prodSel.addEventListener('change', async () => {
+        priceInput.value = '...';
+        stockInput.value = '...';
+        try {
+            const res = await fetch(`/api/catalog/product_details?product_name=${encodeURIComponent(prodSel.value)}`);
+            const details = await res.json();
+            priceInput.value = details.price.toFixed(2);
+            activeProductId = details.product_id || "PROD-GENERIC";
+            
+            // Generate clean structural mock sample records for stock on hand metrics
+            // Formulates a stable value between 15 and 85 based on name length strings
+            const mockStockValue = ((prodSel.value.length * 7) % 70) + 15;
+            stockInput.value = mockStockValue;
+
+        } catch(e) {
+            priceInput.value = '0.00';
+            stockInput.value = '25';
+            activeProductId = "PROD-GENERIC";
+        }
+    });
+
+    // Step 4: Submit Execution mapping to dynamic backend parameters
+    forecastForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const selectedEvent = holidayContext.value;
+        let priceValue = parseFloat(priceInput.value) || 0;
+        let stockValue = parseInt(stockInput.value) || 0;
+
+        // Formulate request configuration schema body parameters
+        const payload = {
+            product_id: activeProductId,
+            price: priceValue,
+            stock: stockValue,
+            holiday_context: selectedEvent // Relayed context variable
+        };
+
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            
+            let result = await response.json();
+            
+            if (result.error) {
+                alert("Pipeline model execution error: " + result.error);
+                return;
+            }
+
+            // Client-Side Context Enhancement Mapping
+            let rawDemand = result.predicted_demand;
+            let explanationText = "";
+            let strategyText = result.recommendation;
+
+            if (selectedEvent === 'valentines') {
+                rawDemand = Math.round(rawDemand * 1.65); // Significant multiplier spike
+                explanationText = "Demand Surge: Since Valentine's Day is in a week, gift purchases are significantly higher than standard seasonal baseline rules.";
+                strategyText = "Increase display placement prominence. Restock safety margins immediately to protect high-velocity turnover.";
+            } else if (selectedEvent === 'festive') {
+                rawDemand = Math.round(rawDemand * 1.40);
+                explanationText = "active Campaign Shock: The ongoing store-wide flash sale event is accelerating catalog item click-through rates and lowering overhead shelf times.";
+                strategyText = "Monitor run-rates hourly. Secure backup buffer replenishment nodes.";
+            } else if (selectedEvent === 'clearance') {
+                rawDemand = Math.round(rawDemand * 1.20);
+                explanationText = "Liquidation Event: Seasonal clearance price-cuts are pushing unit velocity volumes higher to prepare shelf capacity for upcoming catalog releases.";
+                strategyText = "Deplete remaining inventory completely. Do not trigger automatic restocking loops.";
+            } else {
+                explanationText = "Standard Balance: Stable seasonal run-rate recorded. No abnormal calendar fluctuations detected within this local operating window.";
+            }
+
+            // Map outcomes onto view components
+            document.getElementById('res_units').innerText = rawDemand;
+            document.getElementById('res_strategy').innerText = strategyText;
+            contextExplanation.innerHTML = explanationText;
+            
+            const holidayEl = document.getElementById('res_holiday');
+            if (selectedEvent !== 'none') {
+                holidayEl.innerText = "SYSTEM TRIGGERED CONTEXT MODIFIER APPLIED";
+                holidayEl.className = "text-[11px] font-bold tracking-widest uppercase block mt-1 text-amber-600";
+                contextExplanation.className = "mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200/60 text-center text-amber-900 text-xs font-medium";
+            } else {
+                holidayEl.innerText = "REGULAR SEASON TEMPORAL CALIBRATION";
+                holidayEl.className = "text-[11px] font-bold tracking-widest uppercase block mt-1 text-emerald-600";
+                contextExplanation.className = "mt-4 p-3 bg-emerald-50 rounded-xl border border-emerald-200/60 text-center text-emerald-900 text-xs font-medium";
+            }
+            
+            resultCard.classList.remove('hidden');
+        } catch (err) {
+            alert("System connectivity exception processing inference pipelines.");
+        }
+    });
+});
+</script>
+{% endblock %}

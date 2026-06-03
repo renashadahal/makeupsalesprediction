@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width: 1000px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+
+    <div style="margin-bottom: 30px; border-bottom: 2px solid #eae2e2; padding-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+            <h2 style="color: #3a2226; margin: 0 0 5px 0; font-size: 26px; font-weight: 600;">Master Catalog</h2>
+        </div>
+        <a href="{{ url_for('inventory_view') }}" style="background: #faf9f9; color: #4a2e35; border: 1px solid #cccccc; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s; height: fit-content;">
+            Back to Inventory Ledger
+        </a>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div style="background-color: #f4fbf7; border: 1px solid #2b8a3e; color: #2b8a3e; padding: 12px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; margin-bottom: 25px;">
+                    ✓ {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div style="background: #ffffff; padding: 35px; border-radius: 8px; border: 1px solid #e6dede; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+        <form action="{{ url_for('update_catalog') }}" method="POST" style="display: flex; flex-direction: column; gap: 30px;">
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; row-gap: 25px; column-gap: 40px;">
+                
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="store_id" style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Branch ID</label>
+                    <input type="text" id="store_id" name="store_id" value="ST-01" required style="padding: 12px; border: 1px solid #cccccc; border-radius: 4px; font-size: 14px; height: 44px; box-sizing: border-box; background-color: #f5f5f5; color: #555555; width: 100%;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="product_id" style="font-size: 13px; font-weight: 600; color: #4a3b3d;">SKU / Product ID</label>
+                    <input type="text" id="product_id" name="product_id" placeholder="e.g. PROD-882" required style="padding: 12px; border: 1px solid #cccccc; border-radius: 4px; font-size: 14px; height: 44px; box-sizing: border-box; width: 100%;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="brand" style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Brand Name</label>
+                    <input type="text" id="brand" name="brand" placeholder="e.g. Maybelline" required style="padding: 12px; border: 1px solid #cccccc; border-radius: 4px; font-size: 14px; height: 44px; box-sizing: border-box; width: 100%;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="product_name" style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Product Name</label>
+                    <input type="text" id="product_name" name="product_name" placeholder="e.g. Fit Me Foundation" required style="padding: 12px; border: 1px solid #cccccc; border-radius: 4px; font-size: 14px; height: 44px; box-sizing: border-box; width: 100%;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="subcategory" style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Subcategory</label>
+                    <input type="text" id="subcategory" name="subcategory" placeholder="e.g. Foundation" required style="padding: 12px; border: 1px solid #cccccc; border-radius: 4px; font-size: 14px; height: 44px; box-sizing: border-box; width: 100%;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label for="price" style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Base Price ($)</label>
+                    <input type="number" step="0.01" id="price" name="price" placeholder="0.00" required style="padding: 12px; border: 1px solid #cccccc; border-radius: 4px; font-size: 14px; height: 44px; box-sizing: border-box; width: 100%;">
+                </div>
+
+            </div>
+
+            <div style="margin-top: 10px;">
+                <button type="submit" style="background: #4a2e35; color: white; border: none; padding: 0 30px; border-radius: 4px; font-size: 15px; font-weight: 600; height: 46px; cursor: pointer; transition: background 0.2s;">
+                    Commit to Catalog
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
+{% endblock %}

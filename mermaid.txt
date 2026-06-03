@@ -1,0 +1,86 @@
+graph TD
+    classDef startEnd fill:#f9fafb,stroke:#4b5563,stroke-width:2px;
+    classDef decision fill:#fffbeb,stroke:#d97706,stroke-width:2px;
+    classDef action fill:#f0f9ff,stroke:#0284c7,stroke-width:2px;
+    classDef page fill:#f0fdf4,stroke:#16a34a,stroke-width:2px;
+
+    %% 1. Authentication flow
+    Start((Start)):::startEnd
+    Start --> Login[Login Page: Input Credentials]:::page
+    Login --> AuthCheck{Credentials Valid?}:::decision
+    AuthCheck -->|No| LoginErr[Show Invalid Credentials Alert]:::action
+    LoginErr --> Login
+    
+    AuthCheck -->|Yes| SessionStart[Initialize Session & Set Active Branch]:::action
+    SessionStart --> RoleCheck{User Role?}:::decision
+
+    %% Role-based separation
+    RoleCheck -->|Admin| AdminDash[Admin Dashboard]:::page
+    RoleCheck -->|Staff| StaffDash[Staff Dashboard]:::page
+
+    %% Admin Only Portal (Left Side)
+    subgraph Admin_Only["Admin-Only Operations"]
+        AdminDash --> AdminChoice{Select Admin Tool}:::decision
+        AdminChoice -->|Manage Users| UserPanel[Manage Users Form]:::page
+        UserPanel --> UserCreate[Input Username, Password, Role & Save]:::action
+        UserCreate --> AdminDash
+        
+        AdminChoice -->|Catalog Manager| CatalogPanel[Expand Catalog Form]:::page
+        CatalogPanel --> CatalogAdd[Input Product Details & Append]:::action
+        CatalogAdd --> AdminDash
+    end
+
+    %% Shared Portal Operations (Center)
+    subgraph Shared_Ops["Shared Operations (Staff & Admin)"]
+        %% POS Workflow
+        POS[Record Sale Screen]:::page
+        POS --> POSSelect[Select Brand & Product]:::action
+        POSSelect --> POSAdd[Specify Quantity & Add to Cart]:::action
+        POSAdd --> POSCartCheck{Add More Items?}:::decision
+        POSCartCheck -->|Yes| POSSelect
+        POSCartCheck -->|No| POSCheckout[Enter Promo Code & Checkout]:::action
+        POSCheckout --> POSComplete[Record Sale to History & Display TX ID]:::action
+        
+        %% Inventory Workflow
+        Inv[Inventory Stock Ledger Screen]:::page
+        Inv --> InvView[View Current Stock & Low Stock Warnings]:::action
+        InvView --> InvCheck{Receive New Stock?}:::decision
+        InvCheck -->|Yes| InvForm[Input Product & Received Quantity]:::action
+        InvForm --> InvUpdate[Update Inventory Ledger & Refresh Screen]:::action
+        InvUpdate --> Inv
+        
+        %% Forecasting Workflow
+        Forecast[AI Forecast Screen]:::page
+        Forecast --> ForecastForm[Select Product & Input Price/Stock]:::action
+        ForecastForm --> ForecastRequest[Request AI Prediction]:::action
+        ForecastRequest --> ForecastResult[Display Predicted Demand & Recommendations]:::action
+    end
+
+    %% Connections from Admin Dash to Shared Ops
+    AdminDash -->|POS / Record Sale| POS
+    AdminDash -->|Stock Ledger| Inv
+    AdminDash -->|AI Forecast| Forecast
+
+    %% Connections from Staff Dash to Shared Ops
+    StaffDash -->|POS / Record Sale| POS
+    StaffDash -->|Stock Ledger| Inv
+    StaffDash -->|AI Forecast| Forecast
+    StaffDash -.->|Attempt Admin URL Access| AdminBlock[Display 403 Access Denied]:::action
+    AdminBlock -.-> StaffDash
+
+    %% Returning to dashboards
+    POSComplete --> RoleRedirect{Redirect to Role Dash?}:::decision
+    InvUpdate --> RoleRedirect
+    ForecastResult --> RoleRedirect
+    InvCheck -->|No| RoleRedirect
+
+    RoleRedirect -->|Admin| AdminDash
+    RoleRedirect -->|Staff| StaffDash
+    AdminChoice -->|Return| AdminDash
+
+    %% Logout & Termination
+    AdminDash -->|Logout| LogoutAdmin[Clear Session]:::action
+    StaffDash -->|Logout| LogoutStaff[Clear Session]:::action
+    
+    LogoutAdmin --> Stop((Stop)):::startEnd
+    LogoutStaff --> Stop

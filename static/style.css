@@ -1,0 +1,340 @@
+/* static/style.css */
+:root {
+    --primary-bg: #4a2e35;         /* Deep Elegant Berry / Plum */
+    --secondary-bg: #5c3a42;       /* Medium Warm Cocoa / Wine */
+    --accent-blue: #d4a373;        /* Soft Muted Gold */
+    --accent-rose: #e5a9a9;        /* Pastel Blush Pink */
+    --accent-green: #6b8e23;       /* Olive/Sage for active status */
+    --danger-red: #cd5c5c;         /* Crimson Blush for alert badges */
+    --text-dark: #2d3748;          /* Charcoal for reading text */
+    --text-light: #fdf8f7;         /* Warm Soft Cream text */
+    --border-color: #e2d4d4;       /* Soft Pinkish-Grey border lines */
+    
+    /* Newly Added System Theme Tones */
+    --corporate-slate: #2b3a4a;    /* Muted corporate slate for catalogs */
+    --corporate-slate-hover: #1f2b37;
+    --success-green: #1e7e34;
+    --success-bg: #e6f7ed;
+    --success-border: #c3ebd2;
+    --alert-bg: #ffebe6;
+    --alert-border: #ffd1c7;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    display: flex;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #fbf7f6;      /* Soft Vanilla Pearl global backdrop */
+    color: var(--text-dark);
+    min-height: 100vh;
+}
+
+/* Sidebar Structural Mechanics */
+.sidebar {
+    width: 260px;
+    height: 100vh;
+    background-color: var(--primary-bg);
+    color: var(--text-light);
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 3px 0 10px rgba(74, 46, 53, 0.15);
+    z-index: 100;
+}
+
+.sidebar h2 {
+    margin-top: 0;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    border-bottom: 2px solid var(--secondary-bg);
+    padding-bottom: 12px;
+    color: var(--accent-rose);
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+}
+
+.sidebar li {
+    margin-bottom: 8px;
+}
+
+.sidebar a {
+    color: #a39595;                /* Default muted navigation link color */
+    text-decoration: none;
+    font-weight: 600;
+    display: block;
+    padding: 12px;
+    border-radius: 6px;
+    transition: all 0.2s ease-in-out;
+}
+
+.sidebar a:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--text-light);
+    padding-left: 18px;
+}
+
+/* Dynamic Active State Matching Selection */
+.sidebar a.active-node-highlight {
+    color: #ffffff !important;
+    background-color: #634349 !important; /* Slightly lighter plum highlighting node context */
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    font-weight: 600;
+}
+
+/* Fixes content compression bugs */
+.main-stage {
+    margin-left: 260px; /* Perfectly offsets content to align right next to the fixed navigation panel */
+    padding: 40px;
+    width: calc(100% - 260px);
+    box-sizing: border-box;
+    flex-grow: 1;
+}
+
+.container, .card, .catalog-maintenance-card, .inventory-container-card {
+    background: #ffffff;
+    padding: 35px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(74, 46, 53, 0.04);
+    margin-bottom: 30px;
+    border: 1px solid var(--border-color);
+    width: 100%;
+}
+
+h1, h2, h3, .section-title {
+    color: #3a2226;
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+.section-subtitle {
+    color: #8c7e7e;
+    font-size: 14px;
+    margin-top: 0;
+    margin-bottom: 24px;
+}
+
+/* Form Layout Grids & Input Containers */
+.structured-catalog-form {
+    width: 100%;
+}
+
+.form-grid-layout {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.input-field-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.standard-fullwidth-override {
+    grid-column: span 2;
+}
+
+label {
+    display: block;
+    margin-top: 0;
+    font-weight: 600;
+    font-size: 13px;
+    color: #5c4d50;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 11px 14px;
+    margin-top: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 14px;
+    background-color: #fff;
+    color: var(--text-dark);
+    transition: all 0.15s ease-in-out;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent-rose);
+    box-shadow: 0 0 0 3px rgba(229, 169, 169, 0.25);
+}
+
+input:disabled, select:disabled {
+    background-color: #f5eded !important;
+    color: #8a7a7c !important;
+    cursor: not-allowed;
+    border-color: var(--border-color);
+}
+
+/* Button & Action Mechanics */
+.btn, button {
+    display: inline-block;
+    background-color: #b57c7c;
+    color: #ffffff;
+    border: none;
+    padding: 11px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn:hover, button:hover {
+    background-color: #966161;
+}
+
+/* Catalog Master File Commit Button Overrides */
+.btn-action-submit-catalog {
+    display: block;
+    width: 100%;
+    padding: 0.85rem 1.5rem;
+    margin-top: 20px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #ffffff;
+    background-color: var(--corporate-slate);
+    border: 1px solid var(--corporate-slate-hover);
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn-action-submit-catalog:hover {
+    background-color: var(--corporate-slate-hover);
+}
+
+.btn-action-submit-catalog:active {
+    transform: translateY(1px);
+}
+
+/* Responsive Table Infrastructure */
+.table-responsive-wrapper {
+    width: 100%;
+    margin-top: 20px;
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: #ffffff;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+}
+
+.branch-inventory-table {
+    width: 100%;
+}
+
+th, td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 14px;
+    vertical-align: middle;
+}
+
+th {
+    background-color: #fdfaf9;
+    color: #6e595b;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 12px;
+}
+
+tr:nth-child(even) {
+    background-color: #fffaf9;
+}
+
+tbody tr:hover {
+    background-color: #fff5f6;
+}
+
+/* Quantitative Tracking Badges */
+.stock-quantity-badge {
+    display: inline-block;
+    font-weight: 700;
+    background-color: #f0e6e6;
+    color: var(--text-dark);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-right: 4px;
+}
+
+/* Alert Flag Micro-Layout Elements */
+.alert-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.25px;
+}
+
+.secure-threshold-alert {
+    background-color: var(--success-bg);
+    color: var(--success-green);
+    border: 1px solid var(--success-border);
+}
+
+.low-threshold-alert {
+    background-color: var(--alert-bg);
+    color: var(--danger-red);
+    border: 1px solid var(--alert-border);
+}
+
+.empty-table-state-placeholder {
+    text-align: center;
+    color: #8c7e7e;
+    font-style: italic;
+    padding: 32px !important;
+}
+
+/* Flash alerts message blocks styling elements */
+.flashed-messages, .flash-container, .flash-alert {
+    background-color: #fceeed;
+    border-left: 4px solid var(--danger-red);
+    color: #7a4f52;
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+/* Responsive Scaling Viewport Matrix Overrides */
+@media (max-width: 768px) {
+    .form-grid-layout {
+        grid-template-columns: 1fr;
+    }
+    .standard-fullwidth-override {
+        grid-column: span 1;
+    }
+}
+
+```
