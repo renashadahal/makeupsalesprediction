@@ -1,23 +1,23 @@
 {% extends "base.html" %}
 {% block content %}
-<div style="max-width: 1000px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+<div class="max-w-5xl mx-auto px-4 py-8 space-y-8">
 
-    <div style="margin-bottom: 30px; border-bottom: 2px solid #eae2e2; padding-bottom: 15px;">
-        <h2 style="color: #3a2226; margin: 0 0 5px 0; font-size: 26px; font-weight: 600;">Inventory Ledger</h2>
-        <p style="color: #8c7e7e; font-size: 14px; margin: 0;">Log new shipments and monitor store stock balances.</p>
+    <div class="border-b border-noireText/10 pb-4">
+        <h2 class="text-4xl text-noireText font-serif">Inventory Ledger</h2>
+        <p class="text-xs text-noireText/60 font-light mt-1">Log new shipments and monitor store stock balances.</p>
     </div>
 
-    <div style="background: #ffffff; padding: 30px; border-radius: 8px; border: 1px solid #e6dede; box-shadow: 0 2px 8px rgba(0,0,0,0.03); margin-bottom: 35px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-            <h3 style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.8px; color: #705e61; margin: 0;">Log Shipments</h3>
+    <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
+        <div class="border-b border-noireText/10 pb-3 mb-6">
+            <h3 class="text-2xl text-noireText font-serif">Log Shipments</h3>
         </div>
         
-        <form action="{{ url_for('inventory_view') }}" method="POST" style="display: flex; flex-direction: column; gap: 20px;">
+        <form action="{{ url_for('inventory_view') }}" method="POST" class="space-y-6">
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start;">
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Select Brand</label>
-                    <select id="brand_select" name="brand" onchange="handleBrandChange()" required style="padding: 10px; border: 1px solid #cccccc; border-radius: 4px; background-color: #faf9f9; font-size: 14px; height: 42px; width: 100%;">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs tracking-wide">
+                <div class="flex flex-col gap-1.5">
+                    <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Select Brand</label>
+                    <select id="brand_select" name="brand" onchange="handleBrandChange()" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
                         <option value="">-- Choose Existing Brand --</option>
                         {% for brand in brands %}
                         <option value="{{ brand }}">{{ brand }}</option>
@@ -25,32 +25,35 @@
                     </select>
                 </div>
                 
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Select Product</label>
-                    <select id="product_select" name="product" onchange="handleProductChange()" required style="padding: 10px; border: 1px solid #cccccc; border-radius: 4px; background-color: #faf9f9; font-size: 14px; height: 42px; width: 100%;">
+                <div class="flex flex-col gap-1.5">
+                    <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Select Product</label>
+                    <select id="product_select" name="product" onchange="handleProductChange()" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
                         <option value="">-- Select Brand First --</option>
                     </select>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: end;">
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Unit Price ($)</label>
-                    <input type="text" id="price_input" name="price" placeholder="0.00" readonly style="padding: 10px; border: 1px solid #cccccc; border-radius: 4px; font-size: 14px; height: 42px; background-color: #f1eeee; color: #555555; box-sizing: border-box; width: 100%;">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs tracking-wide items-end">
+                <div class="flex flex-col gap-1.5">
+                    <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Unit Price ($)</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-2.5 text-noireText/50 font-medium">$</span>
+                        <input type="text" id="price_input" name="price" placeholder="0.00" readonly class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-velvet/20 border border-noireText/10 text-noireText font-mono font-medium focus:outline-none cursor-not-allowed text-sm">
+                    </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <label style="font-size: 13px; font-weight: 600; color: #4a3b3d;">Quantity Received</label>
-                    <input type="text" id="quantity_received" name="quantity_received" placeholder="e.g. 10" required style="padding: 10px; border: 1px solid #cccccc; border-radius: 4px; font-size: 14px; height: 42px; box-sizing: border-box; width: 100%;">
+                <div class="flex flex-col gap-1.5">
+                    <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Quantity Received</label>
+                    <input type="text" id="quantity_received" name="quantity_received" placeholder="e.g. 10" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
                 </div>
                 <div>
-                    <button type="submit" style="background: #4a2e35; color: white; border: none; padding: 0 24px; border-radius: 4px; font-size: 14px; font-weight: 600; height: 42px; width: 100%; cursor: pointer;">Log Stock Intake</button>
+                    <button type="submit" class="w-full px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md h-[44px]">Log Stock Intake</button>
                 </div>
             </div>
 
         </form>
     </div>
 
-    <div style="background: #ffffff; border-radius: 8px; border: 1px solid #e6dede; box-shadow: 0 2px 8px rgba(0,0,0,0.03); overflow: hidden;">
+    <div class="bg-white rounded-2xl border border-noireText/10 shadow-md overflow-hidden">
         <!-- Search & Filter Controls -->
         <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex flex-col md:flex-row gap-4 items-stretch md:items-end justify-between text-xs tracking-wide">
             <div class="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -101,44 +104,46 @@
             </button>
         </div>
 
-        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
-            <thead>
-                <tr style="background: #faf9f9; border-bottom: 2px solid #e6dede;">
-                    <th style="padding: 15px 20px; font-weight: 600; color: #4a3b3d; width: 25%;">Brand</th>
-                    <th style="padding: 15px 20px; font-weight: 600; color: #4a3b3d; width: 45%;">Product Description</th>
-                    <th style="padding: 15px 20px; font-weight: 600; color: #4a3b3d; width: 15%;">Stock Balance</th>
-                    <th style="padding: 15px 20px; font-weight: 600; color: #4a3b3d; width: 15%;">Alert Status</th>
-                </tr>
-            </thead>
-            <tbody id="inventory_table_body">
-                {% for item in inventory_items %}
-                {% set item_status = 'low' if item.stock|int < 10 else 'in-stock' %}
-                <tr class="inventory-row" data-brand="{{ item.brand }}" data-product="{{ item.product_name }}" data-status="{{ item_status }}" style="border-bottom: 1px solid #f0eae1;">
-                    <td style="padding: 15px 20px; font-weight: bold; color: #3a2226;">{{ item.brand }}</td>
-                    <td style="padding: 15px 20px; color: #555555;">{{ item.product_name }}</td>
-                    <td style="padding: 15px 20px; font-weight: 600; color: #3a2226;">{{ item.stock }} units</td>
-                    <td style="padding: 15px 20px;">
-                        {% if item.stock|int < 10 %}
-                            <span style="color: #c92a2a; background: #fff5f5; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block;">⚠️ Low Stock</span>
-                        {% else %}
-                            <span style="color: #2b8a3e; background: #f4fbf7; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block;">✓ In Stock</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="4" style="padding: 30px; text-align: center; color: #8c7e7e; font-style: italic; background: #faf9f9;">
-                        No stock ledger records found. Fill the form above to add inventory.
-                    </td>
-                </tr>
-                {% endfor %}
-                <tr id="no_results_row" style="display: none;">
-                    <td colspan="4" style="padding: 30px; text-align: center; color: #8c7e7e; font-style: italic; background: #faf9f9;">
-                        No matching ledger records found for current filters.
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+        <div class="overflow-x-auto w-full">
+            <table class="w-full text-left text-xs tracking-wide border-collapse min-w-[600px]">
+                <thead>
+                    <tr class="bg-parchment/20 border-b border-noireText/10 text-noireText/70 uppercase text-[10px] tracking-widest">
+                        <th class="py-4 px-6 font-semibold">Brand</th>
+                        <th class="py-4 px-6 font-semibold">Product Description</th>
+                        <th class="py-4 px-6 font-semibold">Stock Balance</th>
+                        <th class="py-4 px-6 font-semibold">Alert Status</th>
+                    </tr>
+                </thead>
+                <tbody id="inventory_table_body">
+                    {% for item in inventory_items %}
+                    {% set item_status = 'low' if item.stock|int < 10 else 'in-stock' %}
+                    <tr class="inventory-row border-b border-noireText/5 hover:bg-velvet/20 transition-colors" data-brand="{{ item.brand }}" data-product="{{ item.product_name }}" data-status="{{ item_status }}">
+                        <td class="py-4 px-6 font-bold text-noireText">{{ item.brand }}</td>
+                        <td class="py-4 px-6 text-noireText/80">{{ item.product_name }}</td>
+                        <td class="py-4 px-6 font-mono font-medium text-noireText">{{ item.stock }} units</td>
+                        <td class="py-4 px-6">
+                            {% if item.stock|int < 10 %}
+                                <span class="text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-block border border-rose-200/50">⚠️ Low Stock</span>
+                            {% else %}
+                                <span class="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-block border border-emerald-200/50">✓ In Stock</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="py-8 text-center text-noireText/40 italic text-sm">
+                            No stock ledger records found. Fill the form above to add inventory.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr id="no_results_row" style="display: none;">
+                        <td colspan="4" class="py-8 text-center text-noireText/40 italic text-sm">
+                            No matching ledger records found for current filters.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </div>
