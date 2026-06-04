@@ -51,6 +51,56 @@
     </div>
 
     <div style="background: #ffffff; border-radius: 8px; border: 1px solid #e6dede; box-shadow: 0 2px 8px rgba(0,0,0,0.03); overflow: hidden;">
+        <!-- Search & Filter Controls -->
+        <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex flex-col md:flex-row gap-4 items-stretch md:items-end justify-between text-xs tracking-wide">
+            <div class="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Search Box -->
+                <div class="flex flex-col gap-1.5">
+                    <label for="table_search" class="font-medium uppercase text-noireText/70 tracking-widest">Search Ledger</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-3 flex items-center text-noireText/40">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </span>
+                        <input type="text" id="table_search" placeholder="Type brand or product..." class="w-full pl-9 pr-4 py-2 rounded-lg bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
+                    </div>
+                </div>
+
+                <!-- Brand Filter -->
+                <div class="flex flex-col gap-1.5">
+                    <label for="table_filter_brand" class="font-medium uppercase text-noireText/70 tracking-widest">Filter by Brand</label>
+                    <select id="table_filter_brand" class="w-full px-3 py-2 rounded-lg bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
+                        <option value="">All Brands</option>
+                    </select>
+                </div>
+
+                <!-- Status Filter -->
+                <div class="flex flex-col gap-1.5">
+                    <label class="font-medium uppercase text-noireText/70 tracking-widest">Filter by Status</label>
+                    <div class="flex rounded-lg border border-noireText/10 overflow-hidden bg-white p-0.5 h-[38px]">
+                        <button type="button" data-status="" class="status-tab flex-1 py-1 px-3 rounded text-center transition-all font-medium text-xs bg-deepWine text-velvet">
+                            All
+                        </button>
+                        <button type="button" data-status="in-stock" class="status-tab flex-1 py-1 px-3 rounded text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
+                            In Stock
+                        </button>
+                        <button type="button" data-status="low" class="status-tab flex-1 py-1 px-3 rounded text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
+                            Low Stock
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clear Filters Button -->
+            <button id="clear_filters" type="button" class="px-4 py-2 border border-noireText/20 hover:border-noireText/40 rounded-lg text-noireText hover:bg-velvet/20 transition-all font-medium text-xs flex items-center justify-center gap-1.5 h-[38px]">
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17" />
+                </svg>
+                Reset
+            </button>
+        </div>
+
         <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
             <thead>
                 <tr style="background: #faf9f9; border-bottom: 2px solid #e6dede;">
@@ -60,9 +110,10 @@
                     <th style="padding: 15px 20px; font-weight: 600; color: #4a3b3d; width: 15%;">Alert Status</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="inventory_table_body">
                 {% for item in inventory_items %}
-                <tr style="border-bottom: 1px solid #f0eae1;">
+                {% set item_status = 'low' if item.stock|int < 10 else 'in-stock' %}
+                <tr class="inventory-row" data-brand="{{ item.brand }}" data-product="{{ item.product_name }}" data-status="{{ item_status }}" style="border-bottom: 1px solid #f0eae1;">
                     <td style="padding: 15px 20px; font-weight: bold; color: #3a2226;">{{ item.brand }}</td>
                     <td style="padding: 15px 20px; color: #555555;">{{ item.product_name }}</td>
                     <td style="padding: 15px 20px; font-weight: 600; color: #3a2226;">{{ item.stock }} units</td>
@@ -81,6 +132,11 @@
                     </td>
                 </tr>
                 {% endfor %}
+                <tr id="no_results_row" style="display: none;">
+                    <td colspan="4" style="padding: 30px; text-align: center; color: #8c7e7e; font-style: italic; background: #faf9f9;">
+                        No matching ledger records found for current filters.
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -126,5 +182,107 @@ function handleProductChange() {
         priceInput.value = '';
     }
 }
+
+// Table Search & Filtering Logic
+document.addEventListener("DOMContentLoaded", () => {
+    const searchInput = document.getElementById('table_search');
+    const brandSelect = document.getElementById('table_filter_brand');
+    const statusTabs = document.querySelectorAll('.status-tab');
+    const clearFiltersBtn = document.getElementById('clear_filters');
+    const tableBody = document.getElementById('inventory_table_body');
+    const tableRows = Array.from(tableBody.querySelectorAll('tr.inventory-row'));
+    const emptyRow = document.getElementById('no_results_row');
+    
+    let activeStatus = ""; // "" (All), "in-stock", "low"
+    
+    // Populate the Brand filter select dropdown dynamically based on available table rows
+    const brandsSet = new Set();
+    tableRows.forEach(row => {
+        const brand = row.dataset.brand;
+        if (brand) brandsSet.add(brand.trim());
+    });
+    
+    const sortedBrands = Array.from(brandsSet).sort();
+    sortedBrands.forEach(brand => {
+        const opt = document.createElement('option');
+        opt.value = brand;
+        opt.textContent = brand;
+        brandSelect.appendChild(opt);
+    });
+    
+    // Main Filter Logic
+    function applyFilters() {
+        const query = searchInput.value.toLowerCase().trim();
+        const selectedBrand = brandSelect.value;
+        let visibleCount = 0;
+        
+        tableRows.forEach(row => {
+            const brand = row.dataset.brand.toLowerCase();
+            const product = row.dataset.product.toLowerCase();
+            const status = row.dataset.status;
+            
+            // Query match
+            const matchesQuery = query === "" || brand.includes(query) || product.includes(query);
+            // Brand match
+            const matchesBrand = selectedBrand === "" || row.dataset.brand === selectedBrand;
+            // Status match
+            const matchesStatus = activeStatus === "" || status === activeStatus;
+            
+            if (matchesQuery && matchesBrand && matchesStatus) {
+                row.style.display = "";
+                visibleCount++;
+            } else {
+                row.style.display = "none";
+            }
+        });
+        
+        // Show/hide empty state
+        if (visibleCount === 0 && tableRows.length > 0) {
+            emptyRow.style.display = "";
+        } else {
+            emptyRow.style.display = "none";
+        }
+    }
+    
+    // Event Listeners
+    searchInput.addEventListener('input', applyFilters);
+    brandSelect.addEventListener('change', applyFilters);
+    
+    statusTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove active classes from all tabs
+            statusTabs.forEach(t => {
+                t.classList.remove('bg-deepWine', 'text-velvet');
+                t.classList.add('hover:bg-velvet/50', 'text-noireText/75');
+            });
+            // Add active classes to clicked tab
+            tab.classList.add('bg-deepWine', 'text-velvet');
+            tab.classList.remove('hover:bg-velvet/50', 'text-noireText/75');
+            
+            activeStatus = tab.dataset.status;
+            applyFilters();
+        });
+    });
+    
+    // Clear/Reset Filters
+    clearFiltersBtn.addEventListener('click', () => {
+        searchInput.value = "";
+        brandSelect.value = "";
+        
+        // Reset status tabs to "All"
+        statusTabs.forEach(tab => {
+            if (tab.dataset.status === "") {
+                tab.classList.add('bg-deepWine', 'text-velvet');
+                tab.classList.remove('hover:bg-velvet/50', 'text-noireText/75');
+            } else {
+                tab.classList.remove('bg-deepWine', 'text-velvet');
+                tab.classList.add('hover:bg-velvet/50', 'text-noireText/75');
+            }
+        });
+        
+        activeStatus = "";
+        applyFilters();
+    });
+});
 </script>
 {% endblock %}
