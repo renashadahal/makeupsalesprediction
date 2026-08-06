@@ -1,5 +1,10 @@
 # src/utils.py
 import os
+import sys
+
+# Ensure project root directory is in sys.path for cross-platform imports (Windows / macOS / Linux)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import csv
 from datetime import datetime
 from src.database import (

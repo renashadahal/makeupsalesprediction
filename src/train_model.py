@@ -1,47 +1,50 @@
 # src/train_model.py
+import os
+import sys
+
+# Ensure project root directory is in sys.path for cross-platform imports (Windows / macOS / Linux)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import sqlite3
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestRegressor
 import joblib
-import os
 from src.database import DB_PATH, get_db
 
 def load_training_data(db_path=DB_PATH):
     print("Step 1: Querying SQLite database tables...")
-    conn = get_db(db_path)
-    
-    # 1. Read historical sales baseline directly from SQLite
-    query_hist = """
-    SELECT 
-        date as Date,
-        branch_id as Store_ID,
-        product_id as Product_ID,
-        units_sold as Units_Sold,
-        inventory_level as Inventory_Level,
-        price as Price,
-        holiday_promotion as Holiday_Promotion
-    FROM historical_sales;
-    """
-    hist_df = pd.read_sql_query(query_hist, conn)
+    with get_db(db_path) as conn:
+        # 1. Read historical sales baseline directly from SQLite
+        query_hist = """
+        SELECT 
+            date as Date,
+            branch_id as Store_ID,
+            product_id as Product_ID,
+            units_sold as Units_Sold,
+            inventory_level as Inventory_Level,
+            price as Price,
+            holiday_promotion as Holiday_Promotion
+        FROM historical_sales;
+        """
+        hist_df = pd.read_sql_query(query_hist, conn)
 
-    # 2. Read live transaction items directly from SQLite
-    query_live = """
-    SELECT 
-        t.transaction_date as Date,
-        t.branch_id as Store_ID,
-        ti.product_id as Product_ID,
-        ti.quantity as Units_Sold,
-        COALESCE(i.stock, 10) as Inventory_Level,
-        ti.unit_price as Price,
-        CASE WHEN strftime('%m', t.transaction_date) IN ('09', '10', '11') THEN 1 ELSE 0 END as Holiday_Promotion
-    FROM transaction_items ti
-    JOIN transactions t ON ti.transaction_id = t.transaction_id
-    LEFT JOIN inventory i ON t.branch_id = i.branch_id AND ti.product_id = i.product_id;
-    """
-    live_df = pd.read_sql_query(query_live, conn)
-    conn.close()
+        # 2. Read live transaction items directly from SQLite
+        query_live = """
+        SELECT 
+            t.transaction_date as Date,
+            t.branch_id as Store_ID,
+            ti.product_id as Product_ID,
+            ti.quantity as Units_Sold,
+            COALESCE(i.stock, 10) as Inventory_Level,
+            ti.unit_price as Price,
+            CASE WHEN strftime('%m', t.transaction_date) IN ('09', '10', '11') THEN 1 ELSE 0 END as Holiday_Promotion
+        FROM transaction_items ti
+        JOIN transactions t ON ti.transaction_id = t.transaction_id
+        LEFT JOIN inventory i ON t.branch_id = i.branch_id AND ti.product_id = i.product_id;
+        """
+        live_df = pd.read_sql_query(query_live, conn)
 
     print("Step 2: Merging historical baseline with live SQLite transactions...")
     full_training_dataset = pd.concat([hist_df, live_df], ignore_index=True)
