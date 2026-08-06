@@ -298,28 +298,36 @@ def db_deduct_inventory_stock(branch, product_name, quantity_sold, db_path=DB_PA
     return False
 
 def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=DB_PATH):
-    """Executes atomic POS checkout transaction (header + items + stock deduction)."""
+    """Executes atomic POS checkout transaction (header + items + stock deduction) and returns detailed receipt data."""
     discount = 1.0
+    promo_code = promo_code.strip().upper()
     if promo_code == "FESTIVE10":
         discount = 0.90
     elif promo_code == "VALENTINE15":
         discount = 0.85
 
     today_date = datetime.now().strftime('%Y-%m-%d')
+    subtotal_before_discount = 0.0
     grand_total = 0.0
     processed_items = []
+    receipt_items = []
 
     with get_db(db_path) as conn:
         cursor = conn.cursor()
 
         for item in cart:
-            p_name = item['product_name']
-            brand_name = item['brand']
+            p_name = item['product_name'].strip()
+            brand_name = item['brand'].strip()
             qty = int(item['quantity'])
-            unit_price = float(item['price']) * discount
-            subtotal = unit_price * qty
-            grand_total += subtotal
-            shade = item.get('shade', 'Default')
+            orig_price = float(item['price'])
+            final_unit_price = orig_price * discount
+            
+            raw_subtotal = orig_price * qty
+            final_subtotal = final_unit_price * qty
+            
+            subtotal_before_discount += raw_subtotal
+            grand_total += final_subtotal
+            shade = item.get('shade', 'Default').strip() or 'Default'
 
             # Lookup product_id
             p_row = cursor.execute("""
@@ -329,7 +337,17 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
             """, (brand_name, p_name)).fetchone()
 
             p_id = p_row['product_id'] if p_row else "P0001"
-            processed_items.append((p_id, p_name, shade, qty, unit_price, subtotal))
+            processed_items.append((p_id, p_name, shade, qty, final_unit_price, final_subtotal))
+            receipt_items.append({
+                'product_id': p_id,
+                'brand': brand_name,
+                'product_name': p_name,
+                'shade': shade,
+                'quantity': qty,
+                'original_price': orig_price,
+                'final_unit_price': final_unit_price,
+                'subtotal': final_subtotal
+            })
 
         # Insert Transaction Header
         cursor.execute("""
@@ -350,8 +368,19 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
             WHERE branch_id = ? AND product_id = ?;
             """, (qty, branch, p_id))
 
-        conn.commit()
-        return True
+        return {
+            'transaction_id': tx_id,
+            'username': username,
+            'branch_id': branch,
+            'transaction_date': today_date,
+            'promo_code': promo_code if discount < 1.0 else '',
+            'discount_rate': discount,
+            'discount_percent': int(round((1.0 - discount) * 100)),
+            'subtotal_before_discount': round(subtotal_before_discount, 2),
+            'discount_amount': round(subtotal_before_discount - grand_total, 2),
+            'grand_total': round(grand_total, 2),
+            'items': receipt_items
+        }
 
 def db_calculate_rolling_lags(product_id, branch_id, default_mean=15.0, db_path=DB_PATH):
     """Fast SQL aggregation for 7-day and 14-day rolling mean sales."""

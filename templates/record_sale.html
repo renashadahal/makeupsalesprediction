@@ -1,11 +1,39 @@
 {% extends "base.html" %}
 {% block content %}
+<style>
+/* Print Stylesheet for Printable Receipt */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #printableReceipt, #printableReceipt * {
+        visibility: visible;
+    }
+    #printableReceipt {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 20px;
+        box-shadow: none !important;
+        border: none !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+    .no-print {
+        display: none !important;
+    }
+}
+</style>
+
 <div class="space-y-10 max-w-6xl mx-auto">
     
     <!-- Top Meta Panel Header -->
     <div class="border-b border-noireText/10 pb-4">
         <h2 class="text-4xl text-noireText font-serif">Sales Transactional Terminal</h2>
-        <p class="text-xs text-noireText/60 font-light mt-1">Process multi-item makeup checkouts logged under active branch ({{ session.get('branch', 'S001') }}).</p>
+        <p class="text-xs text-noireText/60 font-light mt-1">Process multi-item makeup checkouts logged under active branch node ({{ session.get('branch', 'S001') }}).</p>
     </div>
     
     <!-- Catalog Item Selection Matrix Card -->
@@ -55,7 +83,7 @@
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Unit Price ($)</label>
                     <div class="relative">
                         <span class="absolute left-4 top-2.5 text-noireText/50 font-medium">$</span>
-                        <input type="text" id="cart_price" readonly class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-velvet/20 border border-noireText/10 text-noireText font-mono font-medium focus:outline-none cursor-not-allowed">
+                        <input type="text" id="cart_price" readonly placeholder="0.00" class="w-full pl-8 pr-4 py-2.5 rounded-xl bg-velvet/20 border border-noireText/10 text-noireText font-mono font-medium focus:outline-none cursor-not-allowed">
                     </div>
                 </div>
 
@@ -76,7 +104,7 @@
         </div>
     </div>
 
-    <!-- Active Cart Table Ledger -->
+    <!-- Active Cart Table Ledger Card -->
     <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
         <div class="border-b border-noireText/10 pb-3 mb-4">
             <h3 class="text-2xl text-noireText font-serif">Active Multi-Item Cart Ledger</h3>
@@ -91,8 +119,9 @@
                         <th class="pb-3 px-2">Product Description</th>
                         <th class="pb-3 px-2">Shade</th>
                         <th class="pb-3 px-2">Unit Price</th>
-                        <th class="pb-3 px-2">Quantity</th>
-                        <th class="pb-3 px-2 text-right">Row Subtotal</th>
+                        <th class="pb-3 px-2">Qty</th>
+                        <th class="pb-3 px-2 text-right">Subtotal</th>
+                        <th class="pb-3 px-2 text-center">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-noireText/5 text-noireText">
@@ -100,14 +129,132 @@
             </table>
         </div>
 
-        <!-- Checkout Controls -->
-        <div class="mt-8 pt-6 border-t border-noireText/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 text-xs">
-            <div class="flex items-center gap-3">
-                <label class="font-medium uppercase text-noireText/70 tracking-widest whitespace-nowrap">Promo Code:</label>
-                <input type="text" id="promo_code" placeholder="e.g. FESTIVE10" class="px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText placeholder-noireText/30 focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose font-mono w-44 transition-all">
+        <!-- Promo Code & Financial Totals Breakdown -->
+        <div class="mt-8 pt-6 border-t border-noireText/10 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+            
+            <!-- Left: Promo Code Entry -->
+            <div class="space-y-3">
+                <label class="block font-medium uppercase text-noireText/70 tracking-widest">Apply Promotional Code</label>
+                <div class="flex items-center gap-3">
+                    <input type="text" id="promo_code" placeholder="e.g. FESTIVE10 or VALENTINE15" class="px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText uppercase placeholder-noireText/30 focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose font-mono flex-1 transition-all">
+                    <button type="button" id="applyPromoBtn" class="px-4 py-2.5 bg-dustyRose/20 hover:bg-dustyRose/30 text-noireText font-medium uppercase tracking-widest text-[11px] rounded-xl transition-all border border-dustyRose/40">
+                        Apply
+                    </button>
+                </div>
+                <p id="promoMessage" class="text-[11px] font-mono font-medium hidden"></p>
+                <div class="text-[10px] text-noireText/50 space-y-0.5">
+                    <p>💡 Available Promo Codes: <span class="font-mono text-dustyRose font-medium">FESTIVE10</span> (10% Off) | <span class="font-mono text-dustyRose font-medium">VALENTINE15</span> (15% Off)</p>
+                </div>
             </div>
-            <button id="checkoutBtn" class="bg-emerald-700 hover:bg-emerald-800 text-white font-medium uppercase tracking-widest px-6 py-3 rounded-xl transition-colors shadow-md text-center">
+
+            <!-- Right: Subtotal & Grand Total Summary Card -->
+            <div class="bg-velvet/40 p-4 rounded-xl border border-noireText/5 space-y-2 text-noireText font-mono">
+                <div class="flex justify-between items-center text-xs">
+                    <span class="text-noireText/60">Cart Subtotal:</span>
+                    <span id="summarySubtotal" class="font-medium">$0.00</span>
+                </div>
+                <div class="flex justify-between items-center text-xs text-emerald-700">
+                    <span>Promo Discount:</span>
+                    <span id="summaryDiscount" class="font-medium">-$0.00</span>
+                </div>
+                <div class="border-t border-noireText/10 pt-2 flex justify-between items-center text-sm font-bold text-noireText">
+                    <span class="font-serif uppercase tracking-wider text-xs">Grand Total:</span>
+                    <span id="summaryGrandTotal" class="text-emerald-800 font-mono">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Checkout Action Button -->
+        <div class="mt-6 pt-4 border-t border-noireText/5 flex justify-end">
+            <button id="checkoutBtn" class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-medium uppercase tracking-widest px-8 py-3.5 rounded-xl transition-colors shadow-lg text-xs">
                 Commit Cart & Finalize Checkout
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- PRINTABLE RECEIPT MODAL -->
+<div id="receiptModal" class="fixed inset-0 bg-noireText/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white text-noireText w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-noireText/10">
+        
+        <!-- Modal Printable Area -->
+        <div id="printableReceipt" class="p-8 space-y-6">
+            
+            <!-- Receipt Header -->
+            <div class="text-center border-b border-noireText/10 pb-4 space-y-1">
+                <h2 class="text-2xl font-serif font-bold uppercase tracking-widest text-noireText">Noire Beauty Store</h2>
+                <p class="text-xs text-noireText/60 font-mono">Retail Intelligence POS Network</p>
+                <p class="text-[11px] text-noireText/50 font-mono">Branch Node: <span id="r_branch" class="font-bold text-noireText">S001</span></p>
+            </div>
+
+            <!-- Receipt Meta Info -->
+            <div class="grid grid-cols-2 gap-2 text-xs font-mono border-b border-noireText/10 pb-4">
+                <div>
+                    <p class="text-noireText/50 text-[10px] uppercase">Transaction ID</p>
+                    <p id="r_tx_id" class="font-bold text-noireText">TX-0000000000</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-noireText/50 text-[10px] uppercase">Date & Time</p>
+                    <p id="r_date" class="font-medium">2026-08-06</p>
+                </div>
+                <div class="mt-1">
+                    <p class="text-noireText/50 text-[10px] uppercase">Operator</p>
+                    <p id="r_operator" class="font-medium">staff</p>
+                </div>
+                <div class="mt-1 text-right">
+                    <p class="text-noireText/50 text-[10px] uppercase">Payment Status</p>
+                    <p class="font-bold text-emerald-700 uppercase">PAID</p>
+                </div>
+            </div>
+
+            <!-- Receipt Items Table -->
+            <div>
+                <p class="text-[10px] font-mono uppercase text-noireText/50 tracking-wider mb-2">Purchased Items</p>
+                <table class="w-full text-xs font-mono text-left">
+                    <thead>
+                        <tr class="border-b border-noireText/10 text-[10px] text-noireText/50 uppercase">
+                            <th class="pb-1">Item</th>
+                            <th class="pb-1 text-center">Qty</th>
+                            <th class="pb-1 text-right">Price</th>
+                            <th class="pb-1 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="r_items_body" class="divide-y divide-noireText/5">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Receipt Financial Totals -->
+            <div class="border-t border-noireText/10 pt-4 space-y-1.5 font-mono text-xs">
+                <div class="flex justify-between text-noireText/70">
+                    <span>Subtotal:</span>
+                    <span id="r_subtotal">$0.00</span>
+                </div>
+                <div id="r_promo_row" class="flex justify-between text-emerald-700 hidden">
+                    <span>Discount (<span id="r_promo_code">FESTIVE10</span>):</span>
+                    <span id="r_discount">-$0.00</span>
+                </div>
+                <div class="border-t border-noireText/10 pt-2 flex justify-between text-sm font-bold text-noireText">
+                    <span>TOTAL PAID:</span>
+                    <span id="r_grand_total" class="text-emerald-800">$0.00</span>
+                </div>
+            </div>
+
+            <!-- Receipt Footer -->
+            <div class="text-center pt-4 border-t border-noireText/10 text-[11px] text-noireText/50 space-y-0.5">
+                <p class="font-serif italic font-medium text-noireText/80">Thank you for shopping at Noire Beauty!</p>
+                <p class="font-mono text-[10px]">Please retain this receipt for returns or exchanges.</p>
+            </div>
+        </div>
+
+        <!-- Modal Action Buttons (Hidden during print) -->
+        <div class="bg-gray-50 px-6 py-4 border-t border-noireText/10 flex justify-between items-center gap-4 no-print">
+            <button type="button" id="closeReceiptBtn" class="px-5 py-2.5 rounded-xl border border-noireText/20 text-noireText hover:bg-noireText/5 text-xs font-medium uppercase tracking-wider transition-all">
+                Close & Next Sale
+            </button>
+            <button type="button" id="printReceiptBtn" class="px-6 py-2.5 bg-deepWine hover:bg-noireText text-velvet rounded-xl text-xs font-medium uppercase tracking-widest transition-all shadow-md flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H7a2 2 0 00-2 2v4h10z"></path></svg>
+                Print Receipt
             </button>
         </div>
     </div>
@@ -120,7 +267,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     const prodSel = document.getElementById('cart_product');
     const shadeSel = document.getElementById('cart_shade');
     const priceInput = document.getElementById('cart_price');
+    const qtyInput = document.getElementById('cart_qty');
+    const promoInput = document.getElementById('promo_code');
+    const promoMsg = document.getElementById('promoMessage');
+    
     let activeCart = [];
+    let currentDiscountRate = 1.0;
+
+    // Helper: Reset Catalog Selection Controls cleanly
+    function clearCatalogSelection() {
+        brandSel.selectedIndex = 0;
+        
+        subcatSel.innerHTML = '<option value="" disabled selected>-- Select Brand First --</option>';
+        subcatSel.disabled = true;
+
+        prodSel.innerHTML = '<option value="" disabled selected>-- Select Subcat First --</option>';
+        prodSel.disabled = true;
+
+        shadeSel.innerHTML = '<option value="" disabled selected>-- Select Product First --</option>';
+        shadeSel.disabled = true;
+
+        priceInput.value = '';
+        qtyInput.value = '1';
+    }
 
     // Step 1: Load Brands
     try {
@@ -184,7 +353,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
 
-    // Step 5: Append to Cart
+    // Step 5: Append to Cart and CLEAR selection controls
     document.getElementById('addItemBtn').addEventListener('click', () => {
         if(!prodSel.value || !priceInput.value || priceInput.value === '...') {
             alert("Please select all catalog parameters first.");
@@ -192,26 +361,69 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         
         const rowItem = {
+            id: Date.now() + Math.random(),
             brand: brandSel.value,
             product_name: prodSel.value,
             shade: shadeSel.value || 'Default',
             price: parseFloat(priceInput.value),
-            quantity: parseInt(document.getElementById('cart_qty').value) || 1
+            quantity: parseInt(qtyInput.value) || 1
         };
         
         activeCart.push(rowItem);
         renderCartTable();
-        document.getElementById('cart_qty').value = 1;
+
+        // CLEAR SELECTION CONTROLS IMMEDIATELY
+        clearCatalogSelection();
     });
 
+    // Remove Item from Cart
+    window.removeItemFromCart = function(id) {
+        activeCart = activeCart.filter(item => item.id !== id);
+        renderCartTable();
+    };
+
+    // Calculate Promo Discount Live
+    function updatePromoDiscount() {
+        const promoVal = promoInput.value.trim().toUpperCase();
+        if (promoVal === "FESTIVE10") {
+            currentDiscountRate = 0.90;
+            promoMsg.className = "text-[11px] font-mono font-medium text-emerald-700 flex items-center gap-1";
+            promoMsg.innerHTML = "✓ FESTIVE10 applied! (10% Discount)";
+            promoMsg.classList.remove('hidden');
+        } else if (promoVal === "VALENTINE15") {
+            currentDiscountRate = 0.85;
+            promoMsg.className = "text-[11px] font-mono font-medium text-emerald-700 flex items-center gap-1";
+            promoMsg.innerHTML = "✓ VALENTINE15 applied! (15% Discount)";
+            promoMsg.classList.remove('hidden');
+        } else if (promoVal !== "") {
+            currentDiscountRate = 1.0;
+            promoMsg.className = "text-[11px] font-mono font-medium text-rose-600 flex items-center gap-1";
+            promoMsg.innerHTML = "✖ Invalid promo code.";
+            promoMsg.classList.remove('hidden');
+        } else {
+            currentDiscountRate = 1.0;
+            promoMsg.classList.add('hidden');
+        }
+        renderCartTotals();
+    }
+
+    document.getElementById('applyPromoBtn').addEventListener('click', updatePromoDiscount);
+    promoInput.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') updatePromoDiscount();
+    });
+
+    // Render Cart Table & Summary Totals
     function renderCartTable() {
         const tbody = document.querySelector('#cartTable tbody');
         tbody.innerHTML = '';
-        if(activeCart.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-noireText/40 italic">No items staged in cart.</td></tr>';
+        
+        if (activeCart.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="py-6 text-center text-noireText/40 italic">No items staged in cart.</td></tr>';
+            renderCartTotals();
             return;
         }
-        activeCart.forEach((item, index) => {
+
+        activeCart.forEach((item) => {
             const tr = document.createElement('tr');
             tr.className = "hover:bg-velvet/30 transition-colors";
             tr.innerHTML = `
@@ -223,13 +435,31 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <td class="py-3 px-2 font-mono">$${item.price.toFixed(2)}</td>
                 <td class="py-3 px-2 font-mono">${item.quantity}</td>
                 <td class="py-3 px-2 text-right font-mono font-medium text-noireText">$${(item.price * item.quantity).toFixed(2)}</td>
+                <td class="py-3 px-2 text-center">
+                    <button onclick="removeItemFromCart(${item.id})" class="text-rose-600 hover:text-rose-800 font-bold px-2 py-1 text-xs">✖</button>
+                </td>
             `;
             tbody.appendChild(tr);
         });
+
+        renderCartTotals();
     }
+
+    function renderCartTotals() {
+        const subtotal = activeCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const discountAmount = subtotal * (1.0 - currentDiscountRate);
+        const grandTotal = subtotal - discountAmount;
+
+        document.getElementById('summarySubtotal').textContent = `$${subtotal.toFixed(2)}`;
+        document.getElementById('summaryDiscount').textContent = `-$${discountAmount.toFixed(2)}`;
+        document.getElementById('summaryGrandTotal').textContent = `$${grandTotal.toFixed(2)}`;
+    }
+
     renderCartTable();
 
-    // Step 6: Dispatch Cart to Backend (Triggers Stock Deduction)
+    // Step 6: Dispatch Cart to Backend & Show Printable Receipt Modal
+    const receiptModal = document.getElementById('receiptModal');
+
     document.getElementById('checkoutBtn').addEventListener('click', async () => {
         if(activeCart.length === 0) return alert("Active cart must have at least one valid item.");
         
@@ -239,21 +469,75 @@ document.addEventListener("DOMContentLoaded", async () => {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     cart: activeCart,
-                    promo_code: document.getElementById('promo_code').value
+                    promo_code: promoInput.value
                 })
             });
             const result = await response.json();
-            if(result.status === 'success') {
-                alert(`Checkout completed! Transaction ID: ${result.transaction_id}`);
+
+            if (result.status === 'success' && result.receipt) {
+                const r = result.receipt;
+                
+                // Populate Receipt Modal Data
+                document.getElementById('r_branch').textContent = r.branch_id;
+                document.getElementById('r_tx_id').textContent = r.transaction_id;
+                document.getElementById('r_date').textContent = r.transaction_date;
+                document.getElementById('r_operator').textContent = r.username;
+
+                // Populate Receipt Table
+                const rBody = document.getElementById('r_items_body');
+                rBody.innerHTML = '';
+                r.items.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="py-1">
+                            <span class="font-bold">${item.brand}</span> ${item.product_name} 
+                            <span class="text-[9px] text-noireText/60">(${item.shade})</span>
+                        </td>
+                        <td class="py-1 text-center">${item.quantity}</td>
+                        <td class="py-1 text-right">$${item.final_unit_price.toFixed(2)}</td>
+                        <td class="py-1 text-right font-bold">$${item.subtotal.toFixed(2)}</td>
+                    `;
+                    rBody.appendChild(row);
+                });
+
+                // Populate Receipt Financial Totals
+                document.getElementById('r_subtotal').textContent = `$${r.subtotal_before_discount.toFixed(2)}`;
+                if (r.discount_amount > 0) {
+                    document.getElementById('r_promo_code').textContent = `${r.promo_code} (-${r.discount_percent}%)`;
+                    document.getElementById('r_discount').textContent = `-$${r.discount_amount.toFixed(2)}`;
+                    document.getElementById('r_promo_row').classList.remove('hidden');
+                } else {
+                    document.getElementById('r_promo_row').classList.add('hidden');
+                }
+                document.getElementById('r_grand_total').textContent = `$${r.grand_total.toFixed(2)}`;
+
+                // Show Modal
+                receiptModal.classList.remove('hidden');
+
+                // Clear Active Cart & Promo Inputs
                 activeCart = [];
+                currentDiscountRate = 1.0;
+                promoInput.value = '';
+                promoMsg.classList.add('hidden');
+                clearCatalogSelection();
                 renderCartTable();
-                document.getElementById('promo_code').value = '';
+
             } else {
                 alert(`Error: ${result.message || 'Checkout failed.'}`);
             }
         } catch(e) {
             alert("Network error processing transaction.");
         }
+    });
+
+    // Close Receipt Modal
+    document.getElementById('closeReceiptBtn').addEventListener('click', () => {
+        receiptModal.classList.add('hidden');
+    });
+
+    // Print Receipt
+    document.getElementById('printReceiptBtn').addEventListener('click', () => {
+        window.print();
     });
 });
 </script>

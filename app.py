@@ -274,9 +274,9 @@ def record_sale():
         current_user = session.get('username', 'staff')
 
         # Execute atomic POS transaction in SQLite
-        db_record_transaction(tx_id, current_user, current_branch, cart, promo_code=promo)
+        receipt = db_record_transaction(tx_id, current_user, current_branch, cart, promo_code=promo)
 
-        return jsonify({'status': 'success', 'transaction_id': tx_id})
+        return jsonify({'status': 'success', 'transaction_id': tx_id, 'receipt': receipt})
         
     return render_template('record_sale.html')
 
