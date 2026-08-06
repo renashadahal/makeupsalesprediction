@@ -143,7 +143,7 @@ python3 -m venv .venv
 # On macOS/Linux:
 source .venv/bin/activate
 # On Windows:
-# .venv\Scripts\activate
+.venv\Scripts\activate
 
 # Install required packages
 pip install flask pandas numpy scikit-learn joblib pytest werkzeug
