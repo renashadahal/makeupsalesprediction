@@ -159,7 +159,7 @@ uv pip install flask pandas numpy scikit-learn joblib pytest werkzeug
 Migrate the flat CSV datasets into the normalized SQLite database (`data/noire_retail.db`):
 
 ```bash
-PYTHONPATH=. python src/migrate_to_sqlite.py
+python src/migrate_to_sqlite.py
 ```
 *Expected Output:*
 ```text
@@ -175,7 +175,7 @@ PYTHONPATH=. python src/migrate_to_sqlite.py
 Generate the Random Forest predictive model assets:
 
 ```bash
-PYTHONPATH=. python src/train_model.py
+python src/train_model.py
 ```
 *Expected Output:*
 ```text
@@ -190,7 +190,7 @@ Model serialized and outputted to disk successfully as models/demand_model.pkl.
 Start the Flask development server:
 
 ```bash
-PYTHONPATH=. python app.py
+python app.py
 ```
 Open your browser and navigate to: `http://127.0.0.1:5000`
 
@@ -227,7 +227,7 @@ Navigate to `/forecast` in the web app, select a brand and product item. The sys
 Run the Pytest suite to verify security, database isolation, POS workflows, and prediction endpoints:
 
 ```bash
-PYTHONPATH=. pytest tests/test_app.py -v
+pytest tests/test_app.py -v
 ```
 
 *Expected Result:*
