@@ -188,8 +188,9 @@ def test_record_sale_negative_quantity_rejection(client):
 
 def test_catalog_metadata_preservation():
     unique_prod = f"Blush_{uuid.uuid4().hex[:4]}"
-    update_inventory_stock("S001", "NARS", unique_prod, 15, product_id="PROD-9999", subcategory="blush")
+    unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S001", "NARS", unique_prod, 15, product_id=unique_pid, subcategory="blush")
     inv = load_inventory(branch="S001")
     match = next(i for i in inv if i['product_name'] == unique_prod)
-    assert match['product_id'] == "PROD-9999"
+    assert match['product_id'] == unique_pid
     assert match['subcategory'] == "blush"

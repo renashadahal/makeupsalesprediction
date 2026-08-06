@@ -1,67 +1,50 @@
 # src/train_model.py
+import sqlite3
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestRegressor
 import joblib
 import os
+from src.database import DB_PATH, get_db
 
-def load_training_data():
-    print("Step 1: Loading datasets...")
-    makeup_df = pd.read_csv('data/makeup_data.csv')
-    inventory_df = pd.read_csv('data/inventory.csv')
-    sales_df = pd.read_csv('data/sales_history.csv')
+def load_training_data(db_path=DB_PATH):
+    print("Step 1: Querying SQLite database tables...")
+    conn = get_db(db_path)
     
-    print("Step 2: Processing live sales data with accurate domain features...")
-    # Standardize columns from sales_history to match makeup_data
-    processed_sales = sales_df.rename(columns={
-        'branch': 'Store_ID',
-        'quantity': 'Units_Sold',
-        'price': 'Price',
-        'date': 'Date'
-    }).copy()
-    
-    # Enrich live sales with product metadata from inventory catalog
-    catalog_cols = ['product_name', 'brand', 'Product_ID', 'category', 'subcategory']
-    # Filter inventory_df to unique product entries to prevent duplicate rows during merge
-    unique_catalog = inventory_df[catalog_cols].drop_duplicates(subset=['product_name', 'brand'])
-    
-    processed_sales = pd.merge(
-        processed_sales, 
-        unique_catalog, 
-        on=['product_name', 'brand'], 
-        how='left'
-    )
-    
-    # Create store mapping for Region and Location_Detail
-    store_mapping = makeup_df[['Store_ID', 'Region', 'Location_Detail']].drop_duplicates(subset=['Store_ID'])
-    processed_sales = pd.merge(processed_sales, store_mapping, on='Store_ID', how='left')
-    
-    # Calculate real domain features: Holiday_Promotion from Date, Inventory_Level from catalog
-    processed_sales['Date_dt'] = pd.to_datetime(processed_sales['Date'], errors='coerce')
-    processed_sales['Holiday_Promotion'] = processed_sales['Date_dt'].dt.month.isin([9, 10, 11]).astype(int)
-    
-    # Lookup inventory stock level per branch and product
-    inv_stock_map = inventory_df.set_index(['branch', 'product_name'])['stock'].to_dict()
-    processed_sales['Inventory_Level'] = processed_sales.apply(
-        lambda r: inv_stock_map.get((r['Store_ID'], r['product_name']), 20), axis=1
-    )
-    
-    final_cols = [
-        'Date', 'Store_ID', 'Product_ID', 'brand', 'subcategory', 
-        'product_name', 'category', 'Region', 'Location_Detail', 
-        'Units_Sold', 'Inventory_Level', 'Price', 'Holiday_Promotion'
-    ]
-    
-    # Ensure all required columns exist
-    for col in final_cols:
-        if col not in processed_sales.columns:
-            processed_sales[col] = 'Unknown' if col in ['Product_ID', 'subcategory', 'category'] else 0
+    # 1. Read historical sales baseline directly from SQLite
+    query_hist = """
+    SELECT 
+        date as Date,
+        branch_id as Store_ID,
+        product_id as Product_ID,
+        units_sold as Units_Sold,
+        inventory_level as Inventory_Level,
+        price as Price,
+        holiday_promotion as Holiday_Promotion
+    FROM historical_sales;
+    """
+    hist_df = pd.read_sql_query(query_hist, conn)
 
-    processed_sales = processed_sales[final_cols]
-    
-    print("Step 3: Merging historical baseline with live data...")
-    full_training_dataset = pd.concat([makeup_df, processed_sales], ignore_index=True)
+    # 2. Read live transaction items directly from SQLite
+    query_live = """
+    SELECT 
+        t.transaction_date as Date,
+        t.branch_id as Store_ID,
+        ti.product_id as Product_ID,
+        ti.quantity as Units_Sold,
+        COALESCE(i.stock, 10) as Inventory_Level,
+        ti.unit_price as Price,
+        CASE WHEN strftime('%m', t.transaction_date) IN ('09', '10', '11') THEN 1 ELSE 0 END as Holiday_Promotion
+    FROM transaction_items ti
+    JOIN transactions t ON ti.transaction_id = t.transaction_id
+    LEFT JOIN inventory i ON t.branch_id = i.branch_id AND ti.product_id = i.product_id;
+    """
+    live_df = pd.read_sql_query(query_live, conn)
+    conn.close()
+
+    print("Step 2: Merging historical baseline with live SQLite transactions...")
+    full_training_dataset = pd.concat([hist_df, live_df], ignore_index=True)
     full_training_dataset = full_training_dataset.sort_values(by='Date').reset_index(drop=True)
     
     print(f"Dataset successfully connected! Total records ready for AI training: {len(full_training_dataset)} rows.")

@@ -1,23 +1,22 @@
 from flask import Flask, request, redirect, session, render_template, url_for, jsonify, flash
-import csv
 import os
 import joblib
 import numpy as np
 from datetime import datetime, timedelta
 from functools import wraps
 
-from src.utils import (
-    verify_user, load_users, save_user, 
-    load_inventory, update_inventory_stock, deduct_inventory_stock,
-    get_catalog_shades, calculate_rolling_lags,
-    USERS_CSV, INVENTORY_CSV, SALES_CSV, MAKEUP_DATA_CSV
+from src.database import (
+    init_db, get_db, db_verify_user, db_load_users, db_save_user,
+    db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
+    db_record_transaction, db_calculate_rolling_lags, DB_PATH
 )
+from src.utils import get_catalog_shades
 
 app = Flask(__name__)
-# Generate secret key safely or use secure fallback
 app.secret_key = os.environ.get('SECRET_KEY', 'noire_intelligence_matrix_secure_key_2026')
 
-DATA_PATH = MAKEUP_DATA_CSV
+# Initialize SQLite database schema on startup
+init_db(DB_PATH)
 
 # --- AUTHENTICATION & AUTHORIZATION DECORATORS ---
 
@@ -54,7 +53,7 @@ def login():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         
-        user_info = verify_user(username, password)
+        user_info = db_verify_user(username, password)
         if user_info:
             session['username'] = user_info['username']
             session['role'] = user_info['role']
@@ -88,46 +87,56 @@ def logout():
 @login_required
 def dashboard():
     current_branch = session.get('branch', 'S001')
-    low_stock_count = 0
-    today_sales_count = 0
-    
-    # 1. Low stock count for active branch
-    inv_items = load_inventory(branch=current_branch)
-    low_stock_count = sum(1 for item in inv_items if item['stock'] < 10)
-
-    # 2. Today's sales count for active branch
     today_str = datetime.now().strftime('%Y-%m-%d')
+    
+    inv_items = db_load_inventory(branch=current_branch)
+    low_stock_count = sum(1 for item in inv_items if item['stock'] < 10)
+    today_sales_count = 0
     brand_counts = {}
     subcat_counts = {}
     sales_by_date = {}
 
-    if os.path.exists(SALES_CSV):
-        try:
-            with open(SALES_CSV, mode='r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    r_branch = row.get('branch', '').strip()
-                    if r_branch == current_branch or not r_branch:
-                        date_val = row.get('date', '').strip()
-                        qty = int(float(row.get('quantity', 1)))
-                        brand = row.get('brand', 'Generic').strip()
-                        
-                        if date_val == today_str:
-                            today_sales_count += qty
-                        
-                        if date_val:
-                            sales_by_date[date_val] = sales_by_date.get(date_val, 0) + qty
-                            
-                        brand_counts[brand] = brand_counts.get(brand, 0) + qty
-        except Exception as e:
-            print(f"Error loading sales analytics: {e}")
+    with get_db() as conn:
+        # 1. Today's sales count
+        t_row = conn.execute("""
+        SELECT SUM(ti.quantity) as total_qty 
+        FROM transaction_items ti
+        JOIN transactions t ON ti.transaction_id = t.transaction_id
+        WHERE t.branch_id = ? AND t.transaction_date = ?;
+        """, (current_branch, today_str)).fetchone()
+        today_sales_count = int(t_row['total_qty']) if t_row and t_row['total_qty'] else 0
 
-    # Also compute subcategory metrics from active inventory items
+        # 2. Sales volume by brand
+        b_rows = conn.execute("""
+        SELECT b.brand_name, SUM(ti.quantity) as qty
+        FROM transaction_items ti
+        JOIN transactions t ON ti.transaction_id = t.transaction_id
+        JOIN products p ON ti.product_id = p.product_id
+        JOIN brands b ON p.brand_id = b.brand_id
+        WHERE t.branch_id = ?
+        GROUP BY b.brand_name;
+        """, (current_branch,)).fetchall()
+        for r in b_rows:
+            brand_counts[r['brand_name']] = r['qty']
+
+        # 3. Past 30 days daily sales trend
+        thirty_days_ago = (datetime.now() - timedelta(days=29)).strftime('%Y-%m-%d')
+        d_rows = conn.execute("""
+        SELECT t.transaction_date, SUM(ti.quantity) as qty
+        FROM transaction_items ti
+        JOIN transactions t ON ti.transaction_id = t.transaction_id
+        WHERE t.branch_id = ? AND t.transaction_date >= ?
+        GROUP BY t.transaction_date;
+        """, (current_branch, thirty_days_ago)).fetchall()
+        for r in d_rows:
+            sales_by_date[r['transaction_date']] = r['qty']
+
+    # Subcategory breakdown from active inventory stock
     for item in inv_items:
         subc = item.get('subcategory', 'general').capitalize()
         subcat_counts[subc] = subcat_counts.get(subc, 0) + item['stock']
 
-    # 3. Dynamic past 30 days trend line
+    # Populate 30-day timeline array
     date_labels = []
     thirty_day_sales_data = []
     for i in range(29, -1, -1):
@@ -135,7 +144,6 @@ def dashboard():
         dt_str = dt_obj.strftime('%Y-%m-%d')
         lbl_str = dt_obj.strftime('%m/%d')
         date_labels.append(lbl_str)
-        # Pull actual sales volume if present, or zero
         thirty_day_sales_data.append(sales_by_date.get(dt_str, 0))
 
     brand_labels = list(brand_counts.keys()) if brand_counts else ["Maybelline", "MAC", "Clinique", "Estee Lauder"]
@@ -147,7 +155,7 @@ def dashboard():
     return render_template(
         'dashboard.html',
         low_stock_count=low_stock_count,
-        forecast_mode=f"Active ({current_branch} Random Forest Pipeline)",
+        forecast_mode=f"Active ({current_branch} SQLite RF Pipeline)",
         today_sales_count=today_sales_count,
         date_labels=date_labels,
         thirty_day_sales_data=thirty_day_sales_data,
@@ -163,63 +171,50 @@ def dashboard():
 @app.route('/api/catalog/brands')
 @login_required
 def get_brands():
-    brands = set()
-    current_branch = session.get('branch', 'S001')
-    inv_items = load_inventory(branch=current_branch)
-    for item in inv_items:
-        if item['brand']:
-            brands.add(item['brand'])
-            
-    if not brands and os.path.exists(DATA_PATH):
-        with open(DATA_PATH, mode='r', encoding='utf-8') as f:
-            for row in csv.DictReader(f):
-                if row.get('brand'): brands.add(row['brand'].strip())
-                
-    return jsonify(sorted(list(brands)))
+    with get_db() as conn:
+        rows = conn.execute("SELECT brand_name FROM brands ORDER BY brand_name;").fetchall()
+        return jsonify([r['brand_name'] for r in rows])
 
 @app.route('/api/catalog/subcategories')
 @login_required
 def get_subcategories():
     brand = request.args.get('brand')
-    subcats = set()
-    current_branch = session.get('branch', 'S001')
-    
-    inv_items = load_inventory(branch=current_branch)
-    for item in inv_items:
-        if item['brand'] == brand and item['subcategory']:
-            subcats.add(item['subcategory'])
-            
-    if not subcats and os.path.exists(DATA_PATH):
-        with open(DATA_PATH, mode='r', encoding='utf-8') as f:
-            for row in csv.DictReader(f):
-                if row.get('brand') == brand and row.get('subcategory'):
-                    subcats.add(row['subcategory'].strip())
-                    
-    return jsonify(sorted(list(subcats)))
+    with get_db() as conn:
+        query = """
+        SELECT DISTINCT s.subcategory_name FROM subcategories s
+        JOIN products p ON s.subcategory_id = p.subcategory_id
+        JOIN brands b ON p.brand_id = b.brand_id
+        """
+        params = []
+        if brand:
+            query += " WHERE b.brand_name = ?"
+            params.append(brand)
+        query += " ORDER BY s.subcategory_name;"
+        rows = conn.execute(query, params).fetchall()
+        return jsonify([r['subcategory_name'] for r in rows])
 
 @app.route('/api/catalog/products')
 @login_required
 def get_products():
     brand = request.args.get('brand')
     subcat = request.args.get('subcategory')
-    products = set()
-    current_branch = session.get('branch', 'S001')
-
-    inv_items = load_inventory(branch=current_branch)
-    for item in inv_items:
-        if item['brand'] == brand:
-            if not subcat or item['subcategory'] == subcat:
-                products.add(item['product_name'])
-
-    if not products and os.path.exists(DATA_PATH):
-        with open(DATA_PATH, mode='r', encoding='utf-8') as f:
-            for row in csv.DictReader(f):
-                if row.get('brand') == brand:
-                    if not subcat or row.get('subcategory') == subcat:
-                        if row.get('product_name'):
-                            products.add(row['product_name'].strip())
-
-    return jsonify(sorted(list(products)))
+    with get_db() as conn:
+        query = """
+        SELECT DISTINCT p.product_name FROM products p
+        JOIN brands b ON p.brand_id = b.brand_id
+        JOIN subcategories s ON p.subcategory_id = s.subcategory_id
+        WHERE 1=1
+        """
+        params = []
+        if brand:
+            query += " AND b.brand_name = ?"
+            params.append(brand)
+        if subcat:
+            query += " AND s.subcategory_name = ?"
+            params.append(subcat)
+        query += " ORDER BY p.product_name;"
+        rows = conn.execute(query, params).fetchall()
+        return jsonify([r['product_name'] for r in rows])
 
 @app.route('/api/catalog/product_details')
 @login_required
@@ -227,34 +222,22 @@ def get_product_details():
     prod_name = request.args.get('product_name')
     current_branch = session.get('branch', 'S001')
     
-    product_id = 'P0001'
-    price = 25.00
-    stock = 0
+    with get_db() as conn:
+        row = conn.execute("""
+        SELECT p.product_id, p.base_price, COALESCE(i.stock, 0) as stock
+        FROM products p
+        LEFT JOIN inventory i ON p.product_id = i.product_id AND i.branch_id = ?
+        WHERE p.product_name = ?;
+        """, (current_branch, prod_name)).fetchone()
 
-    inv_items = load_inventory(branch=current_branch)
-    for item in inv_items:
-        if item['product_name'] == prod_name:
-            product_id = item['product_id'] or product_id
-            stock = item['stock']
-            break
+        if row:
+            return jsonify({
+                'product_id': row['product_id'],
+                'price': float(row['base_price']),
+                'stock': int(row['stock'])
+            })
 
-    if os.path.exists(DATA_PATH):
-        with open(DATA_PATH, mode='r', encoding='utf-8') as f:
-            for row in csv.DictReader(f):
-                if row.get('product_name') == prod_name:
-                    if not product_id or product_id == 'P0001':
-                        product_id = row.get('Product_ID', 'P0001').strip()
-                    try:
-                        price = float(row.get('Price', price))
-                    except ValueError:
-                        pass
-                    break
-
-    return jsonify({
-        'product_id': product_id,
-        'price': price,
-        'stock': stock
-    })
+    return jsonify({'product_id': 'P0001', 'price': 25.00, 'stock': 0})
 
 @app.route('/api/catalog/shades')
 @login_required
@@ -263,7 +246,7 @@ def get_shades():
     shades = get_catalog_shades(prod_name)
     return jsonify(shades)
 
-# --- TRANSACTION POS SYSTEM ---
+# --- POS TRANSACTIONS SYSTEM ---
 
 @app.route('/record_sale', methods=['GET', 'POST'])
 @login_required
@@ -272,42 +255,26 @@ def record_sale():
         payload = request.get_json() or {}
         cart = payload.get('cart', [])
         promo = payload.get('promo_code', '').strip()
-        
-        discount = 1.0
-        if promo == "FESTIVE10":
-            discount = 0.90
-        elif promo == "VALENTINE15":
-            discount = 0.85
+
+        if not cart:
+            return jsonify({'status': 'error', 'message': 'Cart cannot be empty.'}), 400
+
+        for item in cart:
+            try:
+                price_val = float(item.get('price', 0))
+                qty = int(item.get('quantity', 0))
+            except (ValueError, TypeError):
+                return jsonify({'status': 'error', 'message': 'Invalid price or quantity parameters passed.'}), 400
+
+            if qty <= 0 or price_val < 0:
+                return jsonify({'status': 'error', 'message': 'Quantity must be positive and price cannot be negative.'}), 400
 
         tx_id = f"TX-{int(datetime.now().timestamp())}"
         current_branch = session.get('branch', 'S001')
         current_user = session.get('username', 'staff')
-        today_date = datetime.now().strftime('%Y-%m-%d')
-        
-        with open(SALES_CSV, mode='a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            for item in cart:
-                try:
-                    price_val = float(item.get('price', 0))
-                    qty = int(item.get('quantity', 0))
-                except (ValueError, TypeError):
-                    return jsonify({'status': 'error', 'message': 'Invalid price or quantity parameters passed.'}), 400
 
-                if qty <= 0 or price_val < 0:
-                    return jsonify({'status': 'error', 'message': 'Quantity must be positive and price cannot be negative.'}), 400
-
-                final_unit_price = price_val * discount
-                total_cost = final_unit_price * qty
-                shade = item.get('shade', 'Default')
-                
-                writer.writerow([
-                    tx_id, current_user, current_branch,
-                    item['brand'], item['product_name'], shade,
-                    qty, final_unit_price, total_cost, today_date
-                ])
-                
-                # Automatically deduct quantity sold from active branch inventory
-                deduct_inventory_stock(current_branch, item['product_name'], qty)
+        # Execute atomic POS transaction in SQLite
+        db_record_transaction(tx_id, current_user, current_branch, cart, promo_code=promo)
 
         return jsonify({'status': 'success', 'transaction_id': tx_id})
         
@@ -326,11 +293,11 @@ def inventory_view():
         quantity_added = request.form.get('quantity_received', '0').strip()
 
         if brand and product_name and quantity_added.isdigit():
-            update_inventory_stock(current_branch, brand, product_name, int(quantity_added))
+            db_update_inventory_stock(current_branch, brand, product_name, int(quantity_added))
             flash(f"Stock ledger updated for Branch {current_branch}: Added {quantity_added} units of {product_name}.")
             return redirect(url_for('inventory_view'))
 
-    inventory_items = load_inventory(branch=current_branch)
+    inventory_items = db_load_inventory(branch=current_branch)
 
     # Build brand catalog map for dropdown cascading
     catalog_map = {}
@@ -342,28 +309,9 @@ def inventory_view():
         subcat = item['subcategory']
         if subcat: all_subcategories.add(subcat)
         if b_name and p_name:
-            if b_name not in catalog_map:
-                catalog_map[b_name] = []
+            if b_name not in catalog_map: catalog_map[b_name] = []
             if not any(i['name'] == p_name for i in catalog_map[b_name]):
-                catalog_map[b_name].append({'name': p_name, 'price': 25.00})
-
-    if os.path.exists(DATA_PATH):
-        with open(DATA_PATH, mode='r', encoding='utf-8') as f:
-            for row in csv.DictReader(f):
-                b_name = row.get('brand', '').strip()
-                p_name = row.get('product_name', '').strip()
-                subcat = row.get('subcategory', '').strip()
-                try: p_price = float(row.get('Price', 25.0))
-                except ValueError: p_price = 25.0
-                
-                if subcat: all_subcategories.add(subcat)
-                if b_name and p_name:
-                    if b_name not in catalog_map: catalog_map[b_name] = []
-                    existing = next((i for i in catalog_map[b_name] if i['name'] == p_name), None)
-                    if not existing:
-                        catalog_map[b_name].append({'name': p_name, 'price': p_price})
-                    else:
-                        existing['price'] = p_price
+                catalog_map[b_name].append({'name': p_name, 'price': item['price']})
 
     return render_template(
         'inventory.html', 
@@ -397,12 +345,10 @@ def predict():
     stock_val = int(input_data.get('stock', 10))
     holiday_ctx = input_data.get('holiday_context', 'none')
 
-    # Determine promotional surge flag
     curr_month = datetime.now().month
     is_holiday_ctx = holiday_ctx in ['valentines', 'festive', 'clearance'] or curr_month in [9, 10, 11]
     holiday_surge_flag = 1 if is_holiday_ctx else 0
 
-    # Encoding product and store IDs with unknown fallback support
     le_prod = encoders['Product_ID']
     le_store = encoders['Store_ID']
 
@@ -416,9 +362,8 @@ def predict():
     except Exception:
         store_enc = le_store.transform(['UNKNOWN'])[0] if 'UNKNOWN' in le_store.classes_ else 0
 
-    # Calculate domain rolling lags incorporating live transaction data
     global_mean = encoders.get('Global_Sales_Mean', 15.0)
-    lag_7d, lag_14d = calculate_rolling_lags(product_id, branch_id, default_mean=global_mean)
+    lag_7d, lag_14d = db_calculate_rolling_lags(product_id, branch_id, default_mean=global_mean)
 
     price_inventory_ratio = price_val / (stock_val + 1)
 
@@ -429,7 +374,6 @@ def predict():
     prediction = model.predict(feature_vector)[0]
     predicted_units = max(0, int(round(prediction)))
 
-    # Compute inventory advisory
     rec = "Stock parameters optimal. Current inventory satisfies predicted branch demand."
     if stock_val < predicted_units:
         deficit = predicted_units - stock_val
@@ -454,14 +398,14 @@ def manage_users():
         role = request.form.get('role', 'staff').strip()
         branch = request.form.get('branch', 'S001').strip()
 
-        success, msg = save_user(user, pwd, role, branch)
+        success, msg = db_save_user(user, pwd, role=role, branch=branch)
         if success:
             flash(f"User account '{user}' created successfully for Branch {branch}.")
         else:
             flash(f"User creation failed: {msg}")
         return redirect(url_for('manage_users'))
 
-    current_users = load_users()
+    current_users = db_load_users()
     return render_template('manage_users.html', current_users=current_users)
 
 @app.route('/admin/catalog', methods=['GET', 'POST'])
@@ -475,22 +419,11 @@ def update_catalog():
         subcat = request.form.get('subcategory', '').strip()
         price = request.form.get('price', '25.00').strip()
 
-        # Add item to inventory.csv with all 7 columns including product_id and subcategory
-        update_inventory_stock(b_id, brand, p_name, 25, product_id=p_id, subcategory=subcat, price=price)
+        db_update_inventory_stock(b_id, brand, p_name, 25, product_id=p_id, subcategory_name=subcat, price=price)
         flash(f"Master product catalog expanded. Added '{p_name}' (ID: {p_id}) under brand '{brand}'.")
         return redirect(url_for('update_catalog'))
 
     return render_template('catalog.html')
 
 if __name__ == '__main__':
-    # Initialize default admin/staff accounts if users.csv missing
-    if not os.path.exists(USERS_CSV) or os.path.getsize(USERS_CSV) == 0:
-        save_user('admin', 'admin123', role='admin', branch='S001')
-        save_user('staff', 'staff123', role='staff', branch='S001')
-
-    os.makedirs('data', exist_ok=True)
-    if not os.path.exists(SALES_CSV):
-        with open(SALES_CSV, 'w', newline='', encoding='utf-8') as f:
-            csv.writer(f).writerow(['tx_id', 'username', 'branch', 'brand', 'product_name', 'shade', 'quantity', 'price', 'total', 'date'])
-
     app.run(debug=True, port=5000)
