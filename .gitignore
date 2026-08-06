@@ -1,4 +1,4 @@
-# Python cache
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -6,33 +6,42 @@ __pycache__/
 # Virtual environments
 venv/
 env/
+ENV/
 .venv/
 
-# Jupyter
-.ipynb_checkpoints/
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
 
-# VS Code
-.vscode/
-
-# Environment variables
-.env
-
-# Model files
+# Machine Learning model binaries (generated via python src/train_model.py)
 models/*.pkl
 models/*.joblib
 models/*.h5
 
-# Large datasets (optional)
-*.zip
-*.tar.gz
-
-# Logs
-*.log
-
-# SQLite WAL temp files
+# Database WAL & Temporary Lock Files
 *.db-wal
 *.db-shm
+*.sqlite-wal
+*.sqlite-shm
 
-# OS files
+# Environment & Secret variables
+.env
+.env.*
+
+# IDEs & Text Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS System Files
 .DS_Store
+.DS_Store?
+ehthumbs.db
 Thumbs.db
+
+# Archives & Logs
+*.zip
+*.tar.gz
+*.log
