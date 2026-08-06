@@ -3,15 +3,25 @@ import os
 import sys
 
 # Ensure project root directory is in sys.path for cross-platform imports (Windows / macOS / Linux)
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 import csv
 from datetime import datetime
-from src.database import (
-    db_load_users, db_save_user, db_verify_user,
-    db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
-    db_calculate_rolling_lags, get_db, DB_PATH
-)
+
+try:
+    from src.database import (
+        db_load_users, db_save_user, db_verify_user,
+        db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
+        db_calculate_rolling_lags, get_db, DB_PATH
+    )
+except ModuleNotFoundError:
+    from database import (
+        db_load_users, db_save_user, db_verify_user,
+        db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
+        db_calculate_rolling_lags, get_db, DB_PATH
+    )
 
 USERS_CSV = 'users.csv'
 INVENTORY_CSV = 'data/inventory.csv'

@@ -3,14 +3,20 @@ import os
 import sys
 
 # Ensure project root directory is in sys.path for cross-platform imports (Windows / macOS / Linux)
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 import sqlite3
 import pandas as pd
 import numpy as np
 import csv
 from datetime import datetime
-from src.database import init_db, get_db, DB_PATH
+
+try:
+    from src.database import init_db, get_db, DB_PATH
+except ModuleNotFoundError:
+    from database import init_db, get_db, DB_PATH
 
 def run_etl_migration(db_path=DB_PATH):
     print("=" * 60)

@@ -3,7 +3,9 @@ import os
 import sys
 
 # Ensure project root directory is in sys.path for cross-platform imports (Windows / macOS / Linux)
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 import sqlite3
 import pandas as pd
@@ -11,7 +13,11 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestRegressor
 import joblib
-from src.database import DB_PATH, get_db
+
+try:
+    from src.database import DB_PATH, get_db
+except ModuleNotFoundError:
+    from database import DB_PATH, get_db
 
 def load_training_data(db_path=DB_PATH):
     print("Step 1: Querying SQLite database tables...")
