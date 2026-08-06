@@ -3,6 +3,7 @@ import pytest
 import json
 import os
 import csv
+import uuid
 from werkzeug.security import generate_password_hash
 from app import app
 from src.utils import (
@@ -26,43 +27,45 @@ def test_password_hashing_and_verification():
     assert hashed.startswith(("scrypt:", "pbkdf2:"))
 
 def test_user_management_helpers():
-    success, msg = save_user("testuser_qa", "qa_password", role="staff", branch="S003")
+    unique_user = f"testuser_{uuid.uuid4().hex[:6]}"
+    success, msg = save_user(unique_user, "qa_password", role="staff", branch="S003")
     assert success is True
     
-    verified = verify_user("testuser_qa", "qa_password")
+    verified = verify_user(unique_user, "qa_password")
     assert verified is not None
-    assert verified['username'] == "testuser_qa"
+    assert verified['username'] == unique_user
     assert verified['branch'] == "S003"
     
     # Test duplicate username rejection
-    dup_success, dup_msg = save_user("testuser_qa", "another_pass")
+    dup_success, dup_msg = save_user(unique_user, "another_pass")
     assert dup_success is False
     assert "already exists" in dup_msg
 
 # --- 2. MULTI-BRANCH INVENTORY & SCHEMA TESTS ---
 
 def test_inventory_multi_branch_isolation():
-    # Restock S001 and S002 independently
-    update_inventory_stock("S001", "Clinique", "Test Cream", 50)
-    update_inventory_stock("S002", "Clinique", "Test Cream", 10)
+    unique_prod = f"Cream_{uuid.uuid4().hex[:4]}"
+    update_inventory_stock("S001", "Clinique", unique_prod, 50)
+    update_inventory_stock("S002", "Clinique", unique_prod, 10)
 
     s001_items = load_inventory(branch="S001")
     s002_items = load_inventory(branch="S002")
 
-    s001_match = next((i for i in s001_items if i['product_name'] == "Test Cream"), None)
-    s002_match = next((i for i in s002_items if i['product_name'] == "Test Cream"), None)
+    s001_match = next((i for i in s001_items if i['product_name'] == unique_prod), None)
+    s002_match = next((i for i in s002_items if i['product_name'] == unique_prod), None)
 
     assert s001_match is not None
     assert s002_match is not None
-    assert s001_match['stock'] >= 50
+    assert s001_match['stock'] == 50
     assert s002_match['stock'] == 10
 
 def test_inventory_stock_deduction():
-    update_inventory_stock("S001", "Maybelline", "Test Lipstick", 30)
-    deduct_inventory_stock("S001", "Test Lipstick", 5)
+    unique_prod = f"Lipstick_{uuid.uuid4().hex[:4]}"
+    update_inventory_stock("S001", "Maybelline", unique_prod, 30)
+    deduct_inventory_stock("S001", unique_prod, 5)
     
     s001_items = load_inventory(branch="S001")
-    match = next(i for i in s001_items if i['product_name'] == "Test Lipstick")
+    match = next(i for i in s001_items if i['product_name'] == unique_prod)
     assert match['stock'] == 25
 
 # --- 3. API ENDPOINTS TESTS ---
@@ -113,7 +116,8 @@ def test_admin_route_access_for_admin(client):
 # --- 5. POS CHECKOUT TRANSACTION TEST ---
 
 def test_record_sale_transaction_workflow(client):
-    update_inventory_stock("S001", "Colorbar", "Velvet Lipstick", 40)
+    unique_prod = f"VelvetLip_{uuid.uuid4().hex[:4]}"
+    update_inventory_stock("S001", "Colorbar", unique_prod, 40)
     
     with client.session_transaction() as sess:
         sess['username'] = 'admin'
@@ -123,7 +127,7 @@ def test_record_sale_transaction_workflow(client):
     payload = {
         'cart': [{
             'brand': 'Colorbar',
-            'product_name': 'Velvet Lipstick',
+            'product_name': unique_prod,
             'shade': 'Default',
             'price': 20.00,
             'quantity': 2
@@ -138,7 +142,7 @@ def test_record_sale_transaction_workflow(client):
 
     # Verify inventory was decremented by 2
     s001_items = load_inventory(branch="S001")
-    match = next(i for i in s001_items if i['product_name'] == "Velvet Lipstick")
+    match = next(i for i in s001_items if i['product_name'] == unique_prod)
     assert match['stock'] == 38
 
 # --- 6. AI FORECAST PREDICT ENDPOINT TEST ---
@@ -161,3 +165,31 @@ def test_predict_endpoint_execution(client):
     assert 'predicted_demand' in res_json
     assert 'recommendation' in res_json
     assert res_json['holiday_surge_applied'] is True
+
+def test_record_sale_negative_quantity_rejection(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S001'
+
+    bad_payload = {
+        'cart': [{
+            'brand': 'Colorbar',
+            'product_name': 'Velvet Lipstick',
+            'shade': 'Default',
+            'price': 20.00,
+            'quantity': -5
+        }]
+    }
+    response = client.post('/record_sale', data=json.dumps(bad_payload), content_type='application/json')
+    assert response.status_code == 400
+    res_json = response.get_json()
+    assert res_json['status'] == 'error'
+
+def test_catalog_metadata_preservation():
+    unique_prod = f"Blush_{uuid.uuid4().hex[:4]}"
+    update_inventory_stock("S001", "NARS", unique_prod, 15, product_id="PROD-9999", subcategory="blush")
+    inv = load_inventory(branch="S001")
+    match = next(i for i in inv if i['product_name'] == unique_prod)
+    assert match['product_id'] == "PROD-9999"
+    assert match['subcategory'] == "blush"

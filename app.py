@@ -287,8 +287,16 @@ def record_sale():
         with open(SALES_CSV, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             for item in cart:
-                final_unit_price = float(item['price']) * discount
-                qty = int(item['quantity'])
+                try:
+                    price_val = float(item.get('price', 0))
+                    qty = int(item.get('quantity', 0))
+                except (ValueError, TypeError):
+                    return jsonify({'status': 'error', 'message': 'Invalid price or quantity parameters passed.'}), 400
+
+                if qty <= 0 or price_val < 0:
+                    return jsonify({'status': 'error', 'message': 'Quantity must be positive and price cannot be negative.'}), 400
+
+                final_unit_price = price_val * discount
                 total_cost = final_unit_price * qty
                 shade = item.get('shade', 'Default')
                 
@@ -467,9 +475,9 @@ def update_catalog():
         subcat = request.form.get('subcategory', '').strip()
         price = request.form.get('price', '25.00').strip()
 
-        # Add item to inventory.csv with all 7 columns
-        update_inventory_stock(b_id, brand, p_name, 25)
-        flash(f"Master product catalog expanded. Added '{p_name}' under brand '{brand}'.")
+        # Add item to inventory.csv with all 7 columns including product_id and subcategory
+        update_inventory_stock(b_id, brand, p_name, 25, product_id=p_id, subcategory=subcat, price=price)
+        flash(f"Master product catalog expanded. Added '{p_name}' (ID: {p_id}) under brand '{brand}'.")
         return redirect(url_for('update_catalog'))
 
     return render_template('catalog.html')
