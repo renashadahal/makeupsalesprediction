@@ -133,23 +133,32 @@ The storage layer uses a normalized **SQLite relational database** operating in 
 Ensure Python 3.9+ is installed on your system.
 
 ### 2. Set Up Virtual Environment & Dependencies
-Clone the repository and set up a Python virtual environment:
 
+**On macOS / Linux:**
 ```bash
 # Create virtual environment
 python3 -m venv .venv
 
 # Activate virtual environment
-# On macOS/Linux:
 source .venv/bin/activate
-# On Windows:
-.venv\Scripts\activate
 
 # Install required packages
 pip install flask pandas numpy scikit-learn joblib pytest werkzeug
 ```
 
-*Alternatively, using `uv`:*
+**On Windows (PowerShell / Command Prompt):**
+```cmd
+:: Create virtual environment
+python -m venv .venv
+
+:: Activate virtual environment
+.venv\Scripts\activate
+
+:: Install required packages
+pip install flask pandas numpy scikit-learn joblib pytest werkzeug
+```
+
+*Alternatively, using `uv` (macOS / Windows / Linux):*
 ```bash
 uv venv .venv
 uv pip install flask pandas numpy scikit-learn joblib pytest werkzeug
@@ -159,6 +168,7 @@ uv pip install flask pandas numpy scikit-learn joblib pytest werkzeug
 Migrate the flat CSV datasets into the normalized SQLite database (`data/noire_retail.db`):
 
 ```bash
+# Works on macOS, Windows, and Linux once virtual environment is active:
 python src/migrate_to_sqlite.py
 ```
 *Expected Output:*
