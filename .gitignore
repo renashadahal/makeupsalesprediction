@@ -29,6 +29,10 @@ models/*.h5
 # Logs
 *.log
 
+# SQLite WAL temp files
+*.db-wal
+*.db-shm
+
 # OS files
 .DS_Store
 Thumbs.db
