@@ -139,6 +139,14 @@ def test_record_sale_transaction_workflow(client):
     res_json = response.get_json()
     assert res_json['status'] == 'success'
     assert res_json['transaction_id'].startswith('TX-')
+    assert 'receipt' in res_json
+
+    receipt = res_json['receipt']
+    assert receipt['promo_code'] == 'FESTIVE10'
+    assert receipt['discount_percent'] == 10
+    assert receipt['subtotal_before_discount'] == 40.00
+    assert receipt['discount_amount'] == 4.00
+    assert receipt['grand_total'] == 36.00
 
     # Verify inventory was decremented by 2
     s001_items = load_inventory(branch="S001")
