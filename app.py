@@ -333,8 +333,10 @@ def forecast():
 @login_required
 def predict():
     try:
-        model = joblib.load('models/demand_model.pkl')
-        encoders = joblib.load('models/encoders.pkl')
+        model_path = os.path.join('models', 'demand_model.pkl')
+        encoders_path = os.path.join('models', 'encoders.pkl')
+        model = joblib.load(model_path)
+        encoders = joblib.load(encoders_path)
     except Exception as e:
         return jsonify({'error': 'Pipeline model assets missing. Please run src/train_model.py first.'}), 500
 

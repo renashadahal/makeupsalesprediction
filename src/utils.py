@@ -24,9 +24,9 @@ except ModuleNotFoundError:
     )
 
 USERS_CSV = 'users.csv'
-INVENTORY_CSV = 'data/inventory.csv'
-SALES_CSV = 'data/sales_history.csv'
-MAKEUP_DATA_CSV = 'data/makeup_data.csv'
+INVENTORY_CSV = os.path.join('data', 'inventory.csv')
+SALES_CSV = os.path.join('data', 'sales_history.csv')
+MAKEUP_DATA_CSV = os.path.join('data', 'makeup_data.csv')
 
 # --- USER MANAGEMENT UTILITIES ---
 

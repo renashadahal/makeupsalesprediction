@@ -50,8 +50,8 @@ def run_etl_migration(db_path=DB_PATH):
 
         # 3. Migrate inventory.csv & makeup_data.csv metadata into brands, categories, subcategories, products
         print("Migrating master catalog & inventory...")
-        inv_csv = 'data/inventory.csv'
-        makeup_csv = 'data/makeup_data.csv'
+        inv_csv = os.path.join('data', 'inventory.csv')
+        makeup_csv = os.path.join('data', 'makeup_data.csv')
 
         inv_df = pd.read_csv(inv_csv) if os.path.exists(inv_csv) else pd.DataFrame()
         makeup_df = pd.read_csv(makeup_csv) if os.path.exists(makeup_csv) else pd.DataFrame()
@@ -150,7 +150,7 @@ def run_etl_migration(db_path=DB_PATH):
             print(f"✓ Inventory balances migrated: {len(inv_records)} stock ledger rows.")
 
         # 4. Migrate sales_history.csv into transactions & transaction_items
-        sales_csv = 'data/sales_history.csv'
+        sales_csv = os.path.join('data', 'sales_history.csv')
         if os.path.exists(sales_csv):
             sales_df = pd.read_csv(sales_csv)
             if not sales_df.empty:

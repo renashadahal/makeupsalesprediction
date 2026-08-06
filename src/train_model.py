@@ -93,14 +93,16 @@ def build_predictive_pipeline(df):
     df['Store_Code'] = le_store.transform(df['Store_ID'])
     df['Product_Code'] = le_prod.transform(df['Product_ID'])
 
-    os.makedirs('models', exist_ok=True)
+    models_dir = os.path.join('models')
+    os.makedirs(models_dir, exist_ok=True)
     
     encoders = {
         'Product_ID': le_prod,
         'Store_ID': le_store,
         'Global_Sales_Mean': global_sales_mean
     }
-    joblib.dump(encoders, 'models/encoders.pkl')
+    encoders_path = os.path.join(models_dir, 'encoders.pkl')
+    joblib.dump(encoders, encoders_path)
 
     features = [
         'Product_Code', 'Store_Code', 'Price', 'Holiday_Promotion', 
@@ -128,8 +130,9 @@ def build_predictive_pipeline(df):
     score = model.score(X_test, y_test)
     print(f"Peak Optimized Random Forest R^2 validation score achieved: {score:.4f}")
 
-    joblib.dump(model, 'models/demand_model.pkl')
-    print("Model serialized and outputted to disk successfully as models/demand_model.pkl.")
+    demand_model_path = os.path.join(models_dir, 'demand_model.pkl')
+    joblib.dump(model, demand_model_path)
+    print(f"Model serialized and outputted to disk successfully as {demand_model_path}.")
 
 if __name__ == '__main__':
     df_ready_for_ai = load_training_data()
