@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    
+    <!-- Left Panel Card: Provision Engine Module -->
+    <div class="lg:col-span-1 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md h-fit">
+        <h2 class="text-3xl text-noireText mb-2">Access Allocation</h2>
+        <p class="text-xs text-noireText/60 mb-6 font-light leading-relaxed">Inject credential parameters directly into core encrypted disk arrays.</p>
+        
+        <form method="POST" class="space-y-4 text-xs tracking-wide">
+            <div>
+                <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Operator Username</label>
+                <input type="text" name="username" required class="w-full px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText placeholder-noireText/30 focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+            </div>
+            <div>
+                <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Raw Password Phrase</label>
+                <input type="password" name="password" required class="w-full px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+            </div>
+            <div>
+                <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Authorization Role Tier</label>
+                <select name="role" class="w-full px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <option value="staff">Standard Branch Operator (Staff)</option>
+                    <option value="admin">Global Admin Manager (Admin)</option>
+                </select>
+            </div>
+            <button type="submit" class="w-full bg-deepWine hover:bg-noireText text-velvet py-3 rounded-xl font-medium uppercase tracking-widest transition-colors shadow-md mt-4">
+                Commit Credentials
+            </button>
+        </form>
+    </div>
+
+    <!-- Right Panel Card: Live Ledger Grid Output Container -->
+    <div class="lg:col-span-2 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md overflow-hidden">
+        <h2 class="text-3xl text-noireText mb-2">Active Authorized Users</h2>
+        <p class="text-xs text-noireText/60 mb-6 font-light leading-relaxed">Live reading trace of current system identifiers registered inside the catalog index table file.</p>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead>
+                    <tr class="border-b border-noireText/10 text-noireText/50 uppercase text-[10px] tracking-widest">
+                        <th class="pb-3 px-2">System Username</th>
+                        <th class="pb-3 px-2">Security Authorization Assignment</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-noireText/5 text-noireText">
+                    {% for u in current_users %}
+                    <tr class="hover:bg-velvet/30 transition-colors">
+                        <td class="py-3 px-2 font-medium tracking-wide">{{ u.username }}</td>
+                        <td class="py-3 px-2">
+                            {% if u.role == 'admin' %}
+                                <span class="px-3 py-1 rounded-full text-[10px] font-medium tracking-widest bg-deepWine text-velvet uppercase border border-noireText/10">Admin</span>
+                            {% else %}
+                                <span class="px-3 py-1 rounded-full text-[10px] font-medium tracking-widest bg-velvet text-noireText/70 uppercase border border-noireText/5">Staff</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="2" class="py-6 text-center text-noireText/40 italic text-xs">No active nodes returned from user registration matrix file lookup.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

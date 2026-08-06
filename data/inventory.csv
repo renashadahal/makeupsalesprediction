@@ -1,0 +1,62 @@
+Product_ID,brand,category,subcategory,product_name,stock
+P0001,Clinique,body,perfume,Calyx Eau de Parfum Spray,0
+P0002,Estee Lauder,body,perfume,Pleasures Eau De Parfum,0
+P0003,Clinique,body,perfume,Find Your Happy Fragrance Set,0
+P0004,Estee Lauder,body,perfume,Infinite Sky Eau De Parfum Spray,0
+P0005,Estee Lauder,body,perfume,Beautiful Eau De Parfum Spray,0
+P0006,Clinique,body,perfume,Aromatics Elixir Eau de Parfum Spray,0
+P0007,MAC,face,foundation,Studio Fix Powder Plus Foundation,0
+P0008,Clinique,face,foundation,Beyond Perfecting Powder Foundation + Concealer,0
+P0009,Maybelline,face,foundation,"Maybelline New York Ultimate Powder Foundation, Full Matte Coverage, SPF44, 24H Oil Control, Fit Me, Shade 120, 9g",0
+P0010,Clinique,face,foundation,Superpowder Double Face Makeup Foundation,0
+P0011,Maybelline,face,foundation,"Maybelline New York Liquid Foundation + Compact Powder, Matte & Poreless Finish, Ultra Blendable and Lightweight, Fit Me, 128 Warm Nude",0
+P0012,Colorbar,face,foundation,"Colorbar Amino Skin Radiant Cream Foundation, Ivory Fair 001, 15g",0
+P0013,Estee Lauder,face,concealer,Skin Concealer Stick - Warm Natural,0
+P0014,Maybelline,face,concealer,"Maybelline New York Instant Age Rewind Concealer, Neutral, 6g",0
+P0015,Maybelline,face,concealer,Maybelline New York Fit Me! Concealer,0
+P0016,Maybelline,face,concealer,"Maybelline New York Pencil Radiant Concealer, Dark Circles and Blemish Ultra Blendable, Instant Anti Age Eraser, Caramel, 6g",0
+P0017,Estee Lauder,face,concealer,Skin Concealer Stick - Natural,0
+P0018,Maybelline,face,concealer,"Maybelline Instant Age Rewind Eraser Dark Circles Treatment Multi-Use Concealer, Ivory, 0.2 Fl Oz (Pack of 1)",0
+P0019,Clinique,face,blush,Clinique Blushing Blush Powder Blush - # 101 Aglow - 6g/0.21oz,0
+P0020,Maybelline,face,blush,"Maybelline New York Blush, True to Colour Result, Fit Me Mono Blush, 60 Passionate, 4.5 g",0
+P0021,Colorbar,face,blush,COLORBAR Cheekillusion Blush - 4gm,0
+P0022,Estee Lauder,face,blush,Innerglow Cheek Powder - 01 Inner Light,0
+P0023,Estee Lauder,face,blush,Colorful Blush - 16 Heated!,0
+P0024,Maybelline,face,blush,Fit Me Blush,0
+P0025,Maybelline,lips,lipstick,"Maybelline New York Matte Lipstick, Intense Colour, Moisturised Lips, Color Sensational Creamy Matte, 690 Siren in Scarlet, 3.9g",0
+P0026,Maybelline,lips,lipstick,"Maybelline New York Matte Lipstick, Intense Colour, Keeps Lips Moisturised, 696 Burgundy Blush, Color Sensational Creamy Matte Lipstick, 3.9g",0
+P0027,Maybelline,lips,lipstick,"Maybelline New York Matte Lipstick, Intense Colour, Moisturised Lips, Color Sensational Creamy Matte, 507 Almond Pink, 3.9g",0
+P0028,Colorbar,lips,lipstick,Colorbar Velvet Matte Lipstick (Brown_Free Size),10
+P0029,NARS,lips,lipstick,Powermatte Lip Pigment,0
+P0030,Maybelline,lips,lipstick,"Maybelline New York Matte Lipstick, Intense Colour, Moisturised Lips, Color Sensational Creamy Matte, 695 Divine Wine, 3.9g",0
+P0031,Clinique,eyes,mascara,Clinique High Impact Mascara 01black 0.14oz/3.5*4,0
+P0032,Maybelline,eyes,mascara,"Maybelline New York Colossal Bold Eyeliner, Black, 3G And Maybelline New York Color Sensational Creamy Matte Lipstick, 660 Touch Of Spice, 3.9G",0
+P0033,Clinique,eyes,mascara,Clinique High Impact Mascara Black 4g New (Not Boxed),23
+P0034,Maybelline,eyes,mascara,Volum' Express The Mega Plush Waterproof Mascara,0
+P0035,Clinique,eyes,mascara,Clinique High Impact Waterproof Mascara Black,0
+P0036,Maybelline,eyes,mascara,Maybelline Volum Express The Colossal Mascara Glam Black 2 Pack,0
+P0037,Maybelline,eyes,eyeliner,"Maybelline New York Colossal Bold Eyeliner, Black, Glossy Finish, 15g",0
+P0038,MAC,eyes,eyeliner,Brushstroke Eyeliner,15
+P0039,MAC,eyes,eyeliner,Liquidlast 24-Hour Eyeliner,0
+P0040,Estee Lauder,eyes,eyeliner,Little Black Liner - Onyx,0
+P0041,Colorbar,eyes,eyeliner,"Colorbar Wink With Love 14 Hrs Stay Eyeliner, Blue Pleasure",0
+P0042,Maybelline,eyes,eyeliner,Eyestudio Lasting Drama Waterproof Gel Pencil,0
+P0043,NARS,eyes,eyeshadow,NARS Cinematic Eyeshadow Bad Behaviour,0
+P0044,Maybelline,eyes,eyeshadow,Maybelline New York Makeup Kit Palette (Smoke),0
+P0045,Maybelline,eyes,eyeshadow,"Maybelline New York Eye Studio Color Plush Silk Eyeshadow, Give Me Gold 05, 2.55g",0
+P0046,Maybelline,eyes,eyeshadow,"Maybelline New York Expert Wear Eyeshadow Duos 40d Lasting Lilac Perfect Pastels, 2.27g",0
+P0047,Clinique,eyes,eyeshadow,All About Shadow Single Eyeshadow,0
+P0048,Clinique,eyes,eyeshadow,All About Shadow Quad Eyeshadow,0
+P0049,Clinique,body,sunscreen,Pep Start Daily UV Protector Broad Spectrum SPF 50,0
+P0050,Pipette,body,sunscreen,Mineral Sunscreen Broad Spectrum SPF 50,0
+P0051,Vichy,body,sunscreen,Capital Soleil Tinted Face Mineral Sunscreen SPF 60,0
+P0052,Cetaphil,body,sunscreen,Healthy Radiance Whipped Day Cream SPF 30,0
+P0053,Vichy,body,sunscreen,Aqualia Thermal UV Defense Moisturizer Sunscreen SPF 30,0
+P0054,Jack Black,body,sunscreen,Oil-Free Sun Guard SPF 45 Sunscreen,0
+P0055,NARS,skincare,moisturizer,Light Reflecting Multi-Action Treatment Lotion,0
+P0056,Estee Lauder,skincare,moisturizer,Daywear Multi-Protection Anti-Oxidant 24H Moisture Creme Broad Spectrum SPF 15,0
+P0057,Estee Lauder,skincare,moisturizer,Revitalizing Supreme + Bright Soft Power Cr,0
+P0058,Neutrogena,skincare,moisturizer,Rapid Tone Repair Correcting Cream,0
+P0059,Estee Lauder,skincare,moisturizer,Resilience Lift Night Firming / Sculpting Face And Neck Cr,0
+P0060,Neutrogena,skincare,moisturizer,Travel Size Hydro Boost Water Gel,0
+P34055,Rare Beauty,makeup,Liquid Blush in Hope,Uncategorized,0
