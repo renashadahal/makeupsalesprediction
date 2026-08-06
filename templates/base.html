@@ -41,16 +41,28 @@
     <header class="bg-deepWine text-velvet shadow-md w-full border-b border-noireText/10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             
-            <!-- System Branding Node -->
-            <div class="flex items-center justify-between">
-<!-- Clickable Brand Identity Header Module -->
-<a href="{{ url_for('dashboard') }}" class="group block select-none focus:outline-none transition-all duration-200">
-    <!-- Brand Title -->
-    <h1 class="text-3xl font-serif tracking-wide text-dustyRose group-hover:text-white transition-colors duration-200">
-        Noire
-    </h1>
+            <!-- System Branding Node & Branch Selection -->
+            <div class="flex items-center justify-between gap-4">
+                <a href="{{ url_for('dashboard') }}" class="group block select-none focus:outline-none transition-all duration-200">
+                    <h1 class="text-3xl font-serif tracking-wide text-dustyRose group-hover:text-white transition-colors duration-200">
+                        Noire
+                    </h1>
+                </a>
 
-</a>
+                <!-- Branch Selector Context Dropdown -->
+                {% if session.get('username') %}
+                <div class="flex items-center gap-2 bg-velvet/10 px-3 py-1.5 rounded-xl border border-dustyRose/30 text-xs">
+                    <span class="text-[10px] text-dustyRose uppercase font-bold tracking-widest">Branch:</span>
+                    <select onchange="window.location.href='/switch_branch/' + this.value" class="bg-transparent text-velvet font-bold focus:outline-none cursor-pointer">
+                        {% for b_code in ['S001', 'S002', 'S003', 'S004', 'S005'] %}
+                            <option value="{{ b_code }}" class="bg-deepWine text-velvet" {% if session.get('branch') == b_code %}selected{% endif %}>
+                                {{ b_code }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
                 <div class="text-right lg:hidden">
                     <span class="text-[10px] text-dustyRose uppercase tracking-wider block">Operator</span>
                     <strong class="text-xs text-velvet">{{ session.get('username', 'Guest') }}</strong>
@@ -75,23 +87,34 @@
                 <div class="flex items-center justify-between md:justify-end gap-4 border-t border-velvet/10 pt-3 md:pt-0 md:border-t-0 pl-1">
                     <div class="hidden lg:block text-right">
                         <span class="text-[9px] text-dustyRose/60 uppercase tracking-widest block">Active Node</span>
-                        <strong class="text-velvet text-xs">{{ session.get('username', 'Guest') }}</strong>
+                        <strong class="text-velvet text-xs">{{ session.get('username', 'Guest') }} ({{ session.get('role', 'staff') }})</strong>
                     </div>
+                    {% if session.get('username') %}
                     <a href="{{ url_for('logout') }}" class="w-full md:w-auto bg-dustyRose/20 hover:bg-dustyRose/30 text-dustyRose text-center font-bold text-[10px] tracking-widest uppercase px-4 py-2 rounded-lg transition-colors border border-dustyRose/30">
                         Exit
                     </a>
+                    {% endif %}
                 </div>
             </div>
 
         </div>
     </header>
 
+    <!-- Custom Error Block for Admin 403 -->
+    {% if custom_error %}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full">
+        <div class="bg-rose-100 border border-rose-400 text-rose-800 px-4 py-3 rounded-xl text-sm font-semibold">
+            {{ custom_error }}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Flash Notification Pipeline -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full">
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
-                    <div class="bg-parchment border border-dustyRose/40 text-noireText px-4 py-3 rounded-xl text-sm shadow-inner">
+                    <div class="bg-parchment border border-dustyRose/40 text-noireText px-4 py-3 rounded-xl text-sm shadow-inner mb-2">
                         {{ message }}
                     </div>
                 {% endfor %}

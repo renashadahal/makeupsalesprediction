@@ -4,26 +4,24 @@
     
     <!-- Top Meta Panel Header -->
     <div class="border-b border-noireText/10 pb-4">
-        <h2 class="text-4xl text-noireText font-serif">Advanced Sales Transactional Terminal</h2>
-        <p class="text-xs text-noireText/60 font-light mt-1">Process multiple makeup item selections inside a single checkout session execution.</p>
+        <h2 class="text-4xl text-noireText font-serif">Sales Transactional Terminal</h2>
+        <p class="text-xs text-noireText/60 font-light mt-1">Process multi-item makeup checkouts logged under active branch ({{ session.get('branch', 'S001') }}).</p>
     </div>
     
-    <!-- Catalog Item Parameters Selection Matrix Card -->
+    <!-- Catalog Item Selection Matrix Card -->
     <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
         <div class="border-b border-noireText/10 pb-3 mb-6">
-            <h3 class="text-2xl text-noireText font-serif">Catalog Item Parameters Selection Matrix</h3>
-            <p class="text-xs text-noireText/60 font-light">Filter attributes sequentially to stage items inside current transactional memory memory array.</p>
+            <h3 class="text-2xl text-noireText font-serif">Catalog Item Selection Matrix</h3>
+            <p class="text-xs text-noireText/60 font-light">Filter attributes sequentially to stage items into current cart ledger.</p>
         </div>
 
-        <!-- Form action changed to prevent server page reload, intercepting via JS layout button instead -->
         <div class="space-y-6">
-            <!-- Grid Matrix Layout Split -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 text-xs tracking-wide">
                 
-                <!-- Step 1: Brand Identifier -->
+                <!-- Step 1: Brand -->
                 <div>
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">1. Select Brand</label>
-                    <select id="cart_brand" class="w-full px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose bg-white transition-all">
+                    <select id="cart_brand" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
                         <option value="" disabled selected>-- Loading Brands --</option>
                     </select>
                 </div>
@@ -31,28 +29,28 @@
                 <!-- Step 2: Subcategory Tier -->
                 <div>
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">2. Subcategory</label>
-                    <select id="cart_subcat" disabled class="w-full px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    <select id="cart_subcat" disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                         <option value="" disabled selected>-- Select Brand First --</option>
                     </select>
                 </div>
 
-                <!-- Step 3: Specific Product Variant Name -->
+                <!-- Step 3: Product Name -->
                 <div class="md:col-span-2 lg:col-span-1">
-                    <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">3. Product Variant Name</label>
-                    <select id="cart_product" disabled class="w-full px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose bg-white truncate transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">3. Product Name</label>
+                    <select id="cart_product" disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose truncate transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                         <option value="" disabled selected>-- Select Subcat First --</option>
                     </select>
                 </div>
 
-                <!-- Step 4: Shade Variation Specifics -->
+                <!-- Step 4: Shade Profile -->
                 <div>
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">4. Shade Variation</label>
-                    <select id="cart_shade" disabled class="w-full px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose bg-white transition-all disabled:opacity-50">
+                    <select id="cart_shade" disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all disabled:opacity-50">
                         <option value="" disabled selected>-- Select Product First --</option>
                     </select>
                 </div>
 
-                <!-- Step 5: Unit Operational Pricing Evaluation -->
+                <!-- Step 5: Unit Price -->
                 <div>
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Unit Price ($)</label>
                     <div class="relative">
@@ -61,15 +59,15 @@
                     </div>
                 </div>
 
-                <!-- Step 6: Transaction Quantity Count -->
+                <!-- Step 6: Quantity -->
                 <div>
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Quantity</label>
-                    <input type="number" id="cart_qty" min="1" value="1" class="w-full px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose bg-white transition-all">
+                    <input type="number" id="cart_qty" min="1" value="1" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
                 </div>
 
             </div>
 
-            <!-- Action Submission Dock Wrapper -->
+            <!-- Action Button -->
             <div class="flex justify-center pt-2 border-t border-noireText/5">
                 <button type="button" id="addItemBtn" class="w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md">
                     Append to Transaction Cart
@@ -78,36 +76,35 @@
         </div>
     </div>
 
-    <!-- Active Multi-Item Cart Ledger Card Layout -->
+    <!-- Active Cart Table Ledger -->
     <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
         <div class="border-b border-noireText/10 pb-3 mb-4">
             <h3 class="text-2xl text-noireText font-serif">Active Multi-Item Cart Ledger</h3>
-            <p class="text-xs text-noireText/60 font-light">Current items staged in local volatile buffer state before transaction confirmation.</p>
+            <p class="text-xs text-noireText/60 font-light">Staged items to be processed for checkout.</p>
         </div>
         
         <div class="overflow-x-auto">
             <table id="cartTable" class="w-full text-left text-xs tracking-wide">
                 <thead>
                     <tr class="border-b border-noireText/10 text-noireText/50 uppercase text-[10px] tracking-widest">
-                        <th class="pb-3 px-2">Brand Taxonomy</th>
-                        <th class="pb-3 px-2">Product Identifier Description</th>
-                        <th class="pb-3 px-2">Shade Profile</th>
-                        <th class="pb-3 px-2">Unit Price Base</th>
+                        <th class="pb-3 px-2">Brand</th>
+                        <th class="pb-3 px-2">Product Description</th>
+                        <th class="pb-3 px-2">Shade</th>
+                        <th class="pb-3 px-2">Unit Price</th>
                         <th class="pb-3 px-2">Quantity</th>
                         <th class="pb-3 px-2 text-right">Row Subtotal</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-noireText/5 text-noireText">
-                    <!-- Dynamic updates populate here via JavaScript framework calls -->
                 </tbody>
             </table>
         </div>
 
-        <!-- Checkout Deployment Dock -->
-        <div class="mt-8 pt-6 border-t border-noireText/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-4 text-xs">
+        <!-- Checkout Controls -->
+        <div class="mt-8 pt-6 border-t border-noireText/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 text-xs">
             <div class="flex items-center gap-3">
-                <label class="font-medium uppercase text-noireText/70 tracking-widest whitespace-nowrap">Verification Promotional Code:</label>
-                <input type="text" id="promo_code" placeholder="e.g. FESTIVE10" class="px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText placeholder-noireText/30 focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose bg-white font-mono w-44 transition-all">
+                <label class="font-medium uppercase text-noireText/70 tracking-widest whitespace-nowrap">Promo Code:</label>
+                <input type="text" id="promo_code" placeholder="e.g. FESTIVE10" class="px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText placeholder-noireText/30 focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose font-mono w-44 transition-all">
             </div>
             <button id="checkoutBtn" class="bg-emerald-700 hover:bg-emerald-800 text-white font-medium uppercase tracking-widest px-6 py-3 rounded-xl transition-colors shadow-md text-center">
                 Commit Cart & Finalize Checkout
@@ -116,7 +113,6 @@
     </div>
 </div>
 
-<!-- Interactive Cascade Script Operations -->
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
     const brandSel = document.getElementById('cart_brand');
@@ -126,7 +122,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const priceInput = document.getElementById('cart_price');
     let activeCart = [];
 
-    // Step 1: Securely ingest background brands without layout shifts
+    // Step 1: Load Brands
     try {
         const bRes = await fetch('/api/catalog/brands');
         const brands = await bRes.json();
@@ -152,7 +148,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             subcats.map(s => `<option value="${s}">${s}</option>`).join('');
     });
 
-    // Step 3: Cascade Products
+    // Step 3: Cascade Products filtered by Brand & Subcategory
     subcatSel.addEventListener('change', async () => {
         prodSel.innerHTML = '<option value="" disabled selected>-- Loading --</option>';
         prodSel.disabled = false;
@@ -166,9 +162,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             products.map(p => `<option value="${p}">${p}</option>`).join('');
     });
 
-    // Step 4: Cascade Auto-Fill Price Details and Check Shade Presence
+    // Step 4: Product details & shades lookup
     prodSel.addEventListener('change', async () => {
-        shadeSel.innerHTML = '<option value="" disabled selected>-- Checking Colors --</option>';
+        shadeSel.innerHTML = '<option value="" disabled selected>-- Loading Shades --</option>';
         shadeSel.disabled = true;
         priceInput.value = '...';
 
@@ -179,24 +175,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         const shadeRes = await fetch(`/api/catalog/shades?product_name=${encodeURIComponent(prodSel.value)}`);
         const shades = await shadeRes.json();
 
-        const validShades = shades.filter(s => s && s.toLowerCase() !== 'default' && s.trim() !== '');
-
-        if(validShades.length === 0) {
-            shadeSel.innerHTML = '<option value="Default" selected>No Shade Variations Available</option>';
-            shadeSel.disabled = true;
-            shadeSel.className = "w-full px-4 py-2.5 rounded-xl border border-noireText/10 bg-[#f5eded] text-[#8a7a7c] focus:outline-none transition-all cursor-not-allowed";
-        } else {
-            shadeSel.innerHTML = '<option value="" disabled selected>-- Choose Shade --</option>' + 
-                validShades.map(sh => `<option value="${sh}">${sh}</option>`).join('');
+        if (shades.length > 0) {
+            shadeSel.innerHTML = shades.map(sh => `<option value="${sh}">${sh}</option>`).join('');
             shadeSel.disabled = false;
-            shadeSel.className = "w-full px-4 py-2.5 rounded-xl border border-noireText/10 bg-white text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all";
+        } else {
+            shadeSel.innerHTML = '<option value="Default" selected>Standard Shade</option>';
+            shadeSel.disabled = true;
         }
     });
 
-    // Step 5: Append to Cart Grid Memory Stack
+    // Step 5: Append to Cart
     document.getElementById('addItemBtn').addEventListener('click', () => {
         if(!prodSel.value || !priceInput.value || priceInput.value === '...') {
-            alert("Execution stopped: Please select all catalog parameters first.");
+            alert("Please select all catalog parameters first.");
             return;
         }
         
@@ -210,8 +201,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         
         activeCart.push(rowItem);
         renderCartTable();
-        
-        // Reset inputs back to ground defaults for rapid consecutive entry loop
         document.getElementById('cart_qty').value = 1;
     });
 
@@ -219,10 +208,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         const tbody = document.querySelector('#cartTable tbody');
         tbody.innerHTML = '';
         if(activeCart.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-noireText/40 italic">No items staged in transactional memory.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="py-6 text-center text-noireText/40 italic">No items staged in cart.</td></tr>';
             return;
         }
-        activeCart.forEach(item => {
+        activeCart.forEach((item, index) => {
             const tr = document.createElement('tr');
             tr.className = "hover:bg-velvet/30 transition-colors";
             tr.innerHTML = `
@@ -240,26 +229,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     renderCartTable();
 
-    // Step 6: Dispatch Cart Elements to Flask Backend Server
+    // Step 6: Dispatch Cart to Backend (Triggers Stock Deduction)
     document.getElementById('checkoutBtn').addEventListener('click', async () => {
-        if(activeCart.length === 0) return alert("System state error: Active cart must have at least one valid row.");
+        if(activeCart.length === 0) return alert("Active cart must have at least one valid item.");
         
-        const response = await fetch('/record_sale', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                cart: activeCart,
-                promo_code: document.getElementById('promo_code').value
-            })
-        });
-        const result = await response.json();
-        if(result.status === 'success') {
-            alert(`Checkout committed perfectly! Generated Log Reference: ${result.transaction_id}`);
-            activeCart = [];
-            renderCartTable();
-            document.getElementById('promo_code').value = '';
-        } else {
-            alert(`Execution Error: ${result.message || 'Verification failed.'}`);
+        try {
+            const response = await fetch('/record_sale', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    cart: activeCart,
+                    promo_code: document.getElementById('promo_code').value
+                })
+            });
+            const result = await response.json();
+            if(result.status === 'success') {
+                alert(`Checkout completed! Transaction ID: ${result.transaction_id}`);
+                activeCart = [];
+                renderCartTable();
+                document.getElementById('promo_code').value = '';
+            } else {
+                alert(`Error: ${result.message || 'Checkout failed.'}`);
+            }
+        } catch(e) {
+            alert("Network error processing transaction.");
         }
     });
 });
