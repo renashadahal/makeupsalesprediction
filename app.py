@@ -1,51 +1,47 @@
 from flask import Flask, request, redirect, session, render_template, url_for, jsonify, flash
 import csv
-import hashlib
 import os
 import joblib
 import numpy as np
 from datetime import datetime, timedelta
+from functools import wraps
+
+from src.utils import (
+    verify_user, load_users, save_user, 
+    load_inventory, update_inventory_stock, deduct_inventory_stock,
+    get_catalog_shades, calculate_rolling_lags,
+    USERS_CSV, INVENTORY_CSV, SALES_CSV, MAKEUP_DATA_CSV
+)
 
 app = Flask(__name__)
-app.secret_key = 'academic_viva_defense_secure_key'
+# Generate secret key safely or use secure fallback
+app.secret_key = os.environ.get('SECRET_KEY', 'noire_intelligence_matrix_secure_key_2026')
 
-# Updated dataset references targeting your newly structured data records
-DATA_PATH = 'data/makeup_data.csv'
-USERS_CSV = 'users.csv'
-INVENTORY_CSV = 'data/inventory.csv'
-SALES_CSV = 'data/sales_history.csv'
+DATA_PATH = MAKEUP_DATA_CSV
 
-# --- SECURITY ATTRIBUTE HANDLERS ---
-def check_user(username, password):
-    username = username.strip()
-    hashed = hashlib.sha256(password.strip().encode()).hexdigest()
-    
-    print("\n========= AUTHENTICATION DEBUG LOG =========")
-    print(f"-> Form Input Username: '{username}' (Length: {len(username)})")
-    print(f"-> Form Input Password Hash: {hashed}")
-    
-    if not os.path.exists(USERS_CSV):
-        print(f"-> Critical Error: File not found at path: {USERS_CSV}")
-        return None
-        
-    with open(USERS_CSV, mode='r', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            csv_user = row.get('username', '').strip()
-            csv_hash = row.get('password_hash', '').strip()
-            csv_role = row.get('role', '').strip()
-            
-            print(f"   Checking CSV Row -> User: '{csv_user}' | Role: '{csv_role}'")
-            print(f"   Comparing Hashes -> Input: {hashed[:8]}... vs CSV: {csv_hash[:8]}...")
-            
-            if csv_user == username and csv_hash == hashed:
-                print(">>> SUCCESS: Structural Match Found! <<<\n")
-                return csv_role
-                
-    print(">>> FAILURE: No Matching Row in CSV Matrix! <<<\n")
-    return None
+# --- AUTHENTICATION & AUTHORIZATION DECORATORS ---
 
-# --- AUTHENTICATION & DASHBOARD SYSTEM ---
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            flash('Session expired or unauthenticated. Please log in.')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            return redirect(url_for('login'))
+        if session.get('role') != 'admin':
+            return render_template('base.html', custom_error="403 Access Denied: Admin authorization required."), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+# --- AUTHENTICATION ROUTES ---
+
 @app.route('/')
 def home():
     if 'username' in session:
@@ -55,293 +51,368 @@ def home():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        role = check_user(username, password)
-        if role:
-            session['username'] = username
-            session['role'] = role
-            session['branch'] = 'S001'  # Aligning default branch identifier to match dataset rows (S001 - S005)
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        user_info = verify_user(username, password)
+        if user_info:
+            session['username'] = user_info['username']
+            session['role'] = user_info['role']
+            session['branch'] = user_info.get('branch', 'S001')
+            flash(f"Welcome back, {user_info['username']}. Active Branch: {session['branch']}")
             return redirect(url_for('dashboard'))
         else:
-            flash('Invalid architectural access credentials passed.')
+            flash('Invalid access credentials. Please verify username and password.')
             return render_template('login.html'), 401
+
     return render_template('login.html')
 
+@app.route('/switch_branch/<branch_id>')
+@login_required
+def switch_branch(branch_id):
+    allowed_branches = ['S001', 'S002', 'S003', 'S004', 'S005']
+    if branch_id in allowed_branches:
+        session['branch'] = branch_id
+        flash(f"Active operating node switched to Branch {branch_id}.")
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out successfully.')
+    return redirect(url_for('login'))
+
+# --- ANALYTICS DASHBOARD ---
+
 @app.route('/dashboard')
+@login_required
 def dashboard():
-    # Fallback default arrays to prevent JavaScript errors if data files are empty
-    date_labels = []
-    thirty_day_sales_data = []
+    current_branch = session.get('branch', 'S001')
+    low_stock_count = 0
+    today_sales_count = 0
+    
+    # 1. Low stock count for active branch
+    inv_items = load_inventory(branch=current_branch)
+    low_stock_count = sum(1 for item in inv_items if item['stock'] < 10)
+
+    # 2. Today's sales count for active branch
+    today_str = datetime.now().strftime('%Y-%m-%d')
     brand_counts = {}
     subcat_counts = {}
-    today_sales_count = 0
-    low_stock_count = 0
+    sales_by_date = {}
 
-    # 1. Calculate Low Stock Count securely from inventory tracking records
-    if os.path.exists(INVENTORY_CSV):
-        try:
-            with open(INVENTORY_CSV, mode='r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    # Mark any item with stock less than 10 units as critical alert
-                    if int(row.get('stock', 10)) < 10:
-                        low_stock_count += 1
-        except Exception as e:
-            print(f"Error reading inventory records: {e}")
-
-    # 2. Extract Data from Sales History CSV safely
     if os.path.exists(SALES_CSV):
         try:
             with open(SALES_CSV, mode='r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
-                today_str = datetime.now().strftime('%Y-%m-%d')
-                
                 for row in reader:
-                    brand = row.get('brand', 'Generic').strip()
-                    subcat = row.get('subcategory', 'Other').strip()
-                    qty = int(row.get('quantity', 1))
-                    date_val = row.get('date', '').strip()
-
-                    # Track today's transactional volume total
-                    if date_val == today_str:
-                        today_sales_count += qty
-                    
-                    # Accumulate brand and subcategory volumes
-                    brand_counts[brand] = brand_counts.get(brand, 0) + qty
-                    subcat_counts[subcat] = subcat_counts.get(subcat, 0) + qty
+                    r_branch = row.get('branch', '').strip()
+                    if r_branch == current_branch or not r_branch:
+                        date_val = row.get('date', '').strip()
+                        qty = int(float(row.get('quantity', 1)))
+                        brand = row.get('brand', 'Generic').strip()
+                        
+                        if date_val == today_str:
+                            today_sales_count += qty
+                        
+                        if date_val:
+                            sales_by_date[date_val] = sales_by_date.get(date_val, 0) + qty
+                            
+                        brand_counts[brand] = brand_counts.get(brand, 0) + qty
         except Exception as e:
-            print(f"Error reading sales analytics: {e}")
+            print(f"Error loading sales analytics: {e}")
 
-    # 3. Populate past 30 days trends cleanly
+    # Also compute subcategory metrics from active inventory items
+    for item in inv_items:
+        subc = item.get('subcategory', 'general').capitalize()
+        subcat_counts[subc] = subcat_counts.get(subc, 0) + item['stock']
+
+    # 3. Dynamic past 30 days trend line
+    date_labels = []
+    thirty_day_sales_data = []
     for i in range(29, -1, -1):
-        day_label = (datetime.now() - timedelta(days=i)).strftime('%m/%d')
-        date_labels.append(day_label)
-        thirty_day_sales_data.append(((i * 7) % 25) + 12)
+        dt_obj = datetime.now() - timedelta(days=i)
+        dt_str = dt_obj.strftime('%Y-%m-%d')
+        lbl_str = dt_obj.strftime('%m/%d')
+        date_labels.append(lbl_str)
+        # Pull actual sales volume if present, or zero
+        thirty_day_sales_data.append(sales_by_date.get(dt_str, 0))
 
-    # Convert mapping keys & values into flat list formats for Chart.js targets
-    brand_labels = list(brand_counts.keys()) if brand_counts else ["Estee Lauder", "Colorbar", "Mac"]
-    brand_sales_data = list(brand_counts.values()) if brand_counts else [40, 35, 20]
+    brand_labels = list(brand_counts.keys()) if brand_counts else ["Maybelline", "MAC", "Clinique", "Estee Lauder"]
+    brand_sales_data = list(brand_counts.values()) if brand_counts else [35, 25, 20, 15]
 
-    subcategory_labels = list(subcat_counts.keys()) if subcat_counts else ["Lipstick", "Foundation", "Mascara"]
-    subcategory_sales_data = list(subcat_counts.values()) if subcat_counts else [50, 30, 15]
+    subcategory_labels = list(subcat_counts.keys()) if subcat_counts else ["Lipstick", "Foundation", "Perfume", "Concealer"]
+    subcategory_sales_data = list(subcat_counts.values()) if subcat_counts else [45, 30, 20, 15]
 
     return render_template(
         'dashboard.html',
         low_stock_count=low_stock_count,
-        forecast_mode="Active (30-Day SARIMA Pipeline)",
+        forecast_mode=f"Active ({current_branch} Random Forest Pipeline)",
         today_sales_count=today_sales_count,
         date_labels=date_labels,
         thirty_day_sales_data=thirty_day_sales_data,
         brand_labels=brand_labels,
         brand_sales_data=brand_sales_data,
         subcategory_labels=subcategory_labels,
-        subcategory_sales_data=subcategory_sales_data
+        subcategory_sales_data=subcategory_sales_data,
+        current_branch=current_branch
     )
 
-# --- CASCADING CATALOG FILTER API ENDPOINTS ---
+# --- CASCADING CATALOG API ENDPOINTS ---
+
 @app.route('/api/catalog/brands')
+@login_required
 def get_brands():
     brands = set()
-    if os.path.exists(DATA_PATH):
+    current_branch = session.get('branch', 'S001')
+    inv_items = load_inventory(branch=current_branch)
+    for item in inv_items:
+        if item['brand']:
+            brands.add(item['brand'])
+            
+    if not brands and os.path.exists(DATA_PATH):
         with open(DATA_PATH, mode='r', encoding='utf-8') as f:
             for row in csv.DictReader(f):
                 if row.get('brand'): brands.add(row['brand'].strip())
+                
     return jsonify(sorted(list(brands)))
 
 @app.route('/api/catalog/subcategories')
+@login_required
 def get_subcategories():
     brand = request.args.get('brand')
     subcats = set()
-    if os.path.exists(DATA_PATH):
+    current_branch = session.get('branch', 'S001')
+    
+    inv_items = load_inventory(branch=current_branch)
+    for item in inv_items:
+        if item['brand'] == brand and item['subcategory']:
+            subcats.add(item['subcategory'])
+            
+    if not subcats and os.path.exists(DATA_PATH):
         with open(DATA_PATH, mode='r', encoding='utf-8') as f:
             for row in csv.DictReader(f):
                 if row.get('brand') == brand and row.get('subcategory'):
                     subcats.add(row['subcategory'].strip())
+                    
     return jsonify(sorted(list(subcats)))
 
 @app.route('/api/catalog/products')
+@login_required
 def get_products():
     brand = request.args.get('brand')
+    subcat = request.args.get('subcategory')
     products = set()
-    if os.path.exists(DATA_PATH):
+    current_branch = session.get('branch', 'S001')
+
+    inv_items = load_inventory(branch=current_branch)
+    for item in inv_items:
+        if item['brand'] == brand:
+            if not subcat or item['subcategory'] == subcat:
+                products.add(item['product_name'])
+
+    if not products and os.path.exists(DATA_PATH):
         with open(DATA_PATH, mode='r', encoding='utf-8') as f:
             for row in csv.DictReader(f):
-                if row.get('brand') == brand and row.get('product_name'):
-                    products.add(row['product_name'].strip())
+                if row.get('brand') == brand:
+                    if not subcat or row.get('subcategory') == subcat:
+                        if row.get('product_name'):
+                            products.add(row['product_name'].strip())
+
     return jsonify(sorted(list(products)))
 
 @app.route('/api/catalog/product_details')
+@login_required
 def get_product_details():
     prod_name = request.args.get('product_name')
+    current_branch = session.get('branch', 'S001')
+    
+    product_id = 'P0001'
+    price = 25.00
+    stock = 0
+
+    inv_items = load_inventory(branch=current_branch)
+    for item in inv_items:
+        if item['product_name'] == prod_name:
+            product_id = item['product_id'] or product_id
+            stock = item['stock']
+            break
+
     if os.path.exists(DATA_PATH):
         with open(DATA_PATH, mode='r', encoding='utf-8') as f:
             for row in csv.DictReader(f):
                 if row.get('product_name') == prod_name:
-                    return jsonify({
-                        'product_id': row.get('Product_ID', 'P0001').strip(),
-                        'price': float(row.get('Price', 0))
-                    })
-    return jsonify({'product_id': 'P0001', 'price': 0.0})
+                    if not product_id or product_id == 'P0001':
+                        product_id = row.get('Product_ID', 'P0001').strip()
+                    try:
+                        price = float(row.get('Price', price))
+                    except ValueError:
+                        pass
+                    break
 
-# --- WORKFLOW A: RECORD TRANSACTION (SHOPPING CART LOGIC) ---
+    return jsonify({
+        'product_id': product_id,
+        'price': price,
+        'stock': stock
+    })
+
+@app.route('/api/catalog/shades')
+@login_required
+def get_shades():
+    prod_name = request.args.get('product_name', '')
+    shades = get_catalog_shades(prod_name)
+    return jsonify(shades)
+
+# --- TRANSACTION POS SYSTEM ---
+
 @app.route('/record_sale', methods=['GET', 'POST'])
+@login_required
 def record_sale():
-    if 'username' not in session:
-        return redirect(url_for('login'))
     if request.method == 'POST':
-        payload = request.get_json()
+        payload = request.get_json() or {}
         cart = payload.get('cart', [])
         promo = payload.get('promo_code', '').strip()
         
         discount = 1.0
         if promo == "FESTIVE10":
             discount = 0.90
+        elif promo == "VALENTINE15":
+            discount = 0.85
 
         tx_id = f"TX-{int(datetime.now().timestamp())}"
+        current_branch = session.get('branch', 'S001')
+        current_user = session.get('username', 'staff')
+        today_date = datetime.now().strftime('%Y-%m-%d')
         
         with open(SALES_CSV, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             for item in cart:
                 final_unit_price = float(item['price']) * discount
-                total_cost = final_unit_price * int(item['quantity'])
+                qty = int(item['quantity'])
+                total_cost = final_unit_price * qty
+                shade = item.get('shade', 'Default')
+                
                 writer.writerow([
-                    tx_id, session['username'], session['branch'],
-                    item['brand'], item['product_name'], 'Default',
-                    item['quantity'], final_unit_price, total_cost, datetime.now().strftime('%Y-%m-%d')
+                    tx_id, current_user, current_branch,
+                    item['brand'], item['product_name'], shade,
+                    qty, final_unit_price, total_cost, today_date
                 ])
+                
+                # Automatically deduct quantity sold from active branch inventory
+                deduct_inventory_stock(current_branch, item['product_name'], qty)
+
         return jsonify({'status': 'success', 'transaction_id': tx_id})
+        
     return render_template('record_sale.html')
 
-# --- PHYSICAL STOCK VIEWER / RESTOCK CONTROLLER ---
+# --- STOCK LEDGER / RESTOCK CONTROLLER ---
+
 @app.route('/inventory', methods=['GET', 'POST'])
+@login_required
 def inventory_view():
-    if 'username' not in session:
-        return redirect(url_for('login'))
+    current_branch = session.get('branch', 'S001')
 
     if request.method == 'POST':
-        brand = request.form.get('brand')
-        product_name = request.form.get('product')
+        brand = request.form.get('brand', '').strip()
+        product_name = request.form.get('product', '').strip()
         quantity_added = request.form.get('quantity_received', '0').strip()
 
         if brand and product_name and quantity_added.isdigit():
-            updated_rows = []
-            found = False
-            
-            if os.path.exists(INVENTORY_CSV):
-                with open(INVENTORY_CSV, mode='r', encoding='utf-8') as f:
-                    reader = list(csv.DictReader(f))
-                    for row in reader:
-                        if row.get('brand', '').strip() == brand and row.get('product_name', '').strip() == product_name:
-                            new_stock = int(row.get('stock', 0)) + int(quantity_added)
-                            row['stock'] = str(new_stock)
-                            found = True
-                        updated_rows.append(row)
-
-            if not found:
-                updated_rows.append({'brand': brand, 'product_name': product_name, 'stock': quantity_added})
-
-            with open(INVENTORY_CSV, mode='w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=['brand', 'product_name', 'stock'])
-                writer.writeheader()
-                writer.writerows(updated_rows)
-                
-            flash("Stock ledger configuration updated successfully.")
+            update_inventory_stock(current_branch, brand, product_name, int(quantity_added))
+            flash(f"Stock ledger updated for Branch {current_branch}: Added {quantity_added} units of {product_name}.")
             return redirect(url_for('inventory_view'))
 
-    # Read current stock balance records for the UI table display
-    inventory_items = []
-    if os.path.exists(INVENTORY_CSV):
-        with open(INVENTORY_CSV, mode='r', encoding='utf-8') as f:
-            for row in csv.DictReader(f):
-                inventory_items.append({
-                    'brand': row.get('brand', '').strip(),
-                    'product_name': row.get('product_name', '').strip(),
-                    'stock': row.get('stock', '0').strip()
-                })
+    inventory_items = load_inventory(branch=current_branch)
 
-    # Construct complete catalog structure mapping products and prices under distinct brands
+    # Build brand catalog map for dropdown cascading
     catalog_map = {}
     all_subcategories = set()
     
+    for item in inventory_items:
+        b_name = item['brand']
+        p_name = item['product_name']
+        subcat = item['subcategory']
+        if subcat: all_subcategories.add(subcat)
+        if b_name and p_name:
+            if b_name not in catalog_map:
+                catalog_map[b_name] = []
+            if not any(i['name'] == p_name for i in catalog_map[b_name]):
+                catalog_map[b_name].append({'name': p_name, 'price': 25.00})
+
     if os.path.exists(DATA_PATH):
         with open(DATA_PATH, mode='r', encoding='utf-8') as f:
             for row in csv.DictReader(f):
                 b_name = row.get('brand', '').strip()
                 p_name = row.get('product_name', '').strip()
                 subcat = row.get('subcategory', '').strip()
+                try: p_price = float(row.get('Price', 25.0))
+                except ValueError: p_price = 25.0
                 
-                try:
-                    p_price = float(row.get('Price', row.get('price', 0.0)))
-                except ValueError:
-                    p_price = 0.0
-                
-                if subcat:
-                    all_subcategories.add(subcat)
-                
+                if subcat: all_subcategories.add(subcat)
                 if b_name and p_name:
-                    if b_name not in catalog_map:
-                        catalog_map[b_name] = []
-                    if not any(item['name'] == p_name for item in catalog_map[b_name]):
+                    if b_name not in catalog_map: catalog_map[b_name] = []
+                    existing = next((i for i in catalog_map[b_name] if i['name'] == p_name), None)
+                    if not existing:
                         catalog_map[b_name].append({'name': p_name, 'price': p_price})
-
-    sorted_brands = sorted(list(catalog_map.keys()))
-    sorted_subcats = sorted(list(all_subcategories))
+                    else:
+                        existing['price'] = p_price
 
     return render_template(
         'inventory.html', 
         inventory_items=inventory_items,
-        brands=sorted_brands,
-        subcategories=sorted_subcats,
-        catalog_map=catalog_map
+        brands=sorted(list(catalog_map.keys())),
+        subcategories=sorted(list(all_subcategories)),
+        catalog_map=catalog_map,
+        current_branch=current_branch
     )
-# --- WORKFLOW C: LOCALIZED AI FORECASTING SYSTEM ---
+
+# --- AI FORECASTING ENGINE ---
+
 @app.route('/forecast')
+@login_required
 def forecast():
-    if 'username' not in session: 
-        return redirect(url_for('login'))
-    return render_template('forecast.html')
+    return render_template('forecast.html', current_branch=session.get('branch', 'S001'))
 
 @app.route('/predict', methods=['POST'])
+@login_required
 def predict():
-    if 'username' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-        
     try:
         model = joblib.load('models/demand_model.pkl')
         encoders = joblib.load('models/encoders.pkl')
-    except Exception:
-        return jsonify({'error': 'Pipeline assets missing. Run src/train_model.py first.'}), 500
+    except Exception as e:
+        return jsonify({'error': 'Pipeline model assets missing. Please run src/train_model.py first.'}), 500
 
-    input_data = request.get_json()
-    current_month = datetime.now().month
-    holiday_surge_flag = 1 if current_month in [9, 10, 11] else 0 
+    input_data = request.get_json() or {}
+    product_id = input_data.get('product_id', 'P0001')
+    branch_id = session.get('branch', 'S001')
+    price_val = float(input_data.get('price', 25.0))
+    stock_val = int(input_data.get('stock', 10))
+    holiday_ctx = input_data.get('holiday_context', 'none')
+
+    # Determine promotional surge flag
+    curr_month = datetime.now().month
+    is_holiday_ctx = holiday_ctx in ['valentines', 'festive', 'clearance'] or curr_month in [9, 10, 11]
+    holiday_surge_flag = 1 if is_holiday_ctx else 0
+
+    # Encoding product and store IDs with unknown fallback support
+    le_prod = encoders['Product_ID']
+    le_store = encoders['Store_ID']
 
     try:
-        prod_enc = encoders['Product_ID'].transform([input_data.get('product_id', 'P0001')])[0]
-        store_enc = encoders['Store_ID'].transform([session.get('branch', 'S001')])[0]
-        
-        price_val = float(input_data.get('price', 0))
-        stock_val = int(input_data.get('stock', 0))
-        
-        lag_7d = encoders['Global_Sales_Mean']
-        lag_14d = encoders['Global_Sales_Mean']
-        
-        if os.path.exists(DATA_PATH):
-            match_quantities = []
-            with open(DATA_PATH, mode='r', encoding='utf-8') as f:
-                for row in csv.DictReader(f):
-                    if row.get('Product_ID') == input_data.get('product_id') and row.get('Store_ID') == session.get('branch'):
-                        match_quantities.append(float(row.get('Units_Sold', 0)))
-            
-            if len(match_quantities) > 0:
-                lag_7d = np.mean(match_quantities[-7:])
-                lag_14d = np.mean(match_quantities[-14:])
+        prod_enc = le_prod.transform([product_id])[0]
+    except Exception:
+        prod_enc = le_prod.transform(['UNKNOWN'])[0] if 'UNKNOWN' in le_prod.classes_ else 0
 
-        price_inventory_ratio = price_val / (stock_val + 1)
+    try:
+        store_enc = le_store.transform([branch_id])[0]
+    except Exception:
+        store_enc = le_store.transform(['UNKNOWN'])[0] if 'UNKNOWN' in le_store.classes_ else 0
 
-    except ValueError as e:
-        return jsonify({'error': f'Unseen category reference tag passed to encoder: {str(e)}'}), 400
+    # Calculate domain rolling lags incorporating live transaction data
+    global_mean = encoders.get('Global_Sales_Mean', 15.0)
+    lag_7d, lag_14d = calculate_rolling_lags(product_id, branch_id, default_mean=global_mean)
+
+    price_inventory_ratio = price_val / (stock_val + 1)
 
     feature_vector = np.array([
         prod_enc, store_enc, price_val, holiday_surge_flag, lag_7d, lag_14d, price_inventory_ratio
@@ -349,10 +420,14 @@ def predict():
 
     prediction = model.predict(feature_vector)[0]
     predicted_units = max(0, int(round(prediction)))
-    
-    rec = "Stock parameters optimal. Current coverage meets demand expectations."
+
+    # Compute inventory advisory
+    rec = "Stock parameters optimal. Current inventory satisfies predicted branch demand."
     if stock_val < predicted_units:
-        rec = f"Deficit configuration noted. Target optimization requires adding {predicted_units - stock_val} units."
+        deficit = predicted_units - stock_val
+        rec = f"Stock deficit detected. Recommended restock quantity for Branch {branch_id}: add {deficit} units."
+    elif stock_val > predicted_units * 2:
+        rec = "High safety stock volume recorded. Maintain current levels before placing new orders."
 
     return jsonify({
         'predicted_demand': predicted_units,
@@ -360,104 +435,54 @@ def predict():
         'recommendation': rec
     })
 
-# --- DASHBOARD CHART FEED API ENGINE ---
-@app.route('/api/dashboard/metrics')
-def dashboard_metrics():
-    trend_data = {}
-    brand_volumes = {}
-    low_stock_count = 0
-    
-    if os.path.exists(SALES_CSV):
-        with open(SALES_CSV, 'r', encoding='utf-8') as f:
-            for row in csv.DictReader(f):
-                dt = row.get('date', '').strip()
-                qty = int(row.get('quantity', 0)) if row.get('quantity') else 0
-                br = row.get('brand', '').strip()
-                
-                if dt: trend_data[dt] = trend_data.get(dt, 0) + qty
-                if br: brand_volumes[br] = brand_volumes.get(br, 0) + qty
+# --- ADMIN USER & CATALOG MANAGEMENT ---
 
-    if os.path.exists(INVENTORY_CSV):
-        with open(INVENTORY_CSV, 'r', encoding='utf-8') as f:
-            for row in csv.DictReader(f):
-                if row.get('stock') and int(row.get('stock', 0)) < 10:
-                    low_stock_count += 1
-
-    return jsonify({
-        'trend': trend_data,
-        'brands': brand_volumes,
-        'low_stock_items': low_stock_count
-    })
-
-# --- WORKFLOW B: ADMINISTRATIVE CATALOG & USER CONTROLS ---
 @app.route('/admin/manage_users', methods=['GET', 'POST'])
+@admin_required
 def manage_users():
-    if session.get('role') != 'admin': 
-        return "Unauthorized Access Denied", 403
-        
     if request.method == 'POST':
-        user = request.form['username'].strip()
-        pwd = request.form['password'].strip()
-        role = request.form['role'].strip()
-        h_pwd = hashlib.sha256(pwd.encode()).hexdigest()
-        
-        file_exists = os.path.exists(USERS_CSV)
-        with open(USERS_CSV, 'a', newline='', encoding='utf-8') as f:
-            fieldnames = ['username', 'password_hash', 'role']
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            
-            if not file_exists or os.stat(USERS_CSV).st_size == 0:
-                writer.writeheader()
-                
-            writer.writerow({
-                'username': user,
-                'password_hash': h_pwd,
-                'role': role
-            })
-            
-        flash("User structural deployment logged successfully to file.")
+        user = request.form.get('username', '').strip()
+        pwd = request.form.get('password', '').strip()
+        role = request.form.get('role', 'staff').strip()
+        branch = request.form.get('branch', 'S001').strip()
+
+        success, msg = save_user(user, pwd, role, branch)
+        if success:
+            flash(f"User account '{user}' created successfully for Branch {branch}.")
+        else:
+            flash(f"User creation failed: {msg}")
         return redirect(url_for('manage_users'))
-        
-    return render_template('manage_users.html')
+
+    current_users = load_users()
+    return render_template('manage_users.html', current_users=current_users)
 
 @app.route('/admin/catalog', methods=['GET', 'POST'])
+@admin_required
 def update_catalog():
-    if session.get('role') != 'admin': 
-        return "Unauthorized Access Denied", 403
     if request.method == 'POST':
-        with open(DATA_PATH, 'a', newline='', encoding='utf-8') as f:
-            csv.writer(f).writerow([
-                datetime.now().strftime('%Y-%m-%d'), 
-                request.form['store_id'].strip(), 
-                request.form['product_id'].strip(),
-                request.form['brand'].strip(), 
-                request.form['product_name'].strip(), 
-                request.form['subcategory'].strip(),
-                'makeup', 'Bagmati', 'Kathmandu', 0, 100, 
-                request.form['price'], 0
-            ])
-        flash("Master data catalog expanded successfully.")
+        b_id = request.form.get('store_id', 'S001').strip()
+        p_id = request.form.get('product_id', '').strip()
+        brand = request.form.get('brand', '').strip()
+        p_name = request.form.get('product_name', '').strip()
+        subcat = request.form.get('subcategory', '').strip()
+        price = request.form.get('price', '25.00').strip()
+
+        # Add item to inventory.csv with all 7 columns
+        update_inventory_stock(b_id, brand, p_name, 25)
+        flash(f"Master product catalog expanded. Added '{p_name}' under brand '{brand}'.")
+        return redirect(url_for('update_catalog'))
+
     return render_template('catalog.html')
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
-
 if __name__ == '__main__':
-    if not os.path.exists(USERS_CSV):
-        with open(USERS_CSV, 'w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow(['username', 'password_hash', 'role'])
-            writer.writerow(['admin', hashlib.sha256('admin123'.encode()).hexdigest(), 'admin'])
-            writer.writerow(['staff', hashlib.sha256('staff123'.encode()).hexdigest(), 'staff'])
-            
+    # Initialize default admin/staff accounts if users.csv missing
+    if not os.path.exists(USERS_CSV) or os.path.getsize(USERS_CSV) == 0:
+        save_user('admin', 'admin123', role='admin', branch='S001')
+        save_user('staff', 'staff123', role='staff', branch='S001')
+
     os.makedirs('data', exist_ok=True)
-    if not os.path.exists(INVENTORY_CSV):
-        with open(INVENTORY_CSV, 'w', newline='', encoding='utf-8') as f:
-            csv.writer(f).writerow(['brand', 'product_name', 'stock'])
     if not os.path.exists(SALES_CSV):
         with open(SALES_CSV, 'w', newline='', encoding='utf-8') as f:
             csv.writer(f).writerow(['tx_id', 'username', 'branch', 'brand', 'product_name', 'shade', 'quantity', 'price', 'total', 'date'])
 
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
