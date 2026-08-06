@@ -5,16 +5,26 @@ import csv
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from contextlib import contextmanager
+
 DB_PATH = 'data/noire_retail.db'
 
+@contextmanager
 def get_db(db_path=DB_PATH):
-    """Establishes thread-safe SQLite connection with WAL mode and Foreign Keys enabled."""
+    """Establishes thread-safe SQLite connection with WAL mode, Foreign Keys enabled, and automatic connection closure."""
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path, timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA journal_mode = WAL;")
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 def init_db(db_path=DB_PATH):
     """Initializes normalized relational SQLite schema tables and indexes."""
