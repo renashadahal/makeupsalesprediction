@@ -10,11 +10,11 @@
         <form method="POST" class="space-y-4 text-xs tracking-wide">
             <div>
                 <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Operator Username</label>
-                <input type="text" name="username" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                <input type="text" name="username" required placeholder="e.g. operator_s001" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
             </div>
             <div>
                 <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Raw Password Phrase</label>
-                <input type="password" name="password" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                <input type="password" name="password" required placeholder="••••••••" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
             </div>
             <div>
                 <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Authorization Role Tier</label>
@@ -39,36 +39,73 @@
 
     <!-- Right Panel Card: Live Registered Users Table -->
     <div class="lg:col-span-2 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md overflow-hidden">
-        <h2 class="text-3xl text-noireText mb-2">Active System Accounts</h2>
-        <p class="text-xs text-noireText/60 mb-6 font-light leading-relaxed">Live list of system identifiers registered in users catalog index.</p>
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-3xl text-noireText">Active System Accounts</h2>
+            <span class="text-xs font-mono font-bold bg-white/80 border border-noireText/10 px-3 py-1 rounded-lg text-noireText">
+                {{ current_users|length if current_users else 0 }} Operators
+            </span>
+        </div>
+        <p class="text-xs text-noireText/60 mb-6 font-light leading-relaxed">Live list of system identifiers registered in the relational users catalog.</p>
         
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+            <table class="w-full text-left text-xs tracking-wide">
                 <thead>
-                    <tr class="border-b border-noireText/10 text-noireText/50 uppercase text-[10px] tracking-widest">
-                        <th class="pb-3 px-2">Operator Username</th>
-                        <th class="pb-3 px-2">Assigned Branch</th>
-                        <th class="pb-3 px-2">Security Authorization Assignment</th>
+                    <tr class="border-b border-noireText/10 text-noireText/60 uppercase text-[10px] tracking-widest">
+                        <th class="pb-3 px-3 font-semibold">Operator Username</th>
+                        <th class="pb-3 px-3 font-semibold">Branch</th>
+                        <th class="pb-3 px-3 font-semibold">Role Tier</th>
+                        <th class="pb-3 px-3 font-semibold text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-noireText/5 text-noireText">
                     {% if current_users %}
                         {% for u in current_users %}
-                        <tr class="hover:bg-velvet/30 transition-colors">
-                            <td class="py-3 px-2 font-medium tracking-wide">{{ u.username }}</td>
-                            <td class="py-3 px-2 font-mono text-xs">{{ u.branch or 'S001' }}</td>
-                            <td class="py-3 px-2">
+                        <tr class="hover:bg-velvet/40 transition-colors">
+                            <td class="py-3 px-3 font-medium whitespace-nowrap">
+                                <span class="inline-flex items-center gap-1.5 max-w-[150px] truncate" title="{{ u.username }}">
+                                    <span class="w-2 h-2 rounded-full {% if u.role == 'admin' %}bg-dustyRose{% else %}bg-emerald-600{% endif %}"></span>
+                                    <span class="truncate font-semibold">{{ u.username }}</span>
+                                    {% if u.username == session.get('username') %}
+                                        <span class="text-[9px] bg-dustyRose/20 text-dustyRose font-bold px-1.5 py-0.2 rounded">YOU</span>
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td class="py-3 px-3 font-mono font-bold text-noireText/70 whitespace-nowrap">{{ u.branch or 'S001' }}</td>
+                            <td class="py-3 px-3 whitespace-nowrap">
                                 {% if u.role == 'admin' %}
-                                    <span class="px-3 py-1 rounded-full text-[10px] font-medium tracking-widest bg-deepWine text-velvet uppercase border border-noireText/10">Admin</span>
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider bg-deepWine text-velvet uppercase border border-noireText/10">Admin</span>
                                 {% else %}
-                                    <span class="px-3 py-1 rounded-full text-[10px] font-medium tracking-widest bg-velvet text-noireText/70 uppercase border border-noireText/5">Staff</span>
+                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider bg-white text-noireText/80 uppercase border border-noireText/10">Staff</span>
                                 {% endif %}
+                            </td>
+                            <td class="py-3 px-3 text-right whitespace-nowrap">
+                                <div class="inline-flex items-center gap-1.5">
+                                    <!-- Edit Trigger Button -->
+                                    <button type="button" 
+                                            onclick="openEditModal('{{ u.username }}', '{{ u.role }}', '{{ u.branch or 'S001' }}')" 
+                                            class="px-2.5 py-1 bg-white hover:bg-deepWine hover:text-velvet text-noireText border border-noireText/15 rounded-lg text-xs font-medium transition-all shadow-sm">
+                                        Edit
+                                    </button>
+
+                                    <!-- Delete Trigger Button -->
+                                    {% if u.username == session.get('username') %}
+                                        <button type="button" disabled title="Self-deletion prohibited for active session" class="px-2.5 py-1 bg-noireText/5 text-noireText/30 border border-noireText/5 rounded-lg text-xs cursor-not-allowed">
+                                            Delete
+                                        </button>
+                                    {% else %}
+                                        <button type="button" 
+                                                onclick="openDeleteModal('{{ u.username }}')" 
+                                                class="px-2.5 py-1 bg-rose-50 hover:bg-rose-700 hover:text-white text-rose-800 border border-rose-200 rounded-lg text-xs font-medium transition-all shadow-sm">
+                                            Delete
+                                        </button>
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="3" class="py-6 text-center text-noireText/40 italic text-xs">No active users returned from registration lookup.</td>
+                            <td colspan="4" class="py-8 text-center text-noireText/40 italic text-xs">No active users returned from registration lookup.</td>
                         </tr>
                     {% endif %}
                 </tbody>
@@ -76,4 +113,119 @@
         </div>
     </div>
 </div>
+
+<!-- ================= EDIT USER MODAL ================= -->
+<div id="editUserModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 hidden">
+    <div class="bg-parchment rounded-2xl border border-noireText/15 shadow-2xl max-w-md w-full p-6 text-xs tracking-wide space-y-5 animate-fadeIn">
+        <div class="flex items-center justify-between border-b border-noireText/10 pb-3">
+            <div>
+                <h3 class="text-2xl font-serif text-noireText">Modify Operator</h3>
+                <p class="text-[11px] text-noireText/60 mt-0.5">Updating account: <span id="editUsernameDisplay" class="font-bold font-mono text-deepWine"></span></p>
+            </div>
+            <button type="button" onclick="closeEditModal()" class="text-noireText/50 hover:text-noireText text-lg p-1">✕</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('edit_user') }}" class="space-y-4">
+            <input type="hidden" name="username" id="editUsernameInput">
+            
+            <div>
+                <label class="block font-medium mb-1 uppercase text-noireText/70 tracking-widest text-[10px]">New Password Phrase</label>
+                <input type="password" name="password" id="editPasswordInput" placeholder="Leave blank to keep existing password" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
+                <p class="text-[10px] text-noireText/50 mt-1 italic">Only enter a new password if resetting credentials.</p>
+            </div>
+
+            <div>
+                <label class="block font-medium mb-1 uppercase text-noireText/70 tracking-widest text-[10px]">Authorization Role Tier</label>
+                <select name="role" id="editRoleSelect" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
+                    <option value="staff">Standard Branch Operator (Staff)</option>
+                    <option value="admin">Global Admin Manager (Admin)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block font-medium mb-1 uppercase text-noireText/70 tracking-widest text-[10px]">Assigned Operating Branch</label>
+                <select name="branch" id="editBranchSelect" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
+                    {% for b in ['S001', 'S002', 'S003', 'S004', 'S005'] %}
+                        <option value="{{ b }}">Branch {{ b }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-noireText/10">
+                <button type="button" onclick="closeEditModal()" class="px-4 py-2.5 bg-white hover:bg-noireText/10 text-noireText font-medium uppercase tracking-wider text-[11px] rounded-xl border border-noireText/15 transition-all">
+                    Cancel
+                </button>
+                <button type="submit" class="px-5 py-2.5 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-[11px] rounded-xl transition-all shadow-md">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= DELETE CONFIRMATION MODAL ================= -->
+<div id="deleteUserModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 hidden">
+    <div class="bg-white rounded-2xl border border-rose-200 shadow-2xl max-w-md w-full p-6 text-xs tracking-wide space-y-4 animate-fadeIn">
+        <div class="flex items-center gap-3 text-rose-800">
+            <div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-lg font-bold">
+                ⚠️
+            </div>
+            <div>
+                <h3 class="text-xl font-serif text-noireText">Confirm Account Deletion</h3>
+                <p class="text-[11px] text-noireText/60">This action is permanent and cannot be reversed.</p>
+            </div>
+        </div>
+
+        <p class="text-xs text-noireText/80 leading-relaxed bg-rose-50/70 p-3.5 rounded-xl border border-rose-100">
+            Are you sure you want to permanently remove operator account <strong id="deleteUsernameDisplay" class="font-mono text-rose-900 font-bold"></strong> from system credentials?
+        </p>
+
+        <form id="deleteUserForm" method="POST" action="" class="flex items-center justify-end gap-3 pt-2">
+            <button type="button" onclick="closeDeleteModal()" class="px-4 py-2.5 bg-parchment hover:bg-noireText/10 text-noireText font-medium uppercase tracking-wider text-[11px] rounded-xl border border-noireText/15 transition-all">
+                Cancel
+            </button>
+            <button type="submit" class="px-5 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-medium uppercase tracking-widest text-[11px] rounded-xl transition-all shadow-md">
+                Confirm Delete
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditModal(username, role, branch) {
+    document.getElementById('editUsernameInput').value = username;
+    document.getElementById('editUsernameDisplay').innerText = username;
+    document.getElementById('editRoleSelect').value = role;
+    document.getElementById('editBranchSelect').value = branch;
+    document.getElementById('editPasswordInput').value = '';
+    
+    document.getElementById('editUserModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+    document.getElementById('editUserModal').classList.add('hidden');
+}
+
+function openDeleteModal(username) {
+    document.getElementById('deleteUsernameDisplay').innerText = username;
+    document.getElementById('deleteUserForm').action = '/admin/manage_users/delete/' + encodeURIComponent(username);
+    document.getElementById('deleteUserModal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteUserModal').classList.add('hidden');
+}
+
+// Close modals when clicking on backdrop
+window.addEventListener('click', function(event) {
+    const editModal = document.getElementById('editUserModal');
+    const deleteModal = document.getElementById('deleteUserModal');
+    if (event.target === editModal) {
+        closeEditModal();
+    }
+    if (event.target === deleteModal) {
+        closeDeleteModal();
+    }
+});
+</script>
 {% endblock %}
