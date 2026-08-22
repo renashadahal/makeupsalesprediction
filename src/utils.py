@@ -12,13 +12,13 @@ from datetime import datetime
 
 try:
     from src.database import (
-        db_load_users, db_save_user, db_verify_user,
+        db_load_users, db_save_user, db_verify_user, db_update_user, db_delete_user,
         db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
         db_load_transactions, db_calculate_rolling_lags, get_db, DB_PATH
     )
 except ModuleNotFoundError:
     from database import (
-        db_load_users, db_save_user, db_verify_user,
+        db_load_users, db_save_user, db_verify_user, db_update_user, db_delete_user,
         db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
         db_load_transactions, db_calculate_rolling_lags, get_db, DB_PATH
     )
@@ -35,6 +35,12 @@ def load_users(db_path=DB_PATH):
 
 def save_user(username, password, role='staff', branch='S001', db_path=DB_PATH):
     return db_save_user(username, password, role=role, branch=branch, db_path=db_path)
+
+def update_user(username, password=None, role=None, branch=None, db_path=DB_PATH):
+    return db_update_user(username, password=password, role=role, branch=branch, db_path=db_path)
+
+def delete_user(username, current_admin_user=None, db_path=DB_PATH):
+    return db_delete_user(username, current_admin_user=current_admin_user, db_path=db_path)
 
 def verify_user(username, password, db_path=DB_PATH):
     return db_verify_user(username, password, db_path=db_path)

@@ -204,6 +204,67 @@ def db_verify_user(username, password, db_path=DB_PATH):
                 return user
     return None
 
+def db_update_user(username, password=None, role=None, branch=None, db_path=DB_PATH):
+    """Updates user security credentials, role tier, or branch assignment."""
+    username = username.strip()
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        user_row = cursor.execute("SELECT user_id, role, branch_id FROM users WHERE username = ?;", (username,)).fetchone()
+        if not user_row:
+            return False, f"User '{username}' not found."
+
+        updates = []
+        params = []
+
+        if password and str(password).strip():
+            hashed = generate_password_hash(str(password).strip())
+            updates.append("password_hash = ?")
+            params.append(hashed)
+
+        if role and role in ['admin', 'staff']:
+            # Safety check: Prevent demoting the last remaining admin
+            if user_row['role'] == 'admin' and role != 'admin':
+                admin_count = cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'admin';").fetchone()[0]
+                if admin_count <= 1:
+                    return False, "Cannot change role: at least one administrator account must remain active."
+            updates.append("role = ?")
+            params.append(role)
+
+        if branch:
+            updates.append("branch_id = ?")
+            params.append(branch)
+
+        if not updates:
+            return True, "No changes provided."
+
+        params.append(username)
+        query = f"UPDATE users SET {', '.join(updates)} WHERE username = ?;"
+        cursor.execute(query, params)
+        conn.commit()
+        return True, f"User account '{username}' updated successfully."
+
+def db_delete_user(username, current_admin_user=None, db_path=DB_PATH):
+    """Deletes a user account with safety guards against self-lockout or deleting the last admin."""
+    username = username.strip()
+    if current_admin_user and username.lower() == str(current_admin_user).strip().lower():
+        return False, "Cannot delete currently logged-in administrator account."
+
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        user_row = cursor.execute("SELECT user_id, role FROM users WHERE username = ?;", (username,)).fetchone()
+        if not user_row:
+            return False, f"User '{username}' not found."
+
+        if user_row['role'] == 'admin':
+            admin_count = cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'admin';").fetchone()[0]
+            if admin_count <= 1:
+                return False, "Cannot delete the last remaining administrator account."
+
+        cursor.execute("DELETE FROM users WHERE username = ?;", (username,))
+        conn.commit()
+        return True, f"User account '{username}' removed successfully."
+
+
 def db_load_inventory(branch=None, db_path=DB_PATH):
     """Loads inventory stock joined with master product, brand, and subcategory tables."""
     with get_db(db_path) as conn:
