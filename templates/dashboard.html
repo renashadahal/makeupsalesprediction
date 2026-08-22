@@ -15,7 +15,10 @@
         <!-- Today's Transactions -->
         <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-sm flex flex-col justify-between">
             <div>
-                <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Volume Today</span>
+                <div class="flex items-center justify-between">
+                    <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Volume Today</span>
+                    <a href="{{ url_for('sales_history') }}" class="text-[10px] text-dustyRose hover:text-deepWine uppercase font-bold tracking-wider underline">Audit Log →</a>
+                </div>
                 <h3 class="text-4xl font-mono font-bold text-noireText mt-2">{{ today_sales_count if today_sales_count is not none else 0 }}</h3>
             </div>
             <p class="text-[11px] text-emerald-700 font-medium mt-3 flex items-center gap-1">
