@@ -7,7 +7,7 @@ import uuid
 from werkzeug.security import generate_password_hash
 from app import app
 from src.utils import (
-    verify_user, save_user, load_users, 
+    verify_user, save_user, update_user, delete_user, load_users, 
     load_inventory, update_inventory_stock, deduct_inventory_stock,
     get_catalog_shades, calculate_rolling_lags
 )
@@ -255,4 +255,103 @@ def test_sales_history_displays_recorded_transactions(client):
     assert 'S002' in hist_html
     assert 'FESTIVE10' in hist_html
     assert unique_prod in hist_html
+
+# --- 8. ADMIN USER EDIT & DELETE TESTS ---
+
+def test_admin_edit_user_password_and_branch(client):
+    uname = f"edit_test_{uuid.uuid4().hex[:6]}"
+    save_user(uname, "oldpass123", role="staff", branch="S001")
+
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    edit_data = {
+        'username': uname,
+        'password': 'newpass456',
+        'role': 'admin',
+        'branch': 'S004'
+    }
+    resp = client.post('/admin/manage_users/edit', data=edit_data, follow_redirects=True)
+    assert resp.status_code == 200
+
+    # Verify old password fails and new password succeeds
+    assert verify_user(uname, "oldpass123") is None
+    updated = verify_user(uname, "newpass456")
+    assert updated is not None
+    assert updated['role'] == 'admin'
+    assert updated['branch'] == 'S004'
+
+def test_admin_edit_user_preserve_existing_password(client):
+    uname = f"pres_test_{uuid.uuid4().hex[:6]}"
+    save_user(uname, "preserveme999", role="staff", branch="S001")
+
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    edit_data = {
+        'username': uname,
+        'password': '',  # Empty password leaves existing password untouched
+        'role': 'staff',
+        'branch': 'S003'
+    }
+    resp = client.post('/admin/manage_users/edit', data=edit_data, follow_redirects=True)
+    assert resp.status_code == 200
+
+    # Old password should still verify
+    verified = verify_user(uname, "preserveme999")
+    assert verified is not None
+    assert verified['branch'] == 'S003'
+
+def test_admin_delete_user_workflow(client):
+    uname = f"del_test_{uuid.uuid4().hex[:6]}"
+    save_user(uname, "tempdelpass", role="staff", branch="S002")
+    assert verify_user(uname, "tempdelpass") is not None
+
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    resp = client.post(f'/admin/manage_users/delete/{uname}', follow_redirects=True)
+    assert resp.status_code == 200
+
+    # Verify user no longer exists
+    assert verify_user(uname, "tempdelpass") is None
+    users = load_users()
+    assert not any(u['username'] == uname for u in users)
+
+def test_admin_self_deletion_prohibition(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    resp = client.post('/admin/manage_users/delete/admin', follow_redirects=True)
+    assert resp.status_code == 200
+
+    # Admin should still exist
+    users = load_users()
+    assert any(u['username'] == 'admin' for u in users)
+
+def test_staff_cannot_edit_or_delete_users(client):
+    target = f"staff_target_{uuid.uuid4().hex[:6]}"
+    save_user(target, "somepass123", role="staff", branch="S001")
+
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S001'
+
+    # Attempt edit
+    edit_resp = client.post('/admin/manage_users/edit', data={'username': target, 'branch': 'S005'})
+    assert edit_resp.status_code == 403
+
+    # Attempt delete
+    del_resp = client.post(f'/admin/manage_users/delete/{target}')
+    assert del_resp.status_code == 403
+
 
