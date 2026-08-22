@@ -14,13 +14,13 @@ try:
     from src.database import (
         db_load_users, db_save_user, db_verify_user,
         db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
-        db_calculate_rolling_lags, get_db, DB_PATH
+        db_load_transactions, db_calculate_rolling_lags, get_db, DB_PATH
     )
 except ModuleNotFoundError:
     from database import (
         db_load_users, db_save_user, db_verify_user,
         db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
-        db_calculate_rolling_lags, get_db, DB_PATH
+        db_load_transactions, db_calculate_rolling_lags, get_db, DB_PATH
     )
 
 USERS_CSV = 'users.csv'
@@ -38,6 +38,11 @@ def save_user(username, password, role='staff', branch='S001', db_path=DB_PATH):
 
 def verify_user(username, password, db_path=DB_PATH):
     return db_verify_user(username, password, db_path=db_path)
+
+# --- SALES TRANSACTIONS UTILITIES ---
+
+def load_transactions(branch=None, limit=None, db_path=DB_PATH):
+    return db_load_transactions(branch=branch, limit=limit, db_path=db_path)
 
 # --- INVENTORY MANAGEMENT UTILITIES ---
 

@@ -403,3 +403,90 @@ def db_calculate_rolling_lags(product_id, branch_id, default_mean=15.0, db_path=
         lag_7d = float(sum(units[:7]) / min(len(units), 7))
         lag_14d = float(sum(units) / len(units))
         return lag_7d, lag_14d
+
+def db_load_transactions(branch=None, limit=None, db_path=DB_PATH):
+    """Loads transactions along with their nested line items for sales history auditing."""
+    with get_db(db_path) as conn:
+        query = """
+        SELECT 
+            t.transaction_id,
+            t.username,
+            t.branch_id,
+            t.promo_code,
+            t.discount_rate,
+            t.grand_total,
+            t.transaction_date,
+            t.created_at
+        FROM transactions t
+        """
+        params = []
+        if branch:
+            query += " WHERE t.branch_id = ?"
+            params.append(branch)
+        query += " ORDER BY t.transaction_date DESC, t.created_at DESC, t.transaction_id DESC"
+        if limit:
+            query += f" LIMIT {int(limit)}"
+        query += ";"
+
+        tx_rows = conn.execute(query, params).fetchall()
+        if not tx_rows:
+            return []
+
+        tx_ids = [r['transaction_id'] for r in tx_rows]
+        placeholders = ','.join(['?'] * len(tx_ids))
+        items_query = f"""
+        SELECT 
+            ti.transaction_id,
+            ti.shade,
+            ti.quantity,
+            ti.unit_price,
+            ti.subtotal,
+            p.product_name,
+            b.brand_name
+        FROM transaction_items ti
+        JOIN products p ON ti.product_id = p.product_id
+        JOIN brands b ON p.brand_id = b.brand_id
+        WHERE ti.transaction_id IN ({placeholders})
+        ORDER BY ti.item_id ASC;
+        """
+        item_rows = conn.execute(items_query, tx_ids).fetchall()
+
+        items_by_tx = {}
+        for item in item_rows:
+            t_id = item['transaction_id']
+            if t_id not in items_by_tx:
+                items_by_tx[t_id] = []
+            items_by_tx[t_id].append({
+                'brand_name': item['brand_name'],
+                'product_name': item['product_name'],
+                'shade': item['shade'] if item['shade'] else 'Default',
+                'quantity': item['quantity'],
+                'unit_price': item['unit_price'],
+                'subtotal': item['subtotal']
+            })
+
+        transactions = []
+        for r in tx_rows:
+            t_id = r['transaction_id']
+            t_items = items_by_tx.get(t_id, [])
+
+            if t_items:
+                product_summary = ", ".join([f"{it['product_name']} (x{it['quantity']})" for it in t_items])
+            else:
+                product_summary = "N/A"
+
+            transactions.append({
+                'transaction_id': t_id,
+                'username': r['username'],
+                'branch_id': r['branch_id'],
+                'promo_code': r['promo_code'],
+                'discount_rate': r['discount_rate'],
+                'grand_total': r['grand_total'],
+                'transaction_date': r['transaction_date'],
+                'created_at': r['created_at'],
+                'product_summary': product_summary,
+                'transaction_items': t_items
+            })
+
+        return transactions
+
