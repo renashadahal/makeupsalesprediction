@@ -354,4 +354,33 @@ def test_staff_cannot_edit_or_delete_users(client):
     del_resp = client.post(f'/admin/manage_users/delete/{target}')
     assert del_resp.status_code == 403
 
+# --- 9. INVENTORY SORTING & METADATA TESTS ---
+
+def test_inventory_ledger_metadata_and_sort_attributes():
+    unique_prod = f"SortTestProd_{uuid.uuid4().hex[:4]}"
+    update_inventory_stock("S001", "Fenty", unique_prod, 42)
+
+    inv = load_inventory(branch="S001")
+    match = next(i for i in inv if i['product_name'] == unique_prod)
+    assert match is not None
+    assert 'inventory_id' in match
+    assert 'last_updated' in match
+    assert match['stock'] == 42
+
+def test_inventory_view_renders_sort_controls(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    resp = client.get('/inventory')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'table_sort' in html
+    assert 'Most Recent Stock Added' in html
+    assert 'Stock: Low to High' in html
+    assert 'data-updated' in html
+    assert 'data-stock' in html
+
+
 
