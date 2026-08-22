@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 from src.database import (
-    init_db, get_db, db_verify_user, db_load_users, db_save_user,
+    init_db, get_db, db_verify_user, db_load_users, db_save_user, db_update_user, db_delete_user,
     db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
     db_record_transaction, db_load_transactions, db_calculate_rolling_lags, DB_PATH
 )
@@ -429,6 +429,42 @@ def manage_users():
 
     current_users = db_load_users()
     return render_template('manage_users.html', current_users=current_users)
+
+@app.route('/admin/manage_users/edit', methods=['POST'])
+@admin_required
+def edit_user():
+    user = request.form.get('username', '').strip()
+    pwd = request.form.get('password', '').strip()
+    role = request.form.get('role', '').strip()
+    branch = request.form.get('branch', '').strip()
+
+    if not user:
+        flash("Target username is required for modification.")
+        return redirect(url_for('manage_users'))
+
+    success, msg = db_update_user(user, password=pwd if pwd else None, role=role if role else None, branch=branch if branch else None)
+    if success:
+        flash(f"User account '{user}' updated successfully.")
+        # If the logged in user modified their own profile, sync session
+        if session.get('username') == user:
+            if role: session['role'] = role
+            if branch: session['branch'] = branch
+    else:
+        flash(f"Update failed: {msg}")
+
+    return redirect(url_for('manage_users'))
+
+@app.route('/admin/manage_users/delete/<username>', methods=['POST'])
+@admin_required
+def delete_user_route(username):
+    current_admin = session.get('username')
+    success, msg = db_delete_user(username, current_admin_user=current_admin)
+    if success:
+        flash(f"User account '{username}' successfully deleted.")
+    else:
+        flash(f"Deletion failed: {msg}")
+
+    return redirect(url_for('manage_users'))
 
 @app.route('/admin/catalog', methods=['GET', 'POST'])
 @admin_required
