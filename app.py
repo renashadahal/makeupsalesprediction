@@ -8,7 +8,7 @@ from functools import wraps
 from src.database import (
     init_db, get_db, db_verify_user, db_load_users, db_save_user,
     db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
-    db_record_transaction, db_calculate_rolling_lags, DB_PATH
+    db_record_transaction, db_load_transactions, db_calculate_rolling_lags, DB_PATH
 )
 from src.utils import get_catalog_shades
 
@@ -279,6 +279,26 @@ def record_sale():
         return jsonify({'status': 'success', 'transaction_id': tx_id, 'receipt': receipt})
         
     return render_template('record_sale.html')
+
+# --- SALES AUDIT & TRANSACTION HISTORY ---
+
+@app.route('/sales_history')
+@login_required
+def sales_history():
+    current_branch = session.get('branch', 'S001')
+    branch_param = request.args.get('branch', current_branch)
+    
+    if branch_param == 'ALL':
+        transactions = db_load_transactions()
+    else:
+        transactions = db_load_transactions(branch=branch_param)
+
+    return render_template(
+        'sales_history.html',
+        transactions=transactions,
+        current_branch=current_branch,
+        selected_branch=branch_param
+    )
 
 # --- STOCK LEDGER / RESTOCK CONTROLLER ---
 
