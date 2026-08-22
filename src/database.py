@@ -270,6 +270,7 @@ def db_load_inventory(branch=None, db_path=DB_PATH):
     with get_db(db_path) as conn:
         query = """
         SELECT 
+            i.inventory_id,
             i.branch_id as branch,
             p.product_id,
             b.brand_name as brand,
@@ -277,7 +278,8 @@ def db_load_inventory(branch=None, db_path=DB_PATH):
             s.subcategory_name as subcategory,
             p.product_name,
             i.stock,
-            p.base_price as price
+            p.base_price as price,
+            i.last_updated
         FROM inventory i
         JOIN products p ON i.product_id = p.product_id
         JOIN brands b ON p.brand_id = b.brand_id
@@ -289,7 +291,7 @@ def db_load_inventory(branch=None, db_path=DB_PATH):
             query += " WHERE i.branch_id = ?"
             params.append(branch)
             
-        query += " ORDER BY b.brand_name, p.product_name;"
+        query += " ORDER BY i.last_updated DESC, i.inventory_id DESC;"
         rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
