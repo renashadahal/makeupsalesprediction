@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
+
+    <!-- Title and Navigation Header -->
+    <div class="border-b border-noireText/10 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-4xl text-noireText font-serif">Sales Transaction History</h2>
+            <p class="text-xs text-noireText/60 font-light mt-1">Audit past sales transactions, filter by staff member, or inspect individual receipts.</p>
+        </div>
+        <a href="/" class="px-5 py-2.5 border border-noireText/20 hover:border-noireText/40 text-noireText font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-sm flex items-center gap-2 self-start md:self-auto">
+            ← Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs tracking-wide">
+            <div class="md:col-span-3 flex flex-col gap-1.5">
+                <label for="searchInput" class="font-semibold uppercase text-noireText/70 tracking-widest">Search Transactions</label>
+                <input type="text" id="searchInput" placeholder="Search by Staff Username, Tx ID, Date, Product Name, or Promo Code..." class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
+            </div>
+            <div class="flex items-end">
+                <button type="button" onclick="filterSales()" class="w-full px-6 py-2.5 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md h-[42px]">
+                    Filter
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sales Table -->
+    <div class="bg-white rounded-2xl border border-noireText/10 shadow-md overflow-hidden">
+        <div class="overflow-x-auto w-full">
+            <table class="w-full text-left text-xs tracking-wide border-collapse" id="salesTable">
+                <thead>
+                    <tr class="bg-parchment/30 border-b border-noireText/10 text-noireText/70 uppercase text-[10px] tracking-widest">
+                        <th class="py-4 px-6 font-semibold">Tx ID</th>
+                        <th class="py-4 px-6 font-semibold">Date & Time</th>
+                        <th class="py-4 px-6 font-semibold">Staff Member</th>
+                        <th class="py-4 px-6 font-semibold">Branch</th>
+                        <th class="py-4 px-6 font-semibold">Products Sold</th>
+                        <th class="py-4 px-6 font-semibold">Promo Code</th>
+                        <th class="py-4 px-6 font-semibold">Grand Total</th>
+                        <th class="py-4 px-6 font-semibold text-center">Items</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if transactions is defined and transactions %}
+                        {% for tx in transactions %}
+                        <tr class="sale-row border-b border-noireText/5 hover:bg-velvet/20 transition-colors">
+                            <td class="py-4 px-6 font-mono font-bold text-noireText">{{ tx.transaction_id }}</td>
+                            <td class="py-4 px-6 text-noireText/80">{{ tx.transaction_date }}</td>
+                            <td class="py-4 px-6">
+                                <span class="bg-parchment px-2.5 py-1 rounded-lg text-noireText font-medium border border-noireText/10">
+                                    {{ tx.username }}
+                                </span>
+                            </td>
+                            <td class="py-4 px-6 font-mono text-noireText/70">{{ tx.branch_id }}</td>
+                            <td class="py-4 px-6 text-noireText/80 max-w-xs truncate" title="{{ tx.product_summary }}">{{ tx.product_summary }}</td>
+                            <td class="py-4 px-6">
+                                {% if tx.promo_code %}
+                                    <span class="text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-emerald-200/50">
+                                        {{ tx.promo_code }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-noireText/30">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-6 font-mono font-bold text-emerald-700">${{ "%.2f"|format(tx.grand_total) }}</td>
+                            <td class="py-4 px-6 text-center">
+                                <button type="button" onclick="toggleDetails('details-{{ loop.index }}')" class="px-3 py-1.5 border border-noireText/20 hover:bg-deepWine hover:text-velvet rounded-lg transition-all text-xs font-medium">
+                                    View
+                                </button>
+                            </td>
+                        </tr>
+                        <!-- Expandable Item Detail Row -->
+                        <tr id="details-{{ loop.index }}" class="details-row hidden bg-parchment/20 border-b border-noireText/10">
+                            <td colspan="8" class="p-4">
+                                <div class="bg-white p-4 rounded-xl border border-noireText/10 shadow-inner">
+                                    <h5 class="font-serif text-sm text-noireText mb-3">Item Breakdown</h5>
+                                    <table class="w-full text-left text-xs">
+                                        <thead>
+                                            <tr class="border-b border-noireText/10 text-noireText/60 uppercase text-[9px] tracking-wider">
+                                                <th class="py-2 px-3">Brand</th>
+                                                <th class="py-2 px-3">Product Name</th>
+                                                <th class="py-2 px-3">Shade</th>
+                                                <th class="py-2 px-3">Qty</th>
+                                                <th class="py-2 px-3">Unit Price</th>
+                                                <th class="py-2 px-3">Subtotal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in tx.transaction_items %}
+                                            <tr class="border-b border-noireText/5">
+                                                <td class="py-2 px-3 font-semibold">{{ item.brand_name }}</td>
+                                                <td class="py-2 px-3">{{ item.product_name }}</td>
+                                                <td class="py-2 px-3"><span class="bg-velvet/40 px-2 py-0.5 rounded text-[10px]">{{ item.shade }}</span></td>
+                                                <td class="py-2 px-3 font-mono">{{ item.quantity }}</td>
+                                                <td class="py-2 px-3 font-mono">${{ "%.2f"|format(item.unit_price) }}</td>
+                                                <td class="py-2 px-3 font-mono font-bold">${{ "%.2f"|format(item.subtotal) }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="py-12 text-center text-noireText/40 italic text-sm">
+                                No sales transactions found in database logs.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function toggleDetails(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.toggle('hidden');
+    }
+}
+
+function filterSales() {
+    const input = document.getElementById('searchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('#salesTable tbody tr.sale-row');
+
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        const nextRow = row.nextElementSibling;
+        
+        if (text.includes(input)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+            if (nextRow && nextRow.classList.contains('details-row')) {
+                nextRow.classList.add('hidden');
+            }
+        }
+    });
+}
+
+document.getElementById('searchInput').addEventListener('keyup', filterSales);
+</script>
+{% endblock %}
