@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-5xl mx-auto px-4 py-8 space-y-8">
+<div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
 
     <div class="border-b border-noireText/10 pb-4">
         <h2 class="text-4xl text-noireText font-serif">Inventory Ledger (Branch {{ current_branch }})</h2>
@@ -55,58 +55,62 @@
 
     <div class="bg-white rounded-2xl border border-noireText/10 shadow-md overflow-hidden">
         <!-- Search, Filter & Sort Controls -->
-        <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex flex-col lg:flex-row gap-4 items-stretch lg:items-end justify-between text-xs tracking-wide">
-            <div class="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- 1. Search Ledger -->
-                <div class="flex flex-col gap-1.5">
-                    <label for="table_search" class="font-medium uppercase text-noireText/70 tracking-widest">Search Ledger</label>
+        <div class="p-5 border-b border-noireText/10 bg-parchment/30 space-y-4 text-xs tracking-wide">
+            
+            <!-- Upper Row: Search, Brand Filter, Reset -->
+            <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-end">
+                <div class="flex-grow flex flex-col gap-1">
+                    <label for="table_search" class="font-medium uppercase text-noireText/70 tracking-widest text-[10px]">Search Ledger</label>
                     <div class="relative">
-                        <input type="text" id="table_search" placeholder="Type brand or product..." class="w-full px-4 py-2 rounded-lg bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
+                        <input type="text" id="table_search" placeholder="Search by brand or product name..." class="w-full px-4 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
                     </div>
                 </div>
 
-                <!-- 2. Filter by Brand -->
-                <div class="flex flex-col gap-1.5">
-                    <label for="table_filter_brand" class="font-medium uppercase text-noireText/70 tracking-widest">Filter by Brand</label>
-                    <select id="table_filter_brand" class="w-full px-3 py-2 rounded-lg bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
+                <div class="w-full md:w-56 flex flex-col gap-1">
+                    <label for="table_filter_brand" class="font-medium uppercase text-noireText/70 tracking-widest text-[10px]">Filter by Brand</label>
+                    <select id="table_filter_brand" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
                         <option value="">All Brands</option>
                     </select>
                 </div>
 
-                <!-- 3. Filter by Status (Tabs) -->
-                <div class="flex flex-col gap-1.5">
-                    <label class="font-medium uppercase text-noireText/70 tracking-widest">Filter by Status</label>
-                    <div class="flex rounded-lg border border-noireText/10 overflow-hidden bg-white p-0.5 h-[38px]">
-                        <button type="button" data-status="" class="status-tab flex-1 py-1 px-2 rounded text-center transition-all font-medium text-xs bg-deepWine text-velvet">
+                <button id="clear_filters" type="button" class="px-4 py-2 bg-white hover:bg-velvet/40 border border-noireText/20 hover:border-noireText/40 rounded-xl text-noireText transition-all font-medium text-xs flex items-center justify-center gap-1.5 h-[38px] shrink-0">
+                    Reset
+                </button>
+            </div>
+
+            <!-- Lower Row: Status Tabs & Inline Sort Control -->
+            <div class="flex flex-col sm:flex-row gap-3 sm:items-center justify-between pt-2 border-t border-noireText/10">
+                <!-- Status Tabs -->
+                <div class="flex items-center gap-2">
+                    <span class="font-medium uppercase text-noireText/60 tracking-widest text-[10px] hidden sm:inline-block mr-1">Status:</span>
+                    <div class="inline-flex rounded-xl border border-noireText/10 overflow-hidden bg-white p-0.5 h-[34px] shadow-sm">
+                        <button type="button" data-status="" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs bg-deepWine text-velvet">
                             All
                         </button>
-                        <button type="button" data-status="in-stock" class="status-tab flex-1 py-1 px-2 rounded text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
+                        <button type="button" data-status="in-stock" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
                             In Stock
                         </button>
-                        <button type="button" data-status="low" class="status-tab flex-1 py-1 px-2 rounded text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
+                        <button type="button" data-status="low" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
                             Low Stock
                         </button>
                     </div>
                 </div>
 
-                <!-- 4. Sort Ledger Dropdown -->
-                <div class="flex flex-col gap-1.5">
-                    <label for="table_sort" class="font-medium uppercase text-noireText/70 tracking-widest">Sort Ledger</label>
-                    <select id="table_sort" class="w-full px-3 py-2 rounded-lg bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm font-medium">
-                        <option value="recent">Most Recent Stock Added</option>
-                        <option value="stock-asc">Stock: Low to High (Low Stock First)</option>
-                        <option value="stock-desc">Stock: High to Low</option>
-                        <option value="product-asc">Product Name (A-Z)</option>
+                <!-- Compact Inline Sort Control -->
+                <div class="flex items-center gap-2 self-start sm:self-auto">
+                    <label for="table_sort" class="font-medium uppercase text-noireText/60 tracking-widest text-[10px] shrink-0">Sort By:</label>
+                    <select id="table_sort" class="px-3 py-1.5 rounded-xl bg-white border border-noireText/15 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-medium cursor-pointer shadow-sm">
+                        <option value="recent">Most Recent</option>
+                        <option value="stock-asc">Low Stock on Top</option>
+                        <option value="stock-desc">High Stock on Top</option>
+                        <option value="product-asc">Product (A-Z)</option>
                         <option value="brand-asc">Brand (A-Z)</option>
-                        <option value="price-asc">Price: Low to High</option>
-                        <option value="price-desc">Price: High to Low</option>
+                        <option value="price-asc">Price (Low → High)</option>
+                        <option value="price-desc">Price (High → Low)</option>
                     </select>
                 </div>
             </div>
 
-            <button id="clear_filters" type="button" class="px-4 py-2 border border-noireText/20 hover:border-noireText/40 rounded-lg text-noireText hover:bg-velvet/20 transition-all font-medium text-xs flex items-center justify-center gap-1.5 h-[38px] self-end">
-                Reset
-            </button>
         </div>
 
         <div class="overflow-x-auto w-full">

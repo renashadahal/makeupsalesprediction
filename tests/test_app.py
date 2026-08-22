@@ -377,8 +377,8 @@ def test_inventory_view_renders_sort_controls(client):
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     assert 'table_sort' in html
-    assert 'Most Recent Stock Added' in html
-    assert 'Stock: Low to High' in html
+    assert 'Most Recent' in html
+    assert 'Low Stock on Top' in html
     assert 'data-updated' in html
     assert 'data-stock' in html
 
