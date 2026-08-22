@@ -202,3 +202,57 @@ def test_catalog_metadata_preservation():
     match = next(i for i in inv if i['product_name'] == unique_prod)
     assert match['product_id'] == unique_pid
     assert match['subcategory'] == "blush"
+
+# --- 7. SALES HISTORY ENDPOINT TESTS ---
+
+def test_sales_history_unauthenticated_redirect(client):
+    response = client.get('/sales_history')
+    assert response.status_code == 302
+    assert '/login' in response.headers.get('Location', '')
+
+def test_sales_history_authenticated_access(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    response = client.get('/sales_history')
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'Sales Transaction History' in html
+    assert 'salesTable' in html
+    assert 'searchInput' in html
+
+def test_sales_history_displays_recorded_transactions(client):
+    unique_prod = f"AuditedItem_{uuid.uuid4().hex[:4]}"
+    update_inventory_stock("S002", "MAC", unique_prod, 50)
+
+    with client.session_transaction() as sess:
+        sess['username'] = 'testauditor'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S002'
+
+    payload = {
+        'cart': [{
+            'brand': 'MAC',
+            'product_name': unique_prod,
+            'shade': 'Ruby Woo',
+            'price': 45.00,
+            'quantity': 1
+        }],
+        'promo_code': 'FESTIVE10'
+    }
+    tx_resp = client.post('/record_sale', data=json.dumps(payload), content_type='application/json')
+    assert tx_resp.status_code == 200
+    tx_id = tx_resp.get_json()['transaction_id']
+
+    # Now verify the sales_history page displays this transaction
+    hist_resp = client.get('/sales_history?branch=S002')
+    assert hist_resp.status_code == 200
+    hist_html = hist_resp.get_data(as_text=True)
+    assert tx_id in hist_html
+    assert 'testauditor' in hist_html
+    assert 'S002' in hist_html
+    assert 'FESTIVE10' in hist_html
+    assert unique_prod in hist_html
+
