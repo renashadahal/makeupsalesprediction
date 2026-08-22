@@ -54,9 +54,10 @@
     </div>
 
     <div class="bg-white rounded-2xl border border-noireText/10 shadow-md overflow-hidden">
-        <!-- Search & Filter Controls -->
-        <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex flex-col md:flex-row gap-4 items-stretch md:items-end justify-between text-xs tracking-wide">
-            <div class="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Search, Filter & Sort Controls -->
+        <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex flex-col lg:flex-row gap-4 items-stretch lg:items-end justify-between text-xs tracking-wide">
+            <div class="flex-grow grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 1. Search Ledger -->
                 <div class="flex flex-col gap-1.5">
                     <label for="table_search" class="font-medium uppercase text-noireText/70 tracking-widest">Search Ledger</label>
                     <div class="relative">
@@ -64,6 +65,7 @@
                     </div>
                 </div>
 
+                <!-- 2. Filter by Brand -->
                 <div class="flex flex-col gap-1.5">
                     <label for="table_filter_brand" class="font-medium uppercase text-noireText/70 tracking-widest">Filter by Brand</label>
                     <select id="table_filter_brand" class="w-full px-3 py-2 rounded-lg bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
@@ -71,23 +73,38 @@
                     </select>
                 </div>
 
+                <!-- 3. Filter by Status (Tabs) -->
                 <div class="flex flex-col gap-1.5">
                     <label class="font-medium uppercase text-noireText/70 tracking-widest">Filter by Status</label>
                     <div class="flex rounded-lg border border-noireText/10 overflow-hidden bg-white p-0.5 h-[38px]">
-                        <button type="button" data-status="" class="status-tab flex-1 py-1 px-3 rounded text-center transition-all font-medium text-xs bg-deepWine text-velvet">
+                        <button type="button" data-status="" class="status-tab flex-1 py-1 px-2 rounded text-center transition-all font-medium text-xs bg-deepWine text-velvet">
                             All
                         </button>
-                        <button type="button" data-status="in-stock" class="status-tab flex-1 py-1 px-3 rounded text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
+                        <button type="button" data-status="in-stock" class="status-tab flex-1 py-1 px-2 rounded text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
                             In Stock
                         </button>
-                        <button type="button" data-status="low" class="status-tab flex-1 py-1 px-3 rounded text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
+                        <button type="button" data-status="low" class="status-tab flex-1 py-1 px-2 rounded text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
                             Low Stock
                         </button>
                     </div>
                 </div>
+
+                <!-- 4. Sort Ledger Dropdown -->
+                <div class="flex flex-col gap-1.5">
+                    <label for="table_sort" class="font-medium uppercase text-noireText/70 tracking-widest">Sort Ledger</label>
+                    <select id="table_sort" class="w-full px-3 py-2 rounded-lg bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm font-medium">
+                        <option value="recent">Most Recent Stock Added</option>
+                        <option value="stock-asc">Stock: Low to High (Low Stock First)</option>
+                        <option value="stock-desc">Stock: High to Low</option>
+                        <option value="product-asc">Product Name (A-Z)</option>
+                        <option value="brand-asc">Brand (A-Z)</option>
+                        <option value="price-asc">Price: Low to High</option>
+                        <option value="price-desc">Price: High to Low</option>
+                    </select>
+                </div>
             </div>
 
-            <button id="clear_filters" type="button" class="px-4 py-2 border border-noireText/20 hover:border-noireText/40 rounded-lg text-noireText hover:bg-velvet/20 transition-all font-medium text-xs flex items-center justify-center gap-1.5 h-[38px]">
+            <button id="clear_filters" type="button" class="px-4 py-2 border border-noireText/20 hover:border-noireText/40 rounded-lg text-noireText hover:bg-velvet/20 transition-all font-medium text-xs flex items-center justify-center gap-1.5 h-[38px] self-end">
                 Reset
             </button>
         </div>
@@ -106,7 +123,14 @@
                 <tbody id="inventory_table_body">
                     {% for item in inventory_items %}
                     {% set item_status = 'low' if item.stock|int < 10 else 'in-stock' %}
-                    <tr class="inventory-row border-b border-noireText/5 hover:bg-velvet/20 transition-colors" data-brand="{{ item.brand }}" data-product="{{ item.product_name }}" data-status="{{ item_status }}">
+                    <tr class="inventory-row border-b border-noireText/5 hover:bg-velvet/20 transition-colors" 
+                        data-brand="{{ item.brand }}" 
+                        data-product="{{ item.product_name }}" 
+                        data-status="{{ item_status }}"
+                        data-stock="{{ item.stock }}"
+                        data-price="{{ item.price }}"
+                        data-updated="{{ item.last_updated or '' }}"
+                        data-id="{{ item.inventory_id or loop.index }}">
                         <td class="py-4 px-6 font-mono text-noireText/60">{{ item.product_id or 'P0000' }}</td>
                         <td class="py-4 px-6 font-bold text-noireText">{{ item.brand }}</td>
                         <td class="py-4 px-6 text-noireText/80">{{ item.product_name }}</td>
@@ -180,6 +204,7 @@ function handleProductChange() {
 document.addEventListener("DOMContentLoaded", () => {
     const searchInput = document.getElementById('table_search');
     const brandSelect = document.getElementById('table_filter_brand');
+    const sortSelect = document.getElementById('table_sort');
     const statusTabs = document.querySelectorAll('.status-tab');
     const clearFiltersBtn = document.getElementById('clear_filters');
     const tableBody = document.getElementById('inventory_table_body');
@@ -202,14 +227,16 @@ document.addEventListener("DOMContentLoaded", () => {
         brandSelect.appendChild(opt);
     });
     
-    function applyFilters() {
+    function applySortAndFilters() {
         const query = searchInput.value.toLowerCase().trim();
         const selectedBrand = brandSelect.value;
+        const sortBy = sortSelect.value;
         let visibleCount = 0;
         
+        // 1. Filter visibility
         tableRows.forEach(row => {
-            const brand = row.dataset.brand.toLowerCase();
-            const product = row.dataset.product.toLowerCase();
+            const brand = (row.dataset.brand || '').toLowerCase();
+            const product = (row.dataset.product || '').toLowerCase();
             const status = row.dataset.status;
             
             const matchesQuery = query === "" || brand.includes(query) || product.includes(query);
@@ -223,16 +250,60 @@ document.addEventListener("DOMContentLoaded", () => {
                 row.style.display = "none";
             }
         });
+
+        // 2. Sort rows
+        tableRows.sort((a, b) => {
+            if (sortBy === 'recent') {
+                const dateA = a.dataset.updated || '';
+                const dateB = b.dataset.updated || '';
+                if (dateA !== dateB) {
+                    return dateB.localeCompare(dateA);
+                }
+                const idA = parseInt(a.dataset.id || 0, 10);
+                const idB = parseInt(b.dataset.id || 0, 10);
+                return idB - idA;
+            } else if (sortBy === 'stock-asc') {
+                const stockA = parseInt(a.dataset.stock || 0, 10);
+                const stockB = parseInt(b.dataset.stock || 0, 10);
+                return stockA - stockB;
+            } else if (sortBy === 'stock-desc') {
+                const stockA = parseInt(a.dataset.stock || 0, 10);
+                const stockB = parseInt(b.dataset.stock || 0, 10);
+                return stockB - stockA;
+            } else if (sortBy === 'product-asc') {
+                return (a.dataset.product || '').localeCompare(b.dataset.product || '');
+            } else if (sortBy === 'brand-asc') {
+                return (a.dataset.brand || '').localeCompare(b.dataset.brand || '');
+            } else if (sortBy === 'price-asc') {
+                const priceA = parseFloat(a.dataset.price || 0);
+                const priceB = parseFloat(b.dataset.price || 0);
+                return priceA - priceB;
+            } else if (sortBy === 'price-desc') {
+                const priceA = parseFloat(a.dataset.price || 0);
+                const priceB = parseFloat(b.dataset.price || 0);
+                return priceB - priceA;
+            }
+            return 0;
+        });
+
+        // 3. Re-append in sorted order before emptyRow
+        tableRows.forEach(row => {
+            tableBody.appendChild(row);
+        });
+        if (emptyRow) {
+            tableBody.appendChild(emptyRow);
+        }
         
         if (visibleCount === 0 && tableRows.length > 0) {
-            emptyRow.style.display = "";
+            if (emptyRow) emptyRow.style.display = "";
         } else {
-            emptyRow.style.display = "none";
+            if (emptyRow) emptyRow.style.display = "none";
         }
     }
     
-    searchInput.addEventListener('input', applyFilters);
-    brandSelect.addEventListener('change', applyFilters);
+    searchInput.addEventListener('input', applySortAndFilters);
+    brandSelect.addEventListener('change', applySortAndFilters);
+    sortSelect.addEventListener('change', applySortAndFilters);
     
     statusTabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -244,7 +315,17 @@ document.addEventListener("DOMContentLoaded", () => {
             tab.classList.remove('hover:bg-velvet/50', 'text-noireText/75');
             
             activeStatus = tab.dataset.status;
-            applyFilters();
+
+            // Default sorting per tab:
+            // 'All' -> recent
+            // 'In Stock' / 'Low Stock' -> stock-asc (low stock on top)
+            if (activeStatus === "") {
+                sortSelect.value = "recent";
+            } else {
+                sortSelect.value = "stock-asc";
+            }
+
+            applySortAndFilters();
         });
     });
     
@@ -263,8 +344,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         
         activeStatus = "";
-        applyFilters();
+        sortSelect.value = "recent";
+        applySortAndFilters();
     });
+
+    // Initial sort and filter application on page load
+    applySortAndFilters();
 });
 </script>
 {% endblock %}
