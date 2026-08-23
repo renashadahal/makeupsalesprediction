@@ -361,11 +361,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         const shadeRes = await fetch(`/api/catalog/shades?product_name=${encodeURIComponent(prodSel.value)}`);
         const shades = await shadeRes.json();
 
-        if (shades.length > 0) {
-            shadeSel.innerHTML = shades.map(sh => `<option value="${sh}">${sh}</option>`).join('');
+        if (shades && shades.length > 0) {
+            shadeSel.innerHTML = '<option value="" disabled selected>-- Select Shade --</option>' + 
+                shades.map(sh => `<option value="${sh}">${sh}</option>`).join('');
             shadeSel.disabled = false;
         } else {
-            shadeSel.innerHTML = '<option value="Default" selected>Standard Shade</option>';
+            shadeSel.innerHTML = '<option value="Default" selected>N/A (Standard / Non-Shaded)</option>';
             shadeSel.disabled = true;
         }
     });

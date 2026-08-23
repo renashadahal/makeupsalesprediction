@@ -65,29 +65,107 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <!-- Target SKU / Product -->
-                    <div class="sm:col-span-2">
-                        <label for="product_id" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
-                            Target Product Catalog SKU
+                <!-- Cascading Catalog Level 1: Brand & Subcategory -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="transfer_brand" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                            1. Select Brand
                         </label>
-                        <select id="product_id" name="product_id" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
-                            <option value="" disabled selected>-- Select Product --</option>
-                            {% for p in all_products %}
-                            <option value="{{ p.product_id }}">
-                                [{{ p.brand_name }}] {{ p.product_name }} ({{ p.product_id }})
-                            </option>
+                        <select id="transfer_brand" name="brand" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-medium">
+                            <option value="" disabled selected>-- Select Brand --</option>
+                            {% for b in catalog_brands %}
+                            <option value="{{ b }}">{{ b }}</option>
                             {% endfor %}
                         </select>
                     </div>
 
-                    <!-- Quantity -->
                     <div>
+                        <label for="transfer_subcategory" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                            2. Select Subcategory
+                        </label>
+                        <select id="transfer_subcategory" name="subcategory" required disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-medium disabled:opacity-50 disabled:bg-gray-100">
+                            <option value="" disabled selected>-- Select Brand First --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Cascading Catalog Level 2: Product, Shade & Quantity -->
+                <div class="grid grid-cols-1 sm:grid-cols-6 gap-4">
+                    <!-- Target Product -->
+                    <div class="sm:col-span-3">
+                        <label for="transfer_product" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                            3. Select Product
+                        </label>
+                        <select id="transfer_product" name="product_name" required disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs disabled:opacity-50 disabled:bg-gray-100">
+                            <option value="" disabled selected>-- Select Subcategory First --</option>
+                        </select>
+                        <input type="hidden" id="transfer_product_id" name="product_id">
+                    </div>
+
+                    <!-- Available Shades -->
+                    <div class="sm:col-span-2">
+                        <label for="transfer_shade" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                            4. Shade (If Applicable)
+                        </label>
+                        <select id="transfer_shade" name="shade" disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs disabled:opacity-50 disabled:bg-gray-100">
+                            <option value="Default" selected>Standard Shade</option>
+                        </select>
+                    </div>
+
+                    <!-- Quantity -->
+                    <div class="sm:col-span-1">
                         <label for="quantity" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
-                            Transfer Quantity
+                            Quantity
                         </label>
                         <input type="number" id="quantity" name="quantity" min="1" value="1" required
-                               class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-medium">
+                               class="w-full px-3 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-medium text-center">
+                    </div>
+                </div>
+
+                <!-- Live Source Branch Availability Badge -->
+                <div id="source_stock_container" class="hidden flex items-center justify-between p-3 rounded-xl bg-velvet/50 border border-noireText/10 text-xs">
+                    <span class="text-noireText/70 text-[11px] flex items-center gap-1.5">
+                        <span id="source_stock_dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span id="source_stock_label">Source Branch Inventory:</span>
+                    </span>
+                    <span id="source_stock_badge" class="font-mono font-bold text-deepWine text-xs bg-white px-2.5 py-0.5 rounded-lg border border-noireText/10">
+                        -- units available
+                    </span>
+                </div>
+
+                <!-- Inline Overstock Warning (Red - Exceeds Stock) -->
+                <div id="overstock_warning" class="hidden flex items-start gap-3.5 bg-red-50 border-2 border-red-500 text-red-900 p-4 rounded-xl text-xs shadow-md ring-2 ring-red-200 transition-all duration-200">
+                    <div class="p-1.5 bg-red-100 rounded-lg text-red-600 flex-shrink-0">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="flex-grow">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="bg-red-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shadow-sm">Stock Deficit Warning</span>
+                            <strong class="text-red-900 font-bold text-xs">Requested Quantity Exceeds Available Inventory</strong>
+                        </div>
+                        <p id="overstock_warning_text" class="text-red-800 font-medium text-[11px] leading-relaxed">
+                            Requested quantity exceeds available stock at the source branch.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Mini Yellow Depletion Warning (Yellow - Stock Requested == Stock Available) -->
+                <div id="depletion_warning" class="hidden flex items-start gap-3 bg-amber-50 border-2 border-amber-400 text-amber-900 p-3.5 rounded-xl text-xs shadow-sm ring-1 ring-amber-200 transition-all duration-200">
+                    <div class="p-1 bg-amber-100 rounded-lg text-amber-700 flex-shrink-0 mt-0.5">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="flex-grow">
+                        <div class="flex items-center gap-2 mb-0.5">
+                            <span class="bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shadow-sm">Caution • 100% Stock Draw</span>
+                            <strong class="text-amber-950 font-bold text-xs">Total Stock Depletion Warning</strong>
+                        </div>
+                        <p id="depletion_warning_text" class="text-amber-900 font-medium text-[11px] leading-relaxed">
+                            This transfer will draw all remaining inventory from the source branch (0 units left). Transfer is permitted, but please ensure the source branch won't face sudden stockouts.
+                        </p>
                     </div>
                 </div>
 
@@ -96,12 +174,12 @@
                     <label for="notes" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
                         Transfer Notes & Reason
                     </label>
-                    <input type="text" id="notes" name="notes" placeholder="e.g., Stock rebalancing for festival surge demand"
+                    <input type="text" id="notes" name="notes" placeholder="e.g., Rebalancing stock for weekend demand spike"
                            class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
                 </div>
 
                 <div class="pt-2 border-t border-noireText/5 flex justify-end">
-                    <button type="submit" class="w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md">
+                    <button id="submit_transfer_btn" type="submit" class="w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md">
                         Submit Transfer Request
                     </button>
                 </div>
@@ -284,4 +362,290 @@
     </div>
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const fromBranchSel = document.getElementById('from_branch');
+    const brandSel = document.getElementById('transfer_brand');
+    const subcatSel = document.getElementById('transfer_subcategory');
+    const prodSel = document.getElementById('transfer_product');
+    const prodIdInput = document.getElementById('transfer_product_id');
+    const shadeSel = document.getElementById('transfer_shade');
+    const stockContainer = document.getElementById('source_stock_container');
+    const stockLabel = document.getElementById('source_stock_label');
+    const stockBadge = document.getElementById('source_stock_badge');
+    const stockDot = document.getElementById('source_stock_dot');
+    const qtyInput = document.getElementById('quantity');
+    const overstockWarning = document.getElementById('overstock_warning');
+    const overstockText = document.getElementById('overstock_warning_text');
+    const depletionWarning = document.getElementById('depletion_warning');
+    const depletionText = document.getElementById('depletion_warning_text');
+    const submitBtn = document.getElementById('submit_transfer_btn');
+
+    let availableStock = null;
+
+    function checkQuantityGuard() {
+        if (availableStock === null || !qtyInput) return;
+        const requested = parseInt(qtyInput.value, 10) || 0;
+        const fromBranchVal = fromBranchSel && fromBranchSel.value ? `Branch ${fromBranchSel.value}` : 'the selected source branch';
+
+        if (requested > availableStock) {
+            // High-visibility red quantity input
+            qtyInput.className = 'w-full px-3 py-2.5 rounded-xl bg-red-50 border-2 border-red-500 text-red-900 font-mono focus:outline-none ring-2 ring-red-300 transition-all text-xs font-bold text-center';
+            
+            // Show bold red alert banner with explicit details
+            if (overstockWarning && overstockText) {
+                overstockText.innerHTML = `Requested <strong class="underline font-bold text-red-950">${requested} units</strong>, but ${fromBranchVal} only has <strong class="underline font-bold text-red-950">${availableStock} units</strong> available in stock. Cannot transfer more stock than available.`;
+                overstockWarning.classList.remove('hidden');
+            }
+            if (depletionWarning) depletionWarning.classList.add('hidden');
+            
+            if (stockBadge) {
+                stockBadge.className = 'font-mono font-bold text-red-700 text-xs bg-red-100 px-2.5 py-0.5 rounded-lg border-2 border-red-400 ring-2 ring-red-200';
+            }
+            if (stockDot) {
+                stockDot.className = 'inline-block w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse';
+            }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.className = 'w-full sm:w-auto px-8 py-3 bg-red-700/85 hover:bg-red-800 text-white font-bold uppercase tracking-widest text-xs rounded-xl cursor-not-allowed opacity-90 transition-all shadow-md';
+                submitBtn.innerText = '❌ Exceeds Source Stock';
+            }
+        } else if (requested === availableStock && availableStock > 0) {
+            // Mini Yellow Warning: Stock Requested == Available Stock
+            qtyInput.className = 'w-full px-3 py-2.5 rounded-xl bg-amber-50 border-2 border-amber-400 text-amber-900 font-mono focus:outline-none ring-2 ring-amber-200 text-xs font-bold text-center transition-all';
+            
+            if (overstockWarning) overstockWarning.classList.add('hidden');
+            if (depletionWarning && depletionText) {
+                depletionText.innerHTML = `Transferring all <strong class="underline font-bold text-amber-950">${requested} units</strong> will leave ${fromBranchVal} with <strong class="underline font-bold text-amber-950">0 stock</strong>. This transfer is permitted, but please verify that the source branch won't be left vulnerable to shortages.`;
+                depletionWarning.classList.remove('hidden');
+            }
+
+            if (stockBadge) {
+                stockBadge.className = 'font-mono font-bold text-amber-800 text-xs bg-amber-100 px-2.5 py-0.5 rounded-lg border-2 border-amber-400 ring-1 ring-amber-200';
+            }
+            if (stockDot) {
+                stockDot.className = 'inline-block w-2 h-2 rounded-full bg-amber-500';
+            }
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.className = 'w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md';
+                submitBtn.innerText = 'Submit Transfer Request (Full Stock)';
+            }
+        } else {
+            // Restore normal quantity input styling
+            qtyInput.className = 'w-full px-3 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-medium text-center';
+            if (overstockWarning) overstockWarning.classList.add('hidden');
+            if (depletionWarning) depletionWarning.classList.add('hidden');
+            
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.className = 'w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md';
+                submitBtn.innerText = 'Submit Transfer Request';
+            }
+
+            if (stockBadge && availableStock !== null) {
+                if (availableStock <= 0) {
+                    stockBadge.className = 'font-mono font-bold text-rose-700 text-xs bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-200';
+                    if (stockDot) stockDot.className = 'inline-block w-2 h-2 rounded-full bg-rose-500';
+                } else if (availableStock < 10) {
+                    stockBadge.className = 'font-mono font-bold text-amber-700 text-xs bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200';
+                    if (stockDot) stockDot.className = 'inline-block w-2 h-2 rounded-full bg-amber-500';
+                } else {
+                    stockBadge.className = 'font-mono font-bold text-emerald-700 text-xs bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200';
+                    if (stockDot) stockDot.className = 'inline-block w-2 h-2 rounded-full bg-emerald-500';
+                }
+            }
+        }
+    }
+
+    if (qtyInput) {
+        qtyInput.addEventListener('input', checkQuantityGuard);
+    }
+
+    const transferForm = document.querySelector('form[action*="transfers"]') || document.querySelector('form');
+    if (transferForm) {
+        transferForm.addEventListener('submit', (e) => {
+            if (availableStock !== null && qtyInput) {
+                const requested = parseInt(qtyInput.value, 10) || 0;
+                if (requested > availableStock) {
+                    e.preventDefault();
+                    checkQuantityGuard();
+                    overstockWarning.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    qtyInput.focus();
+                }
+            }
+        });
+    }
+
+    async function updateSourceStockDisplay() {
+        const prodName = prodSel.value;
+        const fromBranch = fromBranchSel ? fromBranchSel.value : '';
+
+        if (!prodName || !fromBranch) {
+            if (stockContainer) stockContainer.classList.add('hidden');
+            if (overstockWarning) overstockWarning.classList.add('hidden');
+            if (depletionWarning) depletionWarning.classList.add('hidden');
+            availableStock = null;
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/catalog/product_details?product_name=${encodeURIComponent(prodName)}&branch=${encodeURIComponent(fromBranch)}`);
+            const data = await res.json();
+            if (prodIdInput) prodIdInput.value = data.product_id || '';
+            availableStock = data.stock;
+
+            if (stockContainer && stockLabel && stockBadge) {
+                stockContainer.classList.remove('hidden');
+                stockLabel.textContent = `Source Branch (${fromBranch}) Available Stock:`;
+                stockBadge.textContent = `${data.stock} units in stock`;
+                
+                if (data.stock <= 0) {
+                    stockBadge.className = 'font-mono font-bold text-rose-700 text-xs bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-200';
+                    if (stockDot) stockDot.className = stockDot.className.replace(/bg-\w+-\d+/, 'bg-rose-500');
+                } else if (data.stock < 10) {
+                    stockBadge.className = 'font-mono font-bold text-amber-700 text-xs bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200';
+                    if (stockDot) stockDot.className = stockDot.className.replace(/bg-\w+-\d+/, 'bg-amber-500');
+                } else {
+                    stockBadge.className = 'font-mono font-bold text-emerald-700 text-xs bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200';
+                    if (stockDot) stockDot.className = stockDot.className.replace(/bg-\w+-\d+/, 'bg-emerald-500');
+                }
+            }
+            checkQuantityGuard();
+        } catch (err) {
+            console.error('Error fetching product stock:', err);
+        }
+    }
+
+    // Ensure Brands dropdown is populated on load
+    async function loadInitialBrands() {
+        if (!brandSel) return;
+        if (brandSel.options.length <= 1) {
+            try {
+                const res = await fetch('/api/catalog/brands');
+                const brands = await res.json();
+                if (brands && brands.length > 0) {
+                    brandSel.innerHTML = '<option value="" disabled selected>-- Select Brand --</option>' + 
+                        brands.map(b => `<option value="${b}">${b}</option>`).join('');
+                }
+            } catch (err) {
+                console.error('Error fetching initial brands:', err);
+            }
+        }
+    }
+    loadInitialBrands();
+
+    if (fromBranchSel) {
+        fromBranchSel.addEventListener('change', () => {
+            if (prodSel && prodSel.value) {
+                updateSourceStockDisplay();
+            }
+        });
+    }
+
+    if (brandSel) {
+        brandSel.addEventListener('change', async () => {
+            const brand = brandSel.value;
+            if (!brand) return;
+
+            if (subcatSel) {
+                subcatSel.innerHTML = '<option value="" disabled selected>-- Loading Subcategories... --</option>';
+                subcatSel.disabled = false;
+            }
+
+            if (prodSel) {
+                prodSel.innerHTML = '<option value="" disabled selected>-- Select Subcategory First --</option>';
+                prodSel.disabled = true;
+            }
+
+            if (shadeSel) {
+                shadeSel.innerHTML = '<option value="Default" selected>Standard Shade</option>';
+                shadeSel.disabled = true;
+            }
+
+            if (prodIdInput) prodIdInput.value = '';
+            if (stockContainer) stockContainer.classList.add('hidden');
+
+            try {
+                const res = await fetch(`/api/catalog/subcategories?brand=${encodeURIComponent(brand)}`);
+                const subcats = await res.json();
+                if (subcatSel) {
+                    subcatSel.innerHTML = '<option value="" disabled selected>-- Select Subcategory --</option>' + 
+                        subcats.map(s => `<option value="${s}">${s}</option>`).join('');
+                }
+            } catch (e) {
+                if (subcatSel) subcatSel.innerHTML = '<option value="" disabled>Error loading subcategories</option>';
+            }
+        });
+    }
+
+    if (subcatSel) {
+        subcatSel.addEventListener('change', async () => {
+            const brand = brandSel ? brandSel.value : '';
+            const subcat = subcatSel.value;
+            if (!brand || !subcat) return;
+
+            if (prodSel) {
+                prodSel.innerHTML = '<option value="" disabled selected>-- Loading Products... --</option>';
+                prodSel.disabled = false;
+            }
+
+            if (shadeSel) {
+                shadeSel.innerHTML = '<option value="Default" selected>Standard Shade</option>';
+                shadeSel.disabled = true;
+            }
+
+            if (prodIdInput) prodIdInput.value = '';
+            if (stockContainer) stockContainer.classList.add('hidden');
+
+            try {
+                const res = await fetch(`/api/catalog/products?brand=${encodeURIComponent(brand)}&subcategory=${encodeURIComponent(subcat)}`);
+                const prods = await res.json();
+                if (prodSel) {
+                    prodSel.innerHTML = '<option value="" disabled selected>-- Select Product --</option>' + 
+                        prods.map(p => `<option value="${p}">${p}</option>`).join('');
+                }
+            } catch (e) {
+                if (prodSel) prodSel.innerHTML = '<option value="" disabled>Error loading products</option>';
+            }
+        });
+    }
+
+    if (prodSel) {
+        prodSel.addEventListener('change', async () => {
+            const prodName = prodSel.value;
+            if (!prodName) return;
+
+            updateSourceStockDisplay();
+
+            if (shadeSel) {
+                shadeSel.innerHTML = '<option value="" disabled selected>-- Loading Shades... --</option>';
+                shadeSel.disabled = true;
+            }
+
+            try {
+                const shadeRes = await fetch(`/api/catalog/shades?product_name=${encodeURIComponent(prodName)}`);
+                const shades = await shadeRes.json();
+
+                if (shadeSel) {
+                    if (shades && shades.length > 0) {
+                        shadeSel.innerHTML = '<option value="" disabled selected>-- Select Shade --</option>' + 
+                            shades.map(sh => `<option value="${sh}">${sh}</option>`).join('');
+                        shadeSel.disabled = false;
+                    } else {
+                        shadeSel.innerHTML = '<option value="Default" selected>N/A (Standard / Non-Shaded)</option>';
+                        shadeSel.disabled = true;
+                    }
+                }
+            } catch (e) {
+                if (shadeSel) {
+                    shadeSel.innerHTML = '<option value="Default" selected>N/A (Standard / Non-Shaded)</option>';
+                    shadeSel.disabled = true;
+                }
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

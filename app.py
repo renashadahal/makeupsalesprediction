@@ -227,7 +227,7 @@ def get_products():
 @login_required
 def get_product_details():
     prod_name = request.args.get('product_name')
-    current_branch = session.get('branch', 'S001')
+    target_branch = request.args.get('branch') or session.get('branch', 'S001')
     
     with get_db() as conn:
         row = conn.execute("""
@@ -235,7 +235,7 @@ def get_product_details():
         FROM products p
         LEFT JOIN inventory i ON p.product_id = i.product_id AND i.branch_id = ?
         WHERE p.product_name = ?;
-        """, (current_branch, prod_name)).fetchone()
+        """, (target_branch, prod_name)).fetchone()
 
         if row:
             return jsonify({
@@ -580,33 +580,54 @@ def stock_transfers():
         if not to_b:
             to_b = current_branch
         product_id = request.form.get('product_id', '').strip()
+        product_name = request.form.get('product_name', '').strip()
+        shade = request.form.get('shade', '').strip()
         qty = request.form.get('quantity', '1').strip()
         notes = request.form.get('notes', '').strip()
 
         if from_b == to_b:
-            flash("Source and destination branch cannot be the same.")
+            flash("Source and destination branch cannot be the same.", 'error')
             return redirect(url_for('stock_transfers'))
 
+        # Fallback resolution of product_id by product_name if needed
+        if not product_id and product_name:
+            with get_db() as conn:
+                p_row = conn.execute("SELECT product_id FROM products WHERE product_name = ?;", (product_name,)).fetchone()
+                if p_row:
+                    product_id = p_row['product_id']
+
+        # Include shade details in transfer notes if specified
+        if shade and shade.lower() not in ('default', 'standard shade', 'none', ''):
+            if notes:
+                notes = f"[Shade: {shade}] {notes}"
+            else:
+                notes = f"Shade: {shade}"
+
         success, msg = db_request_transfer(from_b, to_b, product_id, qty, requested_by=current_user, notes=notes)
-        flash(msg)
+        flash(msg, 'error' if not success else 'success')
         return redirect(url_for('stock_transfers'))
 
     # Load transfers based on role scope
     branch_filter = None if is_admin else current_branch
     transfers = db_load_transfers(branch=branch_filter)
 
-    # Load available products and inventory stock for the form
+    # Load available brands and master catalog for cascading dropdowns
     with get_db() as conn:
+        brands_rows = conn.execute("SELECT brand_name FROM brands ORDER BY brand_name;").fetchall()
+        all_brands_list = [r['brand_name'] for r in brands_rows]
+
         all_products = conn.execute("""
-        SELECT p.product_id, p.product_name, b.brand_name 
+        SELECT p.product_id, p.product_name, b.brand_name, s.subcategory_name
         FROM products p 
-        JOIN brands b ON p.brand_id = b.brand_id 
-        ORDER BY b.brand_name, p.product_name;
+        JOIN brands b ON p.brand_id = b.brand_id
+        JOIN subcategories s ON p.subcategory_id = s.subcategory_id
+        ORDER BY b.brand_name, s.subcategory_name, p.product_name;
         """).fetchall()
 
     return render_template(
         'transfers.html',
         transfers=transfers,
+        catalog_brands=all_brands_list,
         all_products=[dict(p) for p in all_products],
         current_branch=current_branch,
         all_branches=['S001', 'S002', 'S003', 'S004', 'S005']
@@ -625,14 +646,14 @@ def dispatch_transfer_route(transfer_id):
     with get_db() as conn:
         t_row = conn.execute("SELECT from_branch, to_branch FROM inventory_transfers WHERE transfer_id = ?;", (transfer_id,)).fetchone()
         if not t_row:
-            flash("Transfer not found.")
+            flash("Transfer not found.", 'error')
             return redirect(url_for('stock_transfers'))
         if not is_admin and t_row['from_branch'] != current_branch:
-            flash(f"Authorization Denied: Only the source branch operator (Branch {t_row['from_branch']}) or an administrator can approve and dispatch stock.")
+            flash(f"Authorization Denied: Only the source branch operator (Branch {t_row['from_branch']}) or an administrator can approve and dispatch stock.", 'error')
             return redirect(url_for('stock_transfers')), 403
 
     success, msg = db_dispatch_transfer(transfer_id, approved_by=current_user)
-    flash(msg)
+    flash(msg, 'error' if not success else 'success')
     return redirect(url_for('stock_transfers'))
 
 @app.route('/transfers/complete/<int:transfer_id>', methods=['POST'])
@@ -647,14 +668,14 @@ def complete_transfer_route(transfer_id):
     with get_db() as conn:
         t_row = conn.execute("SELECT from_branch, to_branch FROM inventory_transfers WHERE transfer_id = ?;", (transfer_id,)).fetchone()
         if not t_row:
-            flash("Transfer not found.")
+            flash("Transfer not found.", 'error')
             return redirect(url_for('stock_transfers'))
         if not is_admin and t_row['to_branch'] != current_branch:
-            flash(f"Authorization Denied: Only the destination branch operator (Branch {t_row['to_branch']}) or an administrator can confirm receipt and restock.")
+            flash(f"Authorization Denied: Only the destination branch operator (Branch {t_row['to_branch']}) or an administrator can confirm receipt and restock.", 'error')
             return redirect(url_for('stock_transfers')), 403
 
     success, msg = db_complete_transfer(transfer_id)
-    flash(msg)
+    flash(msg, 'error' if not success else 'success')
     return redirect(url_for('stock_transfers'))
 
 @app.route('/transfers/cancel/<int:transfer_id>', methods=['POST'])
@@ -666,14 +687,14 @@ def cancel_transfer_route(transfer_id):
     with get_db() as conn:
         t_row = conn.execute("SELECT from_branch, to_branch, requested_by FROM inventory_transfers WHERE transfer_id = ?;", (transfer_id,)).fetchone()
         if not t_row:
-            flash("Transfer not found.")
+            flash("Transfer not found.", 'error')
             return redirect(url_for('stock_transfers'))
         if not is_admin and t_row['from_branch'] != current_branch and t_row['to_branch'] != current_branch:
-            flash("Unauthorized to cancel this transfer.")
+            flash("Unauthorized to cancel this transfer.", 'error')
             return redirect(url_for('stock_transfers')), 403
 
     success, msg = db_cancel_transfer(transfer_id)
-    flash(msg)
+    flash(msg, 'error' if not success else 'success')
     return redirect(url_for('stock_transfers'))
 
 if __name__ == '__main__':

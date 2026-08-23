@@ -77,11 +77,32 @@ def test_shades_api_endpoint(client):
         sess['role'] = 'admin'
         sess['branch'] = 'S001'
         
+    # Lipsticks should return valid shade palettes
     response = client.get('/api/catalog/shades?product_name=Lipstick')
     assert response.status_code == 200
-    data = response.get_json()
-    assert isinstance(data, list)
-    assert len(data) > 0
+    lipstick_shades = response.get_json()
+    assert isinstance(lipstick_shades, list)
+    assert len(lipstick_shades) > 0
+
+    # Sunscreens should return empty list (no shades)
+    sunscreen_resp = client.get('/api/catalog/shades?product_name=Mineral+Sunscreen+Broad+Spectrum+SPF+50')
+    assert sunscreen_resp.status_code == 200
+    assert sunscreen_resp.get_json() == []
+
+    # Moisturizers should return empty list (no shades)
+    moisturizer_resp = client.get('/api/catalog/shades?product_name=Rapid+Tone+Repair+Correcting+Cream')
+    assert moisturizer_resp.status_code == 200
+    assert moisturizer_resp.get_json() == []
+
+    # Perfumes should return empty list (no shades)
+    perfume_resp = client.get('/api/catalog/shades?product_name=Calyx+Eau+de+Parfum+Spray')
+    assert perfume_resp.status_code == 200
+    assert perfume_resp.get_json() == []
+
+    # Foundations should return foundation shades (e.g. MAC Studio Fix)
+    fdn_resp = client.get('/api/catalog/shades?product_name=Studio+Fix+Powder+Plus+Foundation')
+    assert fdn_resp.status_code == 200
+    assert 'NC20' in fdn_resp.get_json()
 
 def test_catalog_products_filtered_api(client):
     with client.session_transaction() as sess:
