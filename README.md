@@ -1,4 +1,4 @@
-# 💄 Noire — Advanced Retail Intelligence & Makeup Inventory Forecasting System
+# Noire — Advanced Retail Intelligence & Makeup Inventory Forecasting System
 
 An intelligent, multi-branch retail inventory management, Point of Sale (POS), and AI demand forecasting platform tailored for beauty retailers.
 
@@ -6,25 +6,25 @@ This platform combines Point of Sale transaction processing with machine learnin
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-### 🏢 Multi-Branch Architecture (`S001` – `S005`)
+### Multi-Branch Architecture (`S001` – `S005`)
 * **Branch Isolation**: Manage inventory balances and sales transactions across multiple store branches (`S001` to `S005`).
 * **Operator Context Switching**: Seamlessly toggle active branch view from the global navigation bar.
 * **Per-Branch Stock Ledgers**: Physical stock tracking and restock controls isolated by operating node.
 
-### 📦 Smart Inventory & Master Catalog
+### Smart Inventory & Master Catalog
 * **Real-Time Stock Tracking**: Monitor product quantities across categories (`lips`, `face`, `body`) and subcategories (`lipstick`, `foundation`, `perfume`, `concealer`, `blush`).
 * **Automated POS Stock Deduction**: Committing checkout sales automatically deducts item quantities from the active branch's stock ledger.
 * **Low Stock Alerts**: Real-time visual threshold warnings for items running below safety stock minimums (< 10 units).
 * **Master Catalog Expansion**: Admin controls for registering new SKUs, brands, subcategories, and base retail prices.
 
-### 💰 Transaction Terminal (POS)
+###  Transaction Terminal (POS)
 * **Multi-Item Cart Session**: Staging multiple product items, shades, and quantities in a single checkout session.
 * **Promotions & Promo Codes**: Built-in verification for promo codes (e.g. `FESTIVE10` for 10% off, `VALENTINE15` for 15% off).
 * **Automated Audit Logging**: Complete transaction header and line-item recording in SQLite database.
 
-### 🔮 AI-Powered Demand Forecasting Engine
+### AI-Powered Demand Forecasting Engine
 * **Machine Learning Engine**: Powered by a **Random Forest Regressor** trained on 219,300+ historical baseline records merged with live POS sales ($R^2 \approx 0.65$).
 * **Dynamic Domain Features**:
   1. **Temporal Rolling Lags**: Calculates 7-day and 14-day rolling mean sales for recent demand velocity.
@@ -32,7 +32,7 @@ This platform combines Point of Sale transaction processing with machine learnin
   3. **Promotional Surge Flags**: Models seasonal sales spikes (Valentine's Day, Festive Flash Sales, Clearance Events).
 * **Actionable Stock Advisory**: Generates specific restock unit recommendations based on predicted demand vs. live branch stock.
 
-### 🛡️ Enterprise Security & Access Controls
+### Enterprise Security & Access Controls
 * **Role-Based Access Control (RBAC)**: Distinct access tiers for `Admin` (Global Management) and `Staff` (Branch Operations).
 * **Backend Authorization Decorators**: `@admin_required` python decorators protecting administrative endpoints (`/admin/manage_users`, `/admin/catalog`).
 * **Salted Password Hashing**: Passwords stored using Werkzeug's `scrypt` salted password hashing.
@@ -40,7 +40,7 @@ This platform combines Point of Sale transaction processing with machine learnin
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 | Layer | Technologies Used |
 | :--- | :--- |
@@ -53,7 +53,7 @@ This platform combines Point of Sale transaction processing with machine learnin
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 makeupsalesprediction-main/
@@ -88,7 +88,7 @@ makeupsalesprediction-main/
 
 ---
 
-## 🗄️ Database Architecture (`data/noire_retail.db`)
+## Database Architecture (`data/noire_retail.db`)
 
 The storage layer uses a normalized **SQLite relational database** operating in **Write-Ahead Logging (WAL) mode** (`PRAGMA journal_mode = WAL;`) for high concurrency and zero-locking reads.
 
@@ -127,7 +127,7 @@ The storage layer uses a normalized **SQLite relational database** operating in 
 
 ---
 
-## ⚙️ Setup & Installation Guide
+## Setup & Installation Guide
 
 ### 1. Prerequisites
 Ensure Python 3.9+ is installed on your system.
@@ -206,7 +206,7 @@ Open your browser and navigate to: `http://127.0.0.1:5000`
 
 ---
 
-## 🔐 System Default Credentials
+## System Default Credentials
 
 | Role | Username | Password | Default Branch | Access Level |
 | :--- | :--- | :--- | :--- | :--- |
@@ -216,7 +216,7 @@ Open your browser and navigate to: `http://127.0.0.1:5000`
 
 ---
 
-## 📊 How the AI Demand Forecasting Works
+## How the AI Demand Forecasting Works
 
 The AI engine uses a **Random Forest Regressor** trained on historical sales dynamics combined with real-time POS transaction logs.
 
@@ -232,7 +232,7 @@ Navigate to `/forecast` in the web app, select a brand and product item. The sys
 
 ---
 
-## 🧪 Running Automated Tests
+## Running Automated Tests
 
 Run the Pytest suite to verify security, database isolation, POS workflows, and prediction endpoints:
 
