@@ -68,36 +68,41 @@
                 </div>
                 {% endif %}
 
-                <div class="text-right lg:hidden">
-                    <span class="text-[10px] text-dustyRose uppercase tracking-wider block">Operator</span>
-                    <strong class="text-xs text-velvet">{{ session.get('username', 'Guest') }}</strong>
+                <div class="text-right lg:hidden max-w-[140px] sm:max-w-[180px]" title="{{ session.get('username', 'Guest') }} ({{ session.get('role', 'staff') }})">
+                    <span class="text-[9px] text-dustyRose/70 uppercase tracking-wider block">Operator</span>
+                    <strong class="text-xs text-velvet truncate block">{{ session.get('username', 'Guest') }}</strong>
                 </div>
             </div>
 
             <!-- Fully Responsive Links Container -->
-            <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-4 text-xs font-medium tracking-wide">
+            <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 text-xs font-medium tracking-wide">
                 <nav class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 md:gap-2">
-                    <a href="{{ url_for('dashboard') }}" class="px-3 py-2 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center">Dashboard</a>
-                    <a href="{{ url_for('record_sale') }}" class="px-3 py-2 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center">Record Sale</a>
-                    <a href="{{ url_for('sales_history') }}" class="px-3 py-2 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center">Sales History</a>
-                    <a href="{{ url_for('inventory_view') }}" class="px-3 py-2 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center">Inventory Ledger</a>
-                    <a href="{{ url_for('stock_transfers') }}" class="px-3 py-2 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center">Transfers</a>
-                    <a href="{{ url_for('forecast') }}" class="px-3 py-2 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center">AI Forecast</a>
+                    <a href="{{ url_for('dashboard') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">Dashboard</a>
+                    <a href="{{ url_for('record_sale') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">Record Sale</a>
+                    <a href="{{ url_for('sales_history') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">Sales History</a>
+                    <a href="{{ url_for('inventory_view') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">Inventory Ledger</a>
+                    <a href="{{ url_for('stock_transfers') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">Transfers</a>
+                    <a href="{{ url_for('forecast') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">AI Forecast</a>
                     
                     {% if session.get('role') == 'admin' %}
-                        <a href="{{ url_for('manage_users') }}" class="px-3 py-2 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20">Users</a>
-                        <a href="{{ url_for('update_catalog') }}" class="px-3 py-2 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20">Catalog</a>
+                        <a href="{{ url_for('manage_users') }}" class="px-2.5 py-1.5 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20 whitespace-nowrap">Users</a>
+                        <a href="{{ url_for('update_catalog') }}" class="px-2.5 py-1.5 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20 whitespace-nowrap">Catalog</a>
                     {% endif %}
                 </nav>
 
                 <!-- Operator Session Utilities -->
-                <div class="flex items-center justify-between md:justify-end gap-4 border-t border-velvet/10 pt-3 md:pt-0 md:border-t-0 pl-1">
-                    <div class="hidden lg:block text-right">
-                        <span class="text-[9px] text-dustyRose/60 uppercase tracking-widest block">Active Node</span>
-                        <strong class="text-velvet text-xs">{{ session.get('username', 'Guest') }} ({{ session.get('role', 'staff') }})</strong>
+                <div class="flex items-center justify-between md:justify-end gap-2.5 border-t border-velvet/10 pt-3 md:pt-0 md:border-t-0 pl-1 flex-shrink-0">
+                    <div class="hidden lg:flex items-center gap-2 bg-velvet/10 px-2.5 py-1 rounded-xl border border-dustyRose/25 max-w-[160px] xl:max-w-[220px]" title="{{ session.get('username', 'Guest') }} ({{ session.get('role', 'staff') }})">
+                        <div class="w-5 h-5 rounded-full bg-dustyRose/30 text-velvet flex items-center justify-center text-[10px] font-bold uppercase flex-shrink-0">
+                            {{ session.get('username', 'G')[:1] }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <span class="block text-xs text-velvet font-medium truncate leading-tight">{{ session.get('username', 'Guest') }}</span>
+                            <span class="text-[9px] text-dustyRose/80 uppercase tracking-wider font-semibold block leading-none mt-0.5 truncate">({{ session.get('role', 'staff') }})</span>
+                        </div>
                     </div>
                     {% if session.get('username') %}
-                    <a href="{{ url_for('logout') }}" class="w-full md:w-auto bg-dustyRose/20 hover:bg-dustyRose/30 text-dustyRose text-center font-bold text-[10px] tracking-widest uppercase px-4 py-2 rounded-lg transition-colors border border-dustyRose/30">
+                    <a href="{{ url_for('logout') }}" class="w-full md:w-auto bg-dustyRose/20 hover:bg-dustyRose/30 text-dustyRose hover:text-velvet text-center font-bold text-[10px] tracking-widest uppercase px-3.5 py-1.5 rounded-lg transition-colors border border-dustyRose/30 flex-shrink-0">
                         Exit
                     </a>
                     {% endif %}

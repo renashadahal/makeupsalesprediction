@@ -776,6 +776,29 @@ def test_admin_override_authority_at_all_transfer_steps(client):
     assert comp_resp.status_code == 200
     assert next(i for i in load_inventory("S005") if i['product_id'] == unique_pid)['stock'] == 25
 
+def test_dashboard_real_data_and_admin_scope(client):
+    """Verify dashboard loads real metrics, top products leaderboard, and handles branch filtering."""
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    # 1. Test standard branch view
+    resp_s001 = client.get('/dashboard?branch=S001')
+    assert resp_s001.status_code == 200
+    html_s001 = resp_s001.get_data(as_text=True)
+    assert 'Executive Store Control Panel' in html_s001
+    assert 'Store Inventory & Sales Tracker' in html_s001
+    assert 'Brand Shelf Stock Share' in html_s001
+    assert 'Recent POS Sales Activity' in html_s001
+
+    # 2. Test consolidated ALL view
+    resp_all = client.get('/dashboard?branch=ALL')
+    assert resp_all.status_code == 200
+    html_all = resp_all.get_data(as_text=True)
+    assert 'Network-Wide (All Branches)' in html_all
+
+
 
 
 

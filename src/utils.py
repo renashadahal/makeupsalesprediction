@@ -195,7 +195,7 @@ def get_catalog_shades(product_name, db_path=DB_PATH):
             return ['01 Inner Light', '02 Twilight Hour', '04 Aura Pink', '06 Solar Haze']
         elif 'cheekillusion' in pname_lower:
             return ['01 Coral Bliss', '02 Rosey Peach', '03 Sweet Cheeks', '04 Pink Glow']
-        elif 'liquid blush in hope' in subcat or 'rare beauty' in brand.lower():
+        elif 'rare beauty' in brand.lower() or 'liquid blush' in pname_lower or 'hope' in pname_lower:
             return ['Hope (Dewy)', 'Joy (Dewy)', 'Happy (Dewy)', 'Grace (Matte)', 'Encourage (Dewy)']
         elif 'fit me blush' in pname_lower:
             return ['15 Nude', '25 Pink', '35 Coral', '40 Peach', '50 Wine']

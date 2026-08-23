@@ -93,84 +93,181 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    current_branch = session.get('branch', 'S001')
-    today_str = datetime.now().strftime('%Y-%m-%d')
+    user_branch = session.get('branch', 'S001')
+    is_admin = session.get('role') == 'admin'
     
-    inv_items = db_load_inventory(branch=current_branch)
-    low_stock_count = sum(1 for item in inv_items if item['stock'] < 10)
-    today_sales_count = 0
-    brand_counts = {}
-    subcat_counts = {}
-    sales_by_date = {}
+    # Admins can view a specific branch or 'ALL' consolidated
+    if is_admin:
+        selected_branch = request.args.get('branch', user_branch)
+    else:
+        selected_branch = user_branch
+
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    all_branches = ['S001', 'S002', 'S003', 'S004', 'S005']
 
     with get_db() as conn:
-        # 1. Today's sales count
+        # 1. Today's POS sales KPIs (only real transactions recorded today)
         t_row = conn.execute("""
-        SELECT SUM(ti.quantity) as total_qty 
-        FROM transaction_items ti
-        JOIN transactions t ON ti.transaction_id = t.transaction_id
-        WHERE t.branch_id = ? AND t.transaction_date = ?;
-        """, (current_branch, today_str)).fetchone()
-        today_sales_count = int(t_row['total_qty']) if t_row and t_row['total_qty'] else 0
+        SELECT COUNT(DISTINCT t.transaction_id) as tx_count,
+               COALESCE(SUM(ti.quantity), 0) as total_qty,
+               COALESCE(SUM(ti.subtotal), 0.0) as total_revenue
+        FROM transactions t
+        LEFT JOIN transaction_items ti ON t.transaction_id = ti.transaction_id
+        WHERE (t.branch_id = ? OR ? = 'ALL') AND t.transaction_date = ?;
+        """, (selected_branch, selected_branch, today_str)).fetchone()
+        
+        today_tx_count = int(t_row['tx_count']) if t_row and t_row['tx_count'] else 0
+        today_sales_units = int(t_row['total_qty']) if t_row and t_row['total_qty'] else 0
+        today_sales_revenue = float(t_row['total_revenue']) if t_row and t_row['total_revenue'] else 0.0
 
-        # 2. Sales volume by brand
-        b_rows = conn.execute("""
-        SELECT b.brand_name, SUM(ti.quantity) as qty
-        FROM transaction_items ti
-        JOIN transactions t ON ti.transaction_id = t.transaction_id
-        JOIN products p ON ti.product_id = p.product_id
-        JOIN brands b ON p.brand_id = b.brand_id
-        WHERE t.branch_id = ?
-        GROUP BY b.brand_name;
-        """, (current_branch,)).fetchall()
-        for r in b_rows:
-            brand_counts[r['brand_name']] = r['qty']
+        # 2. Real Store Shelf Stock on Hand (25-40 units per SKU)
+        inv_row = conn.execute("""
+        SELECT COALESCE(SUM(i.stock), 0) as total_stock,
+               COUNT(i.inventory_id) as total_skus,
+               SUM(CASE WHEN i.stock < 15 THEN 1 ELSE 0 END) as low_stock_count,
+               ROUND(COALESCE(SUM(i.stock * p.base_price), 0.0), 2) as inventory_value
+        FROM inventory i
+        JOIN products p ON i.product_id = p.product_id
+        WHERE (i.branch_id = ? OR ? = 'ALL');
+        """, (selected_branch, selected_branch)).fetchone()
+        
+        total_inventory_units = int(inv_row['total_stock']) if inv_row and inv_row['total_stock'] else 0
+        total_skus = int(inv_row['total_skus']) if inv_row and inv_row['total_skus'] else 0
+        low_stock_count = int(inv_row['low_stock_count']) if inv_row and inv_row['low_stock_count'] else 0
+        inventory_value = float(inv_row['inventory_value']) if inv_row and inv_row['inventory_value'] else 0.0
 
-        # 3. Past 30 days daily sales trend
-        thirty_days_ago = (datetime.now() - timedelta(days=29)).strftime('%Y-%m-%d')
-        d_rows = conn.execute("""
-        SELECT t.transaction_date, SUM(ti.quantity) as qty
-        FROM transaction_items ti
-        JOIN transactions t ON ti.transaction_id = t.transaction_id
-        WHERE t.branch_id = ? AND t.transaction_date >= ?
+        # 3. Total Real POS Sales to Date (actual sales made in store POS)
+        pos_total_row = conn.execute("""
+        SELECT COUNT(DISTINCT t.transaction_id) as total_checkouts,
+               COALESCE(SUM(ti.quantity), 0) as total_units_sold,
+               ROUND(COALESCE(SUM(t.grand_total), 0.0), 2) as total_revenue
+        FROM transactions t
+        LEFT JOIN transaction_items ti ON t.transaction_id = ti.transaction_id
+        WHERE (t.branch_id = ? OR ? = 'ALL');
+        """, (selected_branch, selected_branch)).fetchone()
+        
+        total_pos_checkouts = int(pos_total_row['total_checkouts']) if pos_total_row and pos_total_row['total_checkouts'] else 0
+        total_pos_units_sold = int(pos_total_row['total_units_sold']) if pos_total_row and pos_total_row['total_units_sold'] else 0
+        total_pos_revenue = float(pos_total_row['total_revenue']) if pos_total_row and pos_total_row['total_revenue'] else 0.0
+
+        # 4. Active / Pending Transfers Count
+        tr_row = conn.execute("""
+        SELECT COUNT(*) as pending_count
+        FROM inventory_transfers
+        WHERE (from_branch = ? OR to_branch = ? OR ? = 'ALL') AND status IN ('PENDING', 'IN_TRANSIT');
+        """, (selected_branch, selected_branch, selected_branch)).fetchone()
+        pending_transfers_count = int(tr_row['pending_count']) if tr_row and tr_row['pending_count'] else 0
+
+        # 5. Real Daily POS Sales Timeline (Last 14 Days)
+        sales_by_date = {}
+        fourteen_days_ago = (datetime.now() - timedelta(days=13)).strftime('%Y-%m-%d')
+        daily_rows = conn.execute("""
+        SELECT t.transaction_date, SUM(ti.quantity) as daily_units
+        FROM transactions t
+        JOIN transaction_items ti ON t.transaction_id = ti.transaction_id
+        WHERE (t.branch_id = ? OR ? = 'ALL') AND t.transaction_date >= ?
         GROUP BY t.transaction_date;
-        """, (current_branch, thirty_days_ago)).fetchall()
-        for r in d_rows:
-            sales_by_date[r['transaction_date']] = r['qty']
+        """, (selected_branch, selected_branch, fourteen_days_ago)).fetchall()
+        for r in daily_rows:
+            sales_by_date[r['transaction_date']] = int(r['daily_units'])
 
-    # Subcategory breakdown from active inventory stock
-    for item in inv_items:
-        subc = item.get('subcategory', 'general').capitalize()
-        subcat_counts[subc] = subcat_counts.get(subc, 0) + item['stock']
+        date_labels = []
+        daily_sales_data = []
+        for i in range(13, -1, -1):
+            dt_obj = datetime.now() - timedelta(days=i)
+            dt_str = dt_obj.strftime('%Y-%m-%d')
+            lbl_str = dt_obj.strftime('%m/%d')
+            date_labels.append(lbl_str)
+            daily_sales_data.append(sales_by_date.get(dt_str, 0))
 
-    # Populate 30-day timeline array
-    date_labels = []
-    thirty_day_sales_data = []
-    for i in range(29, -1, -1):
-        dt_obj = datetime.now() - timedelta(days=i)
-        dt_str = dt_obj.strftime('%Y-%m-%d')
-        lbl_str = dt_obj.strftime('%m/%d')
-        date_labels.append(lbl_str)
-        thirty_day_sales_data.append(sales_by_date.get(dt_str, 0))
+        # 6. Real Brand Inventory Stock Distribution
+        brand_rows = conn.execute("""
+        SELECT b.brand_name, SUM(i.stock) as stock_units
+        FROM inventory i
+        JOIN products p ON i.product_id = p.product_id
+        JOIN brands b ON p.brand_id = b.brand_id
+        WHERE (i.branch_id = ? OR ? = 'ALL')
+        GROUP BY b.brand_name
+        ORDER BY stock_units DESC;
+        """, (selected_branch, selected_branch)).fetchall()
+        
+        brand_labels = [r['brand_name'] for r in brand_rows]
+        brand_stock_data = [int(r['stock_units']) for r in brand_rows]
 
-    brand_labels = list(brand_counts.keys()) if brand_counts else ["Maybelline", "MAC", "Clinique", "Estee Lauder"]
-    brand_sales_data = list(brand_counts.values()) if brand_counts else [35, 25, 20, 15]
+        # 7. Real Category Stock Allocation
+        subcat_rows = conn.execute("""
+        SELECT s.subcategory_name, SUM(i.stock) as stock_units
+        FROM inventory i
+        JOIN products p ON i.product_id = p.product_id
+        JOIN subcategories s ON p.subcategory_id = s.subcategory_id
+        WHERE (i.branch_id = ? OR ? = 'ALL')
+        GROUP BY s.subcategory_name
+        ORDER BY stock_units DESC;
+        """, (selected_branch, selected_branch)).fetchall()
 
-    subcategory_labels = list(subcat_counts.keys()) if subcat_counts else ["Lipstick", "Foundation", "Perfume", "Concealer"]
-    subcategory_sales_data = list(subcat_counts.values()) if subcat_counts else [45, 30, 20, 15]
+        subcategory_labels = [r['subcategory_name'].title() for r in subcat_rows]
+        subcategory_stock_data = [int(r['stock_units']) for r in subcat_rows]
+
+        # 8. Real Product Catalog & Stock Table
+        inventory_products = conn.execute("""
+        SELECT p.product_id, p.product_name, b.brand_name, s.subcategory_name,
+               p.base_price,
+               COALESCE(SUM(i.stock), 0) as current_stock,
+               COALESCE(sales.sold_units, 0) as units_sold
+        FROM inventory i
+        JOIN products p ON i.product_id = p.product_id
+        JOIN brands b ON p.brand_id = b.brand_id
+        JOIN subcategories s ON p.subcategory_id = s.subcategory_id
+        LEFT JOIN (
+            SELECT ti.product_id, SUM(ti.quantity) as sold_units
+            FROM transaction_items ti
+            JOIN transactions t ON ti.transaction_id = t.transaction_id
+            WHERE (t.branch_id = ? OR ? = 'ALL')
+            GROUP BY ti.product_id
+        ) sales ON p.product_id = sales.product_id
+        WHERE (i.branch_id = ? OR ? = 'ALL')
+        GROUP BY p.product_id
+        ORDER BY units_sold DESC, current_stock ASC
+        LIMIT 10;
+        """, (selected_branch, selected_branch, selected_branch, selected_branch)).fetchall()
+
+        # 9. Low stock items detail list (< 15 units) for quick inspection
+        low_stock_rows = conn.execute("""
+        SELECT i.branch_id, i.product_id, p.product_name, b.brand_name, s.subcategory_name,
+               i.stock, p.base_price
+        FROM inventory i
+        JOIN products p ON i.product_id = p.product_id
+        JOIN brands b ON p.brand_id = b.brand_id
+        JOIN subcategories s ON p.subcategory_id = s.subcategory_id
+        WHERE (i.branch_id = ? OR ? = 'ALL') AND i.stock < 15
+        ORDER BY i.stock ASC, i.branch_id ASC;
+        """, (selected_branch, selected_branch)).fetchall()
+        low_stock_items = [dict(r) for r in low_stock_rows]
 
     return render_template(
         'dashboard.html',
+        selected_branch=selected_branch,
+        all_branches=all_branches,
+        today_tx_count=today_tx_count,
+        today_sales_units=today_sales_units,
+        today_sales_revenue=today_sales_revenue,
+        total_inventory_units=total_inventory_units,
+        total_skus=total_skus,
         low_stock_count=low_stock_count,
-        forecast_mode=f"Active ({current_branch} SQLite RF Pipeline)",
-        today_sales_count=today_sales_count,
+        low_stock_items=low_stock_items,
+        inventory_value=inventory_value,
+        total_pos_checkouts=total_pos_checkouts,
+        total_pos_units_sold=total_pos_units_sold,
+        total_pos_revenue=total_pos_revenue,
+        pending_transfers_count=pending_transfers_count,
         date_labels=date_labels,
-        thirty_day_sales_data=thirty_day_sales_data,
+        daily_sales_data=daily_sales_data,
         brand_labels=brand_labels,
-        brand_sales_data=brand_sales_data,
+        brand_stock_data=brand_stock_data,
         subcategory_labels=subcategory_labels,
-        subcategory_sales_data=subcategory_sales_data,
-        current_branch=current_branch
+        subcategory_stock_data=subcategory_stock_data,
+        inventory_products=[dict(p) for p in inventory_products],
+        current_branch=user_branch
     )
 
 # --- CASCADING CATALOG API ENDPOINTS ---

@@ -3,139 +3,461 @@
 {% block content %}
 <div class="space-y-8 max-w-7xl mx-auto pb-12 px-4">
     
-    <!-- Top Header Title Matrix -->
-    <div class="border-b border-noireText/10 pb-4">
-        <h2 class="text-3xl text-noireText font-serif">Branch Analytics Control Panel</h2>
-        <p class="text-xs text-noireText/60 font-light mt-1">Real-time analytical trends generated directly from active branch catalog ledgers.</p>
+    <!-- Top Header Title & Branch Scope Context -->
+    <div class="border-b border-noireText/10 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-3xl sm:text-4xl text-noireText font-serif">Executive Store Control Panel</h2>
+            <p class="text-xs text-noireText/60 font-light mt-1">Real-time inventory ledger and active point-of-sale transaction tracking.</p>
+        </div>
+        
+        <!-- Branch Context / Admin Filter -->
+        <div class="flex items-center gap-3">
+            {% if session.get('role') == 'admin' %}
+            <div class="flex items-center gap-2 bg-white/80 border border-noireText/10 px-3 py-1.5 rounded-xl text-xs shadow-sm">
+                <span class="text-[10px] text-noireText/50 uppercase font-bold tracking-widest">Scope:</span>
+                <select onchange="window.location.href='{{ url_for('dashboard') }}?branch=' + this.value" class="bg-transparent text-deepWine font-mono font-bold focus:outline-none cursor-pointer text-xs">
+                    <option value="ALL" {% if selected_branch == 'ALL' %}selected{% endif %}>Network-Wide (All Branches)</option>
+                    {% for b in all_branches %}
+                    <option value="{{ b }}" {% if selected_branch == b %}selected{% endif %}>Branch {{ b }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% else %}
+            <span class="text-xs bg-white/80 border border-noireText/10 px-3 py-1.5 rounded-xl font-mono text-noireText">
+                Active Node: <strong class="text-deepWine">Branch {{ current_branch }}</strong>
+            </span>
+            {% endif %}
+        </div>
     </div>
 
-    <!-- KPI Metric Card Row -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- 4-Card KPI Metric Matrix -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         
-        <!-- Today's Transactions -->
-        <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-sm flex flex-col justify-between">
+        <!-- KPI 1: Today's Registered POS Sales -->
+        <div class="bg-parchment p-5 rounded-2xl border border-noireText/5 shadow-sm flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between">
-                    <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Volume Today</span>
+                    <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Today's POS Sales</span>
                     <a href="{{ url_for('sales_history') }}" class="text-[10px] text-dustyRose hover:text-deepWine uppercase font-bold tracking-wider underline">Audit Log →</a>
                 </div>
-                <h3 class="text-4xl font-mono font-bold text-noireText mt-2">{{ today_sales_count if today_sales_count is not none else 0 }}</h3>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <h3 class="text-3xl font-mono font-bold text-noireText">{{ today_sales_units }}</h3>
+                    <span class="text-xs text-noireText/50 font-medium">units sold</span>
+                </div>
             </div>
-            <p class="text-[11px] text-emerald-700 font-medium mt-3 flex items-center gap-1">
-                <span>Active operational baseline steady</span>
-            </p>
+            <div class="pt-3 border-t border-noireText/5 mt-3 flex items-center justify-between text-[11px]">
+                <span class="text-noireText/60">{{ today_tx_count }} checkout{{ 's' if today_tx_count != 1 else '' }} today</span>
+                <span class="font-mono font-bold text-deepWine">${{ "%.2f"|format(today_sales_revenue) }}</span>
+            </div>
         </div>
 
-        <!-- Low Stock Alert -->
-        <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-sm flex flex-col justify-between">
+        <!-- KPI 2: Active Shelf Inventory & Low Stock Alerts -->
+        <div class="bg-parchment p-5 rounded-2xl border border-noireText/5 shadow-sm flex flex-col justify-between">
             <div>
-                <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Inventory Alerts</span>
-                <h3 class="text-4xl font-mono font-bold text-noireText mt-2">{{ low_stock_count if low_stock_count is not none else 0 }}</h3>
+                <div class="flex items-center justify-between">
+                    <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Shelf Inventory</span>
+                    <a href="{{ url_for('inventory_view') }}" class="text-[10px] text-dustyRose hover:text-deepWine uppercase font-bold tracking-wider underline">Ledger →</a>
+                </div>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <h3 class="text-3xl font-mono font-bold text-noireText">{{ "{:,}".format(total_inventory_units) }}</h3>
+                    <span class="text-xs text-noireText/50 font-medium">units across {{ total_skus }} SKUs</span>
+                </div>
             </div>
-            <p class="text-[11px] {% if low_stock_count and low_stock_count > 0 %}text-amber-700 font-medium{% else %}text-noireText/40{% endif %} mt-3">
-                {% if low_stock_count and low_stock_count > 0 %} SKU units running below minimum threshold !!{% else %}All product shelves optimized{% endif %}
-            </p>
+            <div class="pt-3 border-t border-noireText/5 mt-3 flex items-center justify-between text-[11px]">
+                <span class="text-noireText/60">Stock Alerts:</span>
+                {% if low_stock_count > 0 %}
+                <button type="button" onclick="openLowStockModal()" class="font-bold text-rose-800 bg-rose-100 hover:bg-rose-200 border border-rose-300 px-2.5 py-0.5 rounded-lg text-[10px] font-mono flex items-center gap-1 transition-all cursor-pointer shadow-xs" title="Click to see exact low stock products and branches">
+                    <span>⚠ {{ low_stock_count }} Low SKU{{ 's' if low_stock_count != 1 else '' }} (&lt;15)</span>
+                    <span class="underline text-[9px] uppercase font-sans tracking-wider ml-0.5">Inspect →</span>
+                </button>
+                {% else %}
+                <span class="text-emerald-700 font-medium text-[10px]">✓ All Shelves Stocked</span>
+                {% endif %}
+            </div>
         </div>
 
-        <!-- Model Mode Context Card -->
-        <div class="bg-deepWine text-velvet p-6 rounded-2xl border border-noireText/10 shadow-sm flex flex-col justify-between">
+        <!-- KPI 3: Total Shelf Inventory Value -->
+        <div class="bg-parchment p-5 rounded-2xl border border-noireText/5 shadow-sm flex flex-col justify-between">
             <div>
-                <span class="block text-[10px] font-bold tracking-widest uppercase text-velvet/60">Predictive Engine Context</span>
-                <h3 class="text-lg font-serif mt-2 leading-snug">{{ forecast_mode if forecast_mode is not none else "Inference Pipeline Offline" }}</h3>
+                <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Store Stock Value</span>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <h3 class="text-3xl font-mono font-bold text-deepWine">${{ "{:,.2f}".format(inventory_value) }}</h3>
+                </div>
             </div>
-            <p class="text-[11px] text-velvet/50 mt-3">Pipeline sync active</p>
+            <div class="pt-3 border-t border-noireText/5 mt-3 flex items-center justify-between text-[11px]">
+                <span class="text-noireText/60">Avg per SKU:</span>
+                <span class="font-mono font-bold text-deepWine">{{ (total_inventory_units // total_skus) if total_skus > 0 else 0 }} units/SKU</span>
+            </div>
+        </div>
+
+        <!-- KPI 4: Total POS Sales to Date -->
+        <div class="bg-deepWine text-velvet p-5 rounded-2xl border border-noireText/10 shadow-sm flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between">
+                    <span class="block text-[10px] font-bold tracking-widest uppercase text-velvet/60">POS Sales to Date</span>
+                    <a href="{{ url_for('stock_transfers') }}" class="text-[10px] text-dustyRose hover:text-white uppercase font-bold tracking-wider underline">{{ pending_transfers_count }} Transfer{{ 's' if pending_transfers_count != 1 else '' }} →</a>
+                </div>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <h3 class="text-3xl font-mono font-bold text-white">${{ "{:,.2f}".format(total_pos_revenue) }}</h3>
+                    <span class="text-xs text-velvet/60 font-medium">({{ total_pos_units_sold }} units)</span>
+                </div>
+            </div>
+            <div class="pt-3 border-t border-velvet/10 mt-3 flex items-center justify-between text-[11px] text-velvet/70">
+                <span>{{ total_pos_checkouts }} total checkouts recorded</span>
+                <span class="font-mono text-dustyRose font-semibold">Live POS</span>
+            </div>
         </div>
 
     </div>
+
+    {% if low_stock_count > 0 %}
+    <!-- Quick Attention Low Stock Alert Banner -->
+    <div class="bg-gradient-to-r from-amber-50 to-rose-50 border-2 border-amber-300/90 rounded-2xl p-4 sm:p-5 shadow-sm text-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-start gap-3.5">
+            <div class="p-2.5 bg-amber-100 text-amber-800 rounded-xl flex-shrink-0 mt-0.5">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="bg-amber-600 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shadow-xs">Restock Required</span>
+                    <strong class="text-amber-950 font-bold text-sm">{{ low_stock_count }} Low Stock Product{{ 's' if low_stock_count != 1 else '' }} Detected (&lt;15 Units)</strong>
+                </div>
+                <div class="text-amber-900 text-[11px] leading-relaxed flex flex-wrap gap-x-2 gap-y-1.5 mt-1.5">
+                    {% for item in low_stock_items %}
+                    <span class="bg-white/90 border border-amber-200 px-2 py-0.5 rounded-lg font-mono text-[10px] flex items-center gap-1 shadow-xs">
+                        <strong class="text-deepWine">[{{ item.branch_id }}]</strong>
+                        <span>{{ item.brand_name }} {{ item.product_name }}</span>
+                        <strong class="text-rose-700 font-bold ml-1">({{ item.stock }} left)</strong>
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0 self-end md:self-center">
+            <button type="button" onclick="openLowStockModal()" class="px-3.5 py-2 bg-deepWine hover:bg-noireText text-velvet font-medium text-xs rounded-xl shadow-sm transition-all whitespace-nowrap cursor-pointer">
+                Inspect Breakdown →
+            </button>
+            <a href="{{ url_for('stock_transfers') }}" class="px-3.5 py-2 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-medium text-xs rounded-xl transition-all whitespace-nowrap">
+                Request Transfer
+            </a>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Analytics Charts Grid System -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- 30-Day Trend Timeline (Spans 2 columns) -->
-        <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-sm lg:col-span-2">
-            <h4 class="text-sm font-serif tracking-wide text-noireText mb-4">30-Day Sales Volumetric Trend Line</h4>
+        <!-- 14-Day Sales Activity Timeline (Spans 2 columns) -->
+        <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-sm lg:col-span-2 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h4 class="text-base font-serif tracking-wide text-noireText">Recent POS Sales Activity (14 Days)</h4>
+                    <p class="text-[11px] text-noireText/50">Daily units purchased through the store register.</p>
+                </div>
+                <span class="text-[10px] font-mono bg-velvet px-2.5 py-1 rounded-lg border border-noireText/10 text-noireText">
+                    {{ selected_branch if selected_branch != 'ALL' else 'Consolidated' }}
+                </span>
+            </div>
             <div class="h-64 relative">
                 <canvas id="trendChart"></canvas>
             </div>
         </div>
 
-        <!-- Sales Distribution by Brand (Pie / Doughnut Chart) -->
-        <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-sm col-span-1">
-            <h4 class="text-sm font-serif tracking-wide text-noireText mb-4">Brand Volume Share</h4>
+        <!-- Real Brand Inventory Distribution (Doughnut Chart) -->
+        <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-sm col-span-1 flex flex-col justify-between">
+            <div class="mb-4">
+                <h4 class="text-base font-serif tracking-wide text-noireText">Brand Shelf Stock Share</h4>
+                <p class="text-[11px] text-noireText/50">Distribution of available inventory units by brand.</p>
+            </div>
             <div class="h-64 relative flex items-center justify-center">
                 <canvas id="brandChart"></canvas>
             </div>
         </div>
 
-        <!-- Sales Distribution by Subcategory (Horizontal Bar Chart) -->
+        <!-- Real Subcategory Stock Distribution (Bar Chart - Spans 3 columns) -->
         <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-sm lg:col-span-3">
-            <h4 class="text-sm font-serif tracking-wide text-noireText mb-4">Product Category Volume Performance</h4>
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h4 class="text-base font-serif tracking-wide text-noireText">Product Category Stock on Hand</h4>
+                    <p class="text-[11px] text-noireText/50">Current physical inventory units on shelves by category.</p>
+                </div>
+            </div>
             <div class="h-64 relative">
                 <canvas id="categoryChart"></canvas>
             </div>
         </div>
 
     </div>
+
+    <!-- Product Catalog & Shelf Stock Table -->
+    <div class="bg-white rounded-2xl border border-noireText/10 shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex items-center justify-between">
+            <div>
+                <h3 class="text-xl font-serif text-noireText">Store Inventory & Sales Tracker</h3>
+                <p class="text-xs text-noireText/60 font-light">Real shelf stock on hand (25–40 units/SKU) and POS sales registered for each product.</p>
+            </div>
+            <a href="{{ url_for('inventory_view') }}" class="text-xs font-semibold text-deepWine hover:underline">Manage All Inventory →</a>
+        </div>
+
+        <div class="overflow-x-auto w-full">
+            <table class="w-full text-left text-xs tracking-wide border-collapse min-w-[700px]">
+                <thead>
+                    <tr class="bg-parchment/20 border-b border-noireText/10 text-noireText/70 uppercase text-[10px] tracking-widest">
+                        <th class="py-3.5 px-6 font-semibold">SKU ID</th>
+                        <th class="py-3.5 px-6 font-semibold">Product Description</th>
+                        <th class="py-3.5 px-6 font-semibold">Brand / Category</th>
+                        <th class="py-3.5 px-6 text-right font-semibold">Base Price</th>
+                        <th class="py-3.5 px-6 text-center font-semibold">Current Shelf Stock</th>
+                        <th class="py-3.5 px-6 text-center font-semibold">POS Units Sold</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-noireText/5 text-noireText">
+                    {% if inventory_products %}
+                        {% for p in inventory_products %}
+                        <tr class="hover:bg-velvet/20 transition-colors">
+                            <td class="py-4 px-6 whitespace-nowrap font-mono font-bold text-deepWine">
+                                <span class="bg-parchment px-2 py-0.5 rounded border border-noireText/10">{{ p.product_id }}</span>
+                            </td>
+                            <td class="py-4 px-6 font-medium max-w-sm truncate" title="{{ p.product_name }}">
+                                {{ p.product_name }}
+                            </td>
+                            <td class="py-4 px-6 whitespace-nowrap">
+                                <span class="font-semibold text-noireText">{{ p.brand_name }}</span>
+                                <span class="block text-[10px] text-noireText/50 capitalize">{{ p.subcategory_name }}</span>
+                            </td>
+                            <td class="py-4 px-6 text-right font-mono font-semibold text-noireText">
+                                ${{ "%.2f"|format(p.base_price) }}
+                            </td>
+                            <td class="py-4 px-6 text-center whitespace-nowrap">
+                                {% if p.current_stock <= 0 %}
+                                    <span class="text-rose-800 bg-rose-50 px-2.5 py-1 rounded-lg text-[10px] font-bold border border-rose-200">
+                                        0 (Out of Stock)
+                                    </span>
+                                {% elif p.current_stock < 15 %}
+                                    <span class="text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg text-[10px] font-bold border border-amber-200">
+                                        ⚠ {{ p.current_stock }} units left
+                                    </span>
+                                {% else %}
+                                    <span class="text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg text-[10px] font-bold border border-emerald-200">
+                                        ✓ {{ p.current_stock }} in stock
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-6 text-center font-mono font-bold text-deepWine">
+                                {{ p.units_sold }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-noireText/40 italic text-xs">
+                                No products found in this branch inventory ledger.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 
-<!-- Dynamic Charts Rendering Engine -->
+<!-- Modal Dialog: Low Stock Products Detailed Inspection -->
+<div id="lowStockModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-noireText/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-3xl w-full border border-noireText/10 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
+        
+        <div class="p-6 border-b border-noireText/10 bg-parchment/40 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-rose-100 text-rose-700 rounded-2xl flex-shrink-0">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-xl font-serif text-noireText font-bold">Low Stock Inventory Critical Alerts</h3>
+                    <p class="text-xs text-noireText/60">Real-time SKUs running below safety threshold (&lt;15 units) across operating store nodes.</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeLowStockModal()" class="w-8 h-8 rounded-full bg-parchment/80 hover:bg-rose-100 hover:text-rose-700 text-noireText/70 flex items-center justify-center transition-all text-sm font-bold cursor-pointer">
+                ✕
+            </button>
+        </div>
+
+        <div class="p-6 max-h-[60vh] overflow-y-auto">
+            {% if low_stock_items %}
+            <table class="w-full text-left text-xs tracking-wide border-collapse">
+                <thead>
+                    <tr class="bg-parchment/20 border-b border-noireText/10 text-noireText/70 uppercase text-[10px] tracking-widest">
+                        <th class="py-3 px-4 font-semibold">Branch Node</th>
+                        <th class="py-3 px-4 font-semibold">SKU ID</th>
+                        <th class="py-3 px-4 font-semibold">Product Description</th>
+                        <th class="py-3 px-4 font-semibold">Brand / Category</th>
+                        <th class="py-3 px-4 text-center font-semibold">Stock on Hand</th>
+                        <th class="py-3 px-4 text-right font-semibold">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-noireText/5 text-noireText">
+                    {% for item in low_stock_items %}
+                    <tr class="hover:bg-velvet/30 transition-colors">
+                        <td class="py-3.5 px-4 font-mono font-bold text-deepWine whitespace-nowrap">
+                            <span class="bg-deepWine/10 text-deepWine px-2.5 py-1 rounded-lg border border-deepWine/20 text-xs">
+                                Branch {{ item.branch_id }}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4 font-mono text-[11px] text-noireText/70 whitespace-nowrap font-bold">
+                            {{ item.product_id }}
+                        </td>
+                        <td class="py-3.5 px-4 font-medium max-w-xs truncate" title="{{ item.product_name }}">
+                            {{ item.product_name }}
+                        </td>
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                            <span class="font-semibold text-noireText">{{ item.brand_name }}</span>
+                            <span class="block text-[10px] text-noireText/50 capitalize">{{ item.subcategory_name }}</span>
+                        </td>
+                        <td class="py-3.5 px-4 text-center whitespace-nowrap">
+                            <span class="font-mono font-bold text-rose-800 bg-rose-100 border border-rose-300 px-2.5 py-1 rounded-lg text-xs">
+                                ⚠ {{ item.stock }} units
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                            <a href="{{ url_for('stock_transfers') }}" class="inline-flex items-center gap-1 px-3 py-1.5 bg-deepWine hover:bg-noireText text-velvet text-[11px] font-semibold rounded-lg transition-all shadow-xs">
+                                Transfer In →
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="py-12 text-center text-emerald-800">
+                <span class="text-3xl block mb-2">✓</span>
+                <p class="font-semibold text-sm">All product shelves are well-stocked!</p>
+                <p class="text-xs text-noireText/60 mt-1">No SKUs currently running below minimum safety thresholds (&lt;15 units).</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="p-4 border-t border-noireText/10 bg-parchment/20 flex items-center justify-between text-xs">
+            <span class="text-noireText/60 font-mono text-[11px]">Threshold: Less than 15 units remaining</span>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('inventory_view') }}" class="px-4 py-2 bg-white hover:bg-parchment text-noireText border border-noireText/15 rounded-xl font-medium transition-all">
+                    Open Inventory Ledger
+                </a>
+                <button type="button" onclick="closeLowStockModal()" class="px-4 py-2 bg-deepWine hover:bg-noireText text-velvet rounded-xl font-medium transition-all cursor-pointer">
+                    Done
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Dynamic Charts Rendering Engine & Modal Handlers -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+function openLowStockModal() {
+    const modal = document.getElementById('lowStockModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeLowStockModal() {
+    const modal = document.getElementById('lowStockModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+}
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === 'Escape') closeLowStockModal();
+});
+
 document.addEventListener("DOMContentLoaded", () => {
-    // Shared color configuration mappings mirroring Noire design parameters
-    const wineColor = '#582c3e'; // Muted Deep Wine
-    const roseColor = '#bd8c9b'; // Soft Dusty Rose
-    const grayText = '#2b2929';  // Muted Charcoal Dark Text
-    const lineFill = 'rgba(189, 140, 155, 0.15)'; 
+    // Custom Noire Palette Colors
+    const wineColor = '#423338'; 
+    const roseColor = '#a88189'; 
+    const grayText = '#2e2528';  
+    const lineFill = 'rgba(168, 129, 137, 0.18)'; 
+    const palette = [
+        '#423338', '#a88189', '#73525b', '#c4a6ad', '#312328', 
+        '#8c6872', '#b38d97', '#5a4049', '#9f7883', '#d9c2c8', '#634b54', '#845763'
+    ];
 
-    // Safety Fallbacks: Ensures empty arrays instead of throwing Javascript 'undefined' breaks
     const dateLabels = {{ date_labels | tojson }} || [];
-    const trendData = {{ thirty_day_sales_data | tojson }} || [];
+    const dailyData = {{ daily_sales_data | tojson }} || [];
     const brandLabels = {{ brand_labels | tojson }} || [];
-    const brandData = {{ brand_sales_data | tojson }} || [];
+    const brandData = {{ brand_stock_data | tojson }} || [];
     const catLabels = {{ subcategory_labels | tojson }} || [];
-    const catData = {{ subcategory_sales_data | tojson }} || [];
+    const catData = {{ subcategory_stock_data | tojson }} || [];
 
-    // --- CHART 1: 30-DAY SALES LINE TREND ---
+    // --- CHART 1: 14-DAY POS SALES ACTIVITY TREND ---
     const ctxTrend = document.getElementById('trendChart');
-    if (ctxTrend) {
+    if (ctxTrend && dateLabels.length > 0) {
         new Chart(ctxTrend, {
             type: 'line',
             data: {
                 labels: dateLabels,
                 datasets: [{
                     label: 'Units Transacted',
-                    data: trendData,
+                    data: dailyData,
                     borderColor: roseColor,
                     backgroundColor: lineFill,
-                    borderWidth: 2,
+                    borderWidth: 2.5,
                     fill: true,
-                    tension: 0.3,
-                    pointBackgroundColor: wineColor
+                    tension: 0.2,
+                    pointBackgroundColor: wineColor,
+                    pointHoverRadius: 5,
+                    pointRadius: 4
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ` Units Sold: ${context.parsed.y} units`;
+                            }
+                        }
+                    }
+                },
                 scales: {
-                    y: { grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 10 }, color: grayText } },
-                    x: { grid: { display: false }, ticks: { font: { size: 9 }, color: grayText, maxTicksLimit: 10 } }
+                    y: { 
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.04)' }, 
+                        ticks: { 
+                            stepSize: 1,
+                            font: { size: 10 }, 
+                            color: grayText,
+                            callback: function(val) { if (Number.isInteger(val)) return val; }
+                        } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { font: { size: 9 }, color: grayText } 
+                    }
                 }
             }
         });
     }
 
-    // --- CHART 2: BRAND DISTRIBUTION (DOUGHNUT) ---
+    // --- CHART 2: REAL BRAND INVENTORY DISTRIBUTION (DOUGHNUT) ---
     const ctxBrand = document.getElementById('brandChart');
-    if (ctxBrand) {
+    if (ctxBrand && brandLabels.length > 0) {
         new Chart(ctxBrand, {
             type: 'doughnut',
             data: {
                 labels: brandLabels,
                 datasets: [{
                     data: brandData,
-                    backgroundColor: [wineColor, roseColor, '#825666', '#d9b6c0', '#421d2b'],
+                    backgroundColor: palette.slice(0, brandLabels.length),
                     borderWidth: 2,
                     borderColor: '#ffffff'
                 }]
@@ -146,22 +468,32 @@ document.addEventListener("DOMContentLoaded", () => {
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: { boxWidth: 12, font: { size: 10 }, color: grayText }
+                        labels: { boxWidth: 10, font: { size: 9 }, color: grayText, padding: 6 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const val = context.parsed;
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                                return ` ${context.label}: ${val.toLocaleString()} units in stock (${pct}%)`;
+                            }
+                        }
                     }
                 }
             }
         });
     }
 
-    // --- CHART 3: SUBCATEGORY BAR DISPLAY ---
+    // --- CHART 3: SUBCATEGORY SHELF STOCK (BAR) ---
     const ctxCat = document.getElementById('categoryChart');
-    if (ctxCat) {
+    if (ctxCat && catLabels.length > 0) {
         new Chart(ctxCat, {
             type: 'bar',
             data: {
                 labels: catLabels,
                 datasets: [{
-                    label: 'Units Shipped',
+                    label: 'Shelf Stock',
                     data: catData,
                     backgroundColor: wineColor,
                     hoverBackgroundColor: roseColor,
@@ -171,10 +503,29 @@ document.addEventListener("DOMContentLoaded", () => {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ` Shelf Stock: ${context.parsed.y.toLocaleString()} units`;
+                            }
+                        }
+                    }
+                },
                 scales: {
-                    y: { grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 10 }, color: grayText } },
-                    x: { grid: { display: false }, ticks: { font: { size: 11 }, color: grayText } }
+                    y: { 
+                        beginAtZero: true,
+                        grid: { color: 'rgba(0,0,0,0.04)' }, 
+                        ticks: { 
+                            font: { size: 10 }, 
+                            color: grayText
+                        } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { font: { size: 10 }, color: grayText } 
+                    }
                 }
             }
         });
