@@ -49,10 +49,11 @@
                     </h1>
                 </a>
 
-                <!-- Branch Selector Context Dropdown -->
+                <!-- Branch Selector Context: Dropdown for Admin, Locked Static Badge for Staff -->
                 {% if session.get('username') %}
                 <div class="flex items-center gap-2 bg-velvet/10 px-3 py-1.5 rounded-xl border border-dustyRose/30 text-xs">
                     <span class="text-[10px] text-dustyRose uppercase font-bold tracking-widest">Branch:</span>
+                    {% if session.get('role') == 'admin' %}
                     <select onchange="window.location.href='/switch_branch/' + this.value" class="bg-transparent text-velvet font-bold focus:outline-none cursor-pointer">
                         {% for b_code in ['S001', 'S002', 'S003', 'S004', 'S005'] %}
                             <option value="{{ b_code }}" class="bg-deepWine text-velvet" {% if session.get('branch') == b_code %}selected{% endif %}>
@@ -60,6 +61,10 @@
                             </option>
                         {% endfor %}
                     </select>
+                    {% else %}
+                    <span class="text-velvet font-bold font-mono">{{ session.get('branch', 'S001') }}</span>
+                    <span class="text-[9px] bg-dustyRose/20 text-dustyRose px-1.5 py-0.5 rounded font-semibold tracking-wider uppercase">Locked</span>
+                    {% endif %}
                 </div>
                 {% endif %}
 

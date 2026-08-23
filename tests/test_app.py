@@ -113,6 +113,40 @@ def test_admin_route_access_for_admin(client):
     response = client.get('/admin/manage_users')
     assert response.status_code == 200
 
+def test_staff_cannot_switch_branch(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S003'
+
+    # Attempt to switch to S001 should be forbidden (403)
+    response = client.get('/switch_branch/S001')
+    assert response.status_code == 403
+
+    # Verify dashboard renders locked badge and no branch selector dropdown
+    dash_resp = client.get('/dashboard')
+    assert dash_resp.status_code == 200
+    html = dash_resp.get_data(as_text=True)
+    assert 'Locked' in html
+    assert 'switch_branch' not in html
+
+def test_admin_can_switch_branch(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    # Admin switching branch should succeed (302 redirect)
+    response = client.get('/switch_branch/S004', follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers.get('Location') in ['/dashboard', 'http://localhost/dashboard']
+
+    # Verify admin UI renders branch switcher dropdown
+    dash_resp = client.get('/dashboard')
+    assert dash_resp.status_code == 200
+    html = dash_resp.get_data(as_text=True)
+    assert 'switch_branch' in html
+
 # --- 5. POS CHECKOUT TRANSACTION TEST ---
 
 def test_record_sale_transaction_workflow(client):
@@ -173,6 +207,65 @@ def test_predict_endpoint_execution(client):
     assert 'predicted_demand' in res_json
     assert 'recommendation' in res_json
     assert res_json['holiday_surge_applied'] is True
+
+def test_predict_multi_occasion_hierarchy(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    events = ['none', 'valentines', 'newyear', 'festive', 'clearance', 'tihar', 'teej', 'dashain']
+    predictions = {}
+    for ev in events:
+        payload = {
+            'product_id': 'P0001',
+            'price': 25.00,
+            'stock': 10,
+            'holiday_context': ev
+        }
+        res = client.post('/predict', data=json.dumps(payload), content_type='application/json')
+        assert res.status_code == 200
+        res_data = res.get_json()
+        predictions[ev] = res_data['predicted_demand']
+
+    # Demand for Dashain, Teej, Tihar, Sales, Festive should exceed Valentine's and Baseline
+    assert predictions['dashain'] >= predictions['teej']
+    assert predictions['teej'] >= predictions['tihar']
+    assert predictions['tihar'] > predictions['valentines']
+    assert predictions['clearance'] > predictions['valentines']
+    assert predictions['festive'] > predictions['valentines']
+    assert predictions['valentines'] > predictions['none']
+
+def test_predict_status_color_states(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    # 1. GREEN test: Stock at hand (50) is greater than predicted demand (baseline ~9)
+    res_green = client.post('/predict', data=json.dumps({
+        'product_id': 'P0001', 'price': 25.00, 'stock': 50, 'holiday_context': 'none'
+    }), content_type='application/json')
+    data_green = res_green.get_json()
+    assert data_green['status_color'] == 'green'
+    assert data_green['status'] == 'sufficient'
+
+    # 2. RED test: Stock at hand (5) is less than predicted demand (Dashain ~39)
+    res_red = client.post('/predict', data=json.dumps({
+        'product_id': 'P0001', 'price': 25.00, 'stock': 5, 'holiday_context': 'dashain'
+    }), content_type='application/json')
+    data_red = res_red.get_json()
+    assert data_red['status_color'] == 'red'
+    assert data_red['status'] == 'deficit'
+
+    # 3. YELLOW test: Stock at hand equals predicted demand exactly (stock=9, pred=9)
+    res_yellow = client.post('/predict', data=json.dumps({
+        'product_id': 'P0001', 'price': 25.00, 'stock': 9, 'holiday_context': 'none'
+    }), content_type='application/json')
+    data_yellow = res_yellow.get_json()
+    assert data_yellow['status_color'] == 'yellow'
+    assert data_yellow['status'] == 'balanced'
+    assert data_yellow['predicted_demand'] == 9
 
 def test_record_sale_negative_quantity_rejection(client):
     with client.session_transaction() as sess:

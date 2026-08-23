@@ -41,12 +41,16 @@
                 </div>
 
                 <div class="sm:col-span-2 bg-velvet/40 p-4 rounded-xl border border-noireText/5 space-y-3">
-                    <label class="block font-semibold uppercase text-noireText/80 tracking-widest text-[11px]">Active Event Context</label>
+                    <label class="block font-semibold uppercase text-noireText/80 tracking-widest text-[11px]">Active Event / Holiday Context</label>
                     <select id="holiday_context" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
-                        <option value="none">Regular Operating Baseline (No Surge)</option>
-                        <option value="valentines">Valentine's Day Peak Surge (High Cosmetic Demand)</option>
-                        <option value="festive">Festive / Holiday Season Promotion (Store Flash Sale)</option>
-                        <option value="clearance">End-of-Season Inventory Clearance Campaign</option>
+                        <option value="none" selected>Regular Operating Baseline (Standard Daily Demand)</option>
+                        <option value="dashain">Dashain Grand Festival (Mega Peak Demand - Highest Sales)</option>
+                        <option value="teej">Teej Festival (Cosmetics & Beauty Peak Surge)</option>
+                        <option value="tihar">Tihar / Festival of Lights (High Festive Surge)</option>
+                        <option value="clearance">Flash Sale / Clearance Campaign (High Discount Volume)</option>
+                        <option value="festive">Holiday Season Promotion (General Festive Surge)</option>
+                        <option value="newyear">New Year Promotion (Seasonal Demand Surge)</option>
+                        <option value="valentines">Valentine's Day Campaign (Gifting / Date Surge)</option>
                     </select>
                 </div>
 
@@ -60,23 +64,31 @@
         </form>
     </div>
 
-    <div id="forecastResult" class="hidden max-w-2xl mx-auto bg-white p-6 rounded-2xl border border-noireText/10 shadow-lg transition-all duration-300">
-        <div class="border-b border-noireText/10 pb-3 mb-4 text-center">
-            <h4 class="text-xl text-noireText font-serif">Machine Learning Inference Output</h4>
-            <span id="res_holiday" class="text-[10px] font-bold tracking-widest uppercase block mt-1">Model Execution Complete</span>
+    <div id="forecastResult" class="hidden max-w-2xl mx-auto p-6 rounded-2xl border shadow-lg transition-all duration-300">
+        <div class="border-b pb-3 mb-4 text-center">
+            <h4 class="text-xl font-serif text-noireText">Sales Forecast Result</h4>
+            <div class="flex items-center justify-center gap-2 mt-2">
+                <span id="res_event_badge" class="text-xs px-3 py-1 rounded-full font-medium tracking-wide">Event</span>
+                <span id="res_status_badge" class="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider">Status</span>
+            </div>
         </div>
         
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 text-center py-2">
-            <div class="bg-velvet/30 p-4 rounded-xl border border-noireText/5">
-                <span class="block text-[10px] uppercase tracking-widest text-noireText/50 font-semibold mb-1">Predicted Unit Demand</span>
-                <span id="res_units" class="text-4xl font-mono font-bold text-noireText">0</span>
-                <span class="block text-[10px] text-noireText/40 mt-1">Units next operating window</span>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center py-2">
+            <div class="bg-white/80 p-4 rounded-xl border border-noireText/5 shadow-sm">
+                <span class="block text-[11px] uppercase tracking-wider text-noireText/60 font-semibold mb-1">Expected Sales</span>
+                <span id="res_units" class="text-4xl font-mono font-bold">0</span>
+                <span class="block text-[11px] text-noireText/50 mt-1">units demand</span>
             </div>
             
-            <div class="bg-velvet/30 p-4 rounded-xl border border-noireText/5 flex flex-col justify-center items-center">
-                <span class="block text-[10px] uppercase tracking-widest text-noireText/50 font-semibold mb-1">Inventory Strategy Advisory</span>
-                <span id="res_strategy" class="text-xs font-medium text-deepWine block mt-1 px-2 leading-relaxed">Evaluating...</span>
+            <div class="bg-white/80 p-4 rounded-xl border border-noireText/5 shadow-sm">
+                <span class="block text-[11px] uppercase tracking-wider text-noireText/60 font-semibold mb-1">Stock on Hand</span>
+                <span id="res_stock_val" class="text-4xl font-mono font-bold text-noireText/80">0</span>
+                <span class="block text-[11px] text-noireText/50 mt-1">units available</span>
             </div>
+        </div>
+
+        <div id="res_advice_box" class="mt-4 p-4 rounded-xl text-center text-sm font-medium leading-relaxed border shadow-sm">
+            <span id="res_strategy">Evaluating...</span>
         </div>
     </div>
 </div>
@@ -167,26 +179,55 @@ document.addEventListener("DOMContentLoaded", async () => {
             let result = await response.json();
             
             if (result.error) {
-                alert("Model execution error: " + result.error);
+                alert("Error getting prediction: " + result.error);
                 return;
             }
 
-            // Display pure machine learning model prediction without JS multiplier overrides
-            document.getElementById('res_units').innerText = result.predicted_demand;
+            const predUnits = result.predicted_demand;
+            const stockUnits = result.stock_at_hand !== undefined ? result.stock_at_hand : stockValue;
+            
+            document.getElementById('res_units').innerText = predUnits;
+            document.getElementById('res_stock_val').innerText = stockUnits;
             document.getElementById('res_strategy').innerText = result.recommendation;
             
-            const holidayEl = document.getElementById('res_holiday');
-            if (result.holiday_surge_applied) {
-                holidayEl.innerText = "PROMOTIONAL SURGE FEATURE ENGAGED IN ML VECTOR";
-                holidayEl.className = "text-[11px] font-bold tracking-widest uppercase block mt-1 text-amber-600";
+            const eventBadge = document.getElementById('res_event_badge');
+            const statusBadge = document.getElementById('res_status_badge');
+            const unitsEl = document.getElementById('res_units');
+            const adviceBox = document.getElementById('res_advice_box');
+            
+            eventBadge.innerText = result.event_title || "Standard Sales";
+            eventBadge.className = "text-xs px-3 py-1 rounded-full font-medium tracking-wide bg-velvet/50 text-noireText border border-noireText/10";
+
+            // COLOR LOGIC:
+            // 1. Predicted stock < Stock on hand -> GREEN (Sufficient)
+            // 2. Predicted stock == Stock on hand -> YELLOW (Just Enough / Equal)
+            // 3. Stock on hand < Predicted stock -> RED (Shortage / Restock Needed)
+            if (predUnits < stockUnits) {
+                // GREEN - Sufficient Stock
+                resultCard.className = "max-w-2xl mx-auto p-6 rounded-2xl border shadow-lg transition-all duration-300 bg-emerald-50/90 border-emerald-300";
+                statusBadge.innerText = "✓ Stock is Sufficient";
+                statusBadge.className = "text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300";
+                unitsEl.className = "text-4xl font-mono font-bold text-emerald-700";
+                adviceBox.className = "mt-4 p-4 rounded-xl text-center text-sm font-medium leading-relaxed bg-white/90 text-emerald-900 border border-emerald-200 shadow-sm";
+            } else if (predUnits === stockUnits) {
+                // YELLOW - Just Enough
+                resultCard.className = "max-w-2xl mx-auto p-6 rounded-2xl border shadow-lg transition-all duration-300 bg-amber-50/90 border-amber-300";
+                statusBadge.innerText = "⚠ Stock is Just Enough";
+                statusBadge.className = "text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300";
+                unitsEl.className = "text-4xl font-mono font-bold text-amber-700";
+                adviceBox.className = "mt-4 p-4 rounded-xl text-center text-sm font-medium leading-relaxed bg-white/90 text-amber-900 border border-amber-200 shadow-sm";
             } else {
-                holidayEl.innerText = "STANDARD BASELINE REGRESSION INFERENCE";
-                holidayEl.className = "text-[11px] font-bold tracking-widest uppercase block mt-1 text-emerald-600";
+                // RED - Stock Shortage
+                resultCard.className = "max-w-2xl mx-auto p-6 rounded-2xl border shadow-lg transition-all duration-300 bg-rose-50/90 border-rose-300";
+                statusBadge.innerText = "✕ Restock Needed";
+                statusBadge.className = "text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300";
+                unitsEl.className = "text-4xl font-mono font-bold text-rose-700";
+                adviceBox.className = "mt-4 p-4 rounded-xl text-center text-sm font-medium leading-relaxed bg-white/90 text-rose-900 border border-rose-200 shadow-sm";
             }
             
             resultCard.classList.remove('hidden');
         } catch (err) {
-            alert("System connectivity exception processing prediction pipeline.");
+            alert("Unable to process sales prediction.");
         }
     });
 });

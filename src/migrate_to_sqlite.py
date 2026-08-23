@@ -25,7 +25,7 @@ def run_etl_migration(db_path=DB_PATH):
 
     # 1. Initialize SQLite DDL tables
     init_db(db_path)
-    print("✓ SQLite database schemas & indexes initialized.")
+    print("[OK] SQLite database schemas & indexes initialized.")
 
     with get_db(db_path) as conn:
         cursor = conn.cursor()
@@ -46,7 +46,7 @@ def run_etl_migration(db_path=DB_PATH):
                         INSERT OR IGNORE INTO users (username, password_hash, role, branch_id)
                         VALUES (?, ?, ?, ?);
                         """, (u, p, r, b))
-            print("✓ Users migrated.")
+            print("[OK] Users migrated.")
 
         # 3. Migrate inventory.csv & makeup_data.csv metadata into brands, categories, subcategories, products
         print("Migrating master catalog & inventory...")
@@ -131,7 +131,7 @@ def run_etl_migration(db_path=DB_PATH):
         INSERT OR REPLACE INTO products (product_id, brand_id, subcategory_id, product_name, base_price)
         VALUES (?, ?, ?, ?, ?);
         """, prod_records)
-        print(f"✓ Master product catalog migrated: {len(prod_records)} products.")
+        print(f"[OK] Master product catalog migrated: {len(prod_records)} products.")
 
         # Populate branch inventory balances
         if not inv_df.empty:
@@ -147,7 +147,7 @@ def run_etl_migration(db_path=DB_PATH):
             INSERT OR REPLACE INTO inventory (branch_id, product_id, stock)
             VALUES (?, ?, ?);
             """, inv_records)
-            print(f"✓ Inventory balances migrated: {len(inv_records)} stock ledger rows.")
+            print(f"[OK] Inventory balances migrated: {len(inv_records)} stock ledger rows.")
 
         # 4. Migrate sales_history.csv into transactions & transaction_items
         sales_csv = os.path.join('data', 'sales_history.csv')
@@ -188,7 +188,7 @@ def run_etl_migration(db_path=DB_PATH):
                 INSERT INTO transaction_items (transaction_id, product_id, shade, quantity, unit_price, subtotal)
                 VALUES (?, ?, ?, ?, ?, ?);
                 """, tx_items)
-                print(f"✓ Sales history migrated: {len(tx_headers)} transactions ({len(tx_items)} items).")
+                print(f"[OK] Sales history migrated: {len(tx_headers)} transactions ({len(tx_items)} items).")
 
         # 5. Bulk migrate historical_sales from makeup_data.csv (219,000+ rows)
         if not makeup_df.empty:
@@ -213,7 +213,7 @@ def run_etl_migration(db_path=DB_PATH):
                 VALUES (?, ?, ?, ?, ?, ?, ?);
                 """, chunk)
                 print(f"   Migrated batch {i // chunk_size + 1}/{(len(hist_records) // chunk_size) + 1} ({len(chunk)} rows)")
-            print(f"✓ Historical sales baseline fully migrated: {len(hist_records)} rows.")
+            print(f"[OK] Historical sales baseline fully migrated: {len(hist_records)} rows.")
 
         # 6. Verification Audit Queries
         print("-" * 60)

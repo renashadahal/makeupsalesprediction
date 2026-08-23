@@ -2,6 +2,7 @@ from flask import Flask, request, redirect, session, render_template, url_for, j
 import os
 import joblib
 import numpy as np
+import pandas as pd
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -69,6 +70,10 @@ def login():
 @app.route('/switch_branch/<branch_id>')
 @login_required
 def switch_branch(branch_id):
+    if session.get('role') != 'admin':
+        flash("Access Denied: Branch selection is locked to assigned location for staff members.")
+        return redirect(url_for('dashboard')), 403
+
     allowed_branches = ['S001', 'S002', 'S003', 'S004', 'S005']
     if branch_id in allowed_branches:
         session['branch'] = branch_id
@@ -286,12 +291,18 @@ def record_sale():
 @login_required
 def sales_history():
     current_branch = session.get('branch', 'S001')
-    branch_param = request.args.get('branch', current_branch)
+    is_admin = session.get('role') == 'admin'
     
-    if branch_param == 'ALL':
-        transactions = db_load_transactions()
+    if is_admin:
+        branch_param = request.args.get('branch', current_branch)
+        if branch_param == 'ALL':
+            transactions = db_load_transactions()
+        else:
+            transactions = db_load_transactions(branch=branch_param)
     else:
-        transactions = db_load_transactions(branch=branch_param)
+        # Staff is strictly locked to their assigned branch
+        branch_param = current_branch
+        transactions = db_load_transactions(branch=current_branch)
 
     return render_template(
         'sales_history.html',
@@ -365,11 +376,7 @@ def predict():
     branch_id = session.get('branch', 'S001')
     price_val = float(input_data.get('price', 25.0))
     stock_val = int(input_data.get('stock', 10))
-    holiday_ctx = input_data.get('holiday_context', 'none')
-
-    curr_month = datetime.now().month
-    is_holiday_ctx = holiday_ctx in ['valentines', 'festive', 'clearance'] or curr_month in [9, 10, 11]
-    holiday_surge_flag = 1 if is_holiday_ctx else 0
+    holiday_ctx = str(input_data.get('holiday_context', 'none')).lower().strip()
 
     le_prod = encoders['Product_ID']
     le_store = encoders['Store_ID']
@@ -389,23 +396,71 @@ def predict():
 
     price_inventory_ratio = price_val / (stock_val + 1)
 
-    feature_vector = np.array([
-        prod_enc, store_enc, price_val, holiday_surge_flag, lag_7d, lag_14d, price_inventory_ratio
-    ]).reshape(1, -1)
+    event_feature_cols = encoders.get('Event_Feature_Cols', [
+        'Event_valentines', 'Event_newyear', 'Event_clearance', 'Event_festive',
+        'Event_tihar', 'Event_teej', 'Event_dashain'
+    ])
 
-    prediction = model.predict(feature_vector)[0]
+    event_features = []
+    for col in event_feature_cols:
+        cat_name = col.replace('Event_', '')
+        event_features.append(1 if holiday_ctx == cat_name else 0)
+
+    feature_names = encoders.get('Feature_Names', [
+        'Product_Code', 'Store_Code', 'Price', *event_feature_cols,
+        'Lag_7D_Mean', 'Lag_14D_Mean', 'Price_Inventory_Ratio'
+    ])
+
+    feature_values = [prod_enc, store_enc, price_val, *event_features, lag_7d, lag_14d, price_inventory_ratio]
+    X_pred = pd.DataFrame([feature_values], columns=feature_names)
+
+    prediction = model.predict(X_pred)[0]
     predicted_units = max(0, int(round(prediction)))
 
-    rec = "Stock parameters optimal. Current inventory satisfies predicted branch demand."
-    if stock_val < predicted_units:
+    event_labels = {
+        'dashain': "Dashain Festival",
+        'teej': "Teej Festival",
+        'tihar': "Tihar Festival",
+        'clearance': "Clearance Sale",
+        'festive': "Holiday Season",
+        'newyear': "New Year Sale",
+        'valentines': "Valentine's Day",
+        'none': "Regular Sales"
+    }
+    event_title = event_labels.get(holiday_ctx, "Special Event")
+    is_surge = holiday_ctx != 'none'
+
+    # Color logic:
+    # 1. Predicted stock < stock at hand -> Green (Sufficient)
+    # 2. Predicted stock == stock at hand -> Yellow (Exact Match / Just Enough)
+    # 3. Stock at hand < predicted stock -> Red (Shortage / Restock Needed)
+    if predicted_units < stock_val:
+        status = 'sufficient'
+        status_color = 'green'
+        status_text = 'Stock is Sufficient'
+        surplus = stock_val - predicted_units
+        rec = f"You have enough stock for {event_title}. Current stock ({stock_val}) easily covers expected sales ({predicted_units}) with {surplus} extra units in reserve."
+    elif predicted_units == stock_val:
+        status = 'balanced'
+        status_color = 'yellow'
+        status_text = 'Stock is Just Enough'
+        rec = f"Current stock ({stock_val}) matches expected sales ({predicted_units}) for {event_title} exactly. Consider ordering a few extra units as a safety buffer."
+    else:
+        status = 'deficit'
+        status_color = 'red'
+        status_text = 'Restock Needed'
         deficit = predicted_units - stock_val
-        rec = f"Stock deficit detected. Recommended restock quantity for Branch {branch_id}: add {deficit} units."
-    elif stock_val > predicted_units * 2:
-        rec = "High safety stock volume recorded. Maintain current levels before placing new orders."
+        rec = f"Stock shortage for {event_title}! You have {stock_val} units, but need {predicted_units}. Order at least {deficit} more units to avoid running out."
 
     return jsonify({
         'predicted_demand': predicted_units,
-        'holiday_surge_applied': bool(holiday_surge_flag),
+        'stock_at_hand': stock_val,
+        'status': status,
+        'status_color': status_color,
+        'status_text': status_text,
+        'holiday_surge_applied': is_surge,
+        'event_context': holiday_ctx,
+        'event_title': event_title,
         'recommendation': rec
     })
 

@@ -7,7 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from contextlib import contextmanager
 
-DB_PATH = os.path.join('data', 'noire_retail.db')
+DB_PATH = os.environ.get('TEST_DB_PATH', os.path.join('data', 'noire_retail.db'))
 
 @contextmanager
 def get_db(db_path=DB_PATH):

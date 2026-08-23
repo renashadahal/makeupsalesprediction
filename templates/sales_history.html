@@ -28,9 +28,10 @@
             </div>
         </div>
 
-        <!-- Branch Quick Filter Pills -->
+        <!-- Branch Scope: Quick Filter Pills for Admin, Locked Scope for Staff -->
         <div class="flex items-center gap-2 flex-wrap pt-2 border-t border-noireText/10 text-xs">
             <span class="text-[10px] text-noireText/60 font-bold uppercase tracking-widest mr-1">Branch Scope:</span>
+            {% if session.get('role') == 'admin' %}
             <a href="{{ url_for('sales_history', branch='ALL') }}" class="px-3 py-1 rounded-lg font-medium text-[11px] transition-all {% if selected_branch == 'ALL' %}bg-deepWine text-velvet font-bold shadow-sm{% else %}bg-white/80 hover:bg-white text-noireText border border-noireText/10{% endif %}">
                 All Branches
             </a>
@@ -39,6 +40,11 @@
                 {{ b_code }}
             </a>
             {% endfor %}
+            {% else %}
+            <span class="px-3 py-1 rounded-lg font-mono font-bold text-[11px] bg-deepWine text-velvet shadow-sm">
+                {{ current_branch }} (Your Assigned Branch)
+            </span>
+            {% endif %}
         </div>
     </div>
 
