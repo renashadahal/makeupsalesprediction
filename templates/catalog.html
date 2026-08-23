@@ -5,6 +5,7 @@
     <div class="border-b border-noireText/10 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <h2 class="text-3xl text-noireText font-serif">Master Catalog</h2>
+            <p class="text-xs text-noireText/50 mt-1">Add a new product to the catalog and initial stock for the selected branch.</p>
         </div>
         <a href="{{ url_for('inventory_view') }}" class="w-full sm:w-auto px-4 py-2 bg-white text-noireText border border-noireText/10 hover:bg-velvet/50 text-center font-medium rounded-xl text-xs uppercase tracking-wider transition-all h-fit">
             Back to Inventory Ledger
@@ -12,49 +13,209 @@
     </div>
 
     <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
-        <form action="{{ url_for('update_catalog') }}" method="POST" class="space-y-6">
-            
+        <form action="{{ url_for('update_catalog') }}" method="POST" class="space-y-6" id="catalogForm">
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs tracking-wide">
-                
+
+                <!-- Branch ID: auto-filled from session, read-only display -->
                 <div class="flex flex-col gap-1">
-                    <label for="store_id" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Branch ID</label>
-                    <input type="text" id="store_id" name="store_id" value="ST-01" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Branch</label>
+                    <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/60 border border-noireText/10 text-noireText">
+                        <span class="font-mono font-bold text-deepWine text-sm">{{ current_branch }}</span>
+                        <span class="text-[9px] bg-dustyRose/20 text-dustyRose px-1.5 py-0.5 rounded font-semibold tracking-wider uppercase">Auto-Filled</span>
+                    </div>
+                    <input type="hidden" name="store_id" value="{{ current_branch }}">
+                    <p class="text-[10px] text-noireText/40 mt-0.5">Reflects the branch currently selected in the header. Switch branches from there to add stock to a different location.</p>
                 </div>
 
+                <!-- Product ID: auto-suggested next ID, editable -->
                 <div class="flex flex-col gap-1">
-                    <label for="product_id" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">SKU / Product ID</label>
-                    <input type="text" id="product_id" name="product_id" placeholder="e.g. PROD-882" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <label for="product_id" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Product ID (SKU)</label>
+                    <div class="relative">
+                        <input type="text" id="product_id" name="product_id" value="{{ next_product_id }}" required
+                            class="w-full pl-4 pr-12 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-semibold tracking-wider uppercase">Suggested</span>
+                    </div>
+                    <p class="text-[10px] text-noireText/40 mt-0.5">Auto-generated as the next available ID. You can edit this if needed.</p>
                 </div>
 
-                <div class="flex flex-col gap-1">
-                    <label for="brand" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Brand Name</label>
-                    <input type="text" id="brand" name="brand" placeholder="e.g. Maybelline" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                <!-- Brand: toggle between existing dropdown or new text input -->
+                <div class="flex flex-col gap-1 md:col-span-2" id="brandField">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Brand</label>
+                        <div class="flex items-center gap-2">
+                            <button type="button" id="brandToggleExisting"
+                                onclick="setBrandMode('existing')"
+                                class="px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-deepWine text-velvet border border-deepWine">
+                                Existing
+                            </button>
+                            <button type="button" id="brandToggleNew"
+                                onclick="setBrandMode('new')"
+                                class="px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-white text-noireText border border-noireText/20 hover:border-dustyRose">
+                                + New Brand
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Existing brand dropdown -->
+                    <div id="brandExistingWrap">
+                        <select id="brand_existing" name="brand_existing"
+                            class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                            <option value="">— Select a brand —</option>
+                            {% for b in existing_brands %}
+                            <option value="{{ b }}">{{ b }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- New brand text input (hidden by default) -->
+                    <div id="brandNewWrap" class="hidden">
+                        <input type="text" id="brand_new" placeholder="e.g. Fenty Beauty"
+                            class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    </div>
+
+                    <!-- Hidden unified brand input submitted to server -->
+                    <input type="hidden" id="brand" name="brand">
                 </div>
 
-                <div class="flex flex-col gap-1">
+                <!-- Product Name -->
+                <div class="flex flex-col gap-1 md:col-span-2">
                     <label for="product_name" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Product Name</label>
-                    <input type="text" id="product_name" name="product_name" placeholder="e.g. Fit Me Foundation" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <input type="text" id="product_name" name="product_name" placeholder="e.g. Fit Me Foundation" required
+                        class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
                 </div>
 
+                <!-- Subcategory: toggle between existing dropdown or new text input -->
                 <div class="flex flex-col gap-1">
-                    <label for="subcategory" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Subcategory</label>
-                    <input type="text" id="subcategory" name="subcategory" placeholder="e.g. Foundation" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Subcategory</label>
+                        <div class="flex items-center gap-2">
+                            <button type="button" id="subcatToggleExisting"
+                                onclick="setSubcatMode('existing')"
+                                class="px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-deepWine text-velvet border border-deepWine">
+                                Existing
+                            </button>
+                            <button type="button" id="subcatToggleNew"
+                                onclick="setSubcatMode('new')"
+                                class="px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-white text-noireText border border-noireText/20 hover:border-dustyRose">
+                                + New
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Existing subcategory dropdown -->
+                    <div id="subcatExistingWrap">
+                        <select id="subcategory_existing"
+                            class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all capitalize">
+                            <option value="">— Select a subcategory —</option>
+                            {% for s in existing_subcategories %}
+                            <option value="{{ s }}" class="capitalize">{{ s | capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- New subcategory text input (hidden by default) -->
+                    <div id="subcatNewWrap" class="hidden">
+                        <input type="text" id="subcategory_new" placeholder="e.g. Highlighter"
+                            class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    </div>
+
+                    <!-- Hidden unified subcategory input submitted to server -->
+                    <input type="hidden" id="subcategory" name="subcategory">
                 </div>
 
+                <!-- Base Price -->
                 <div class="flex flex-col gap-1">
                     <label for="price" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Base Price ($)</label>
-                    <input type="number" step="0.01" id="price" name="price" placeholder="0.00" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <input type="number" step="0.01" id="price" name="price" placeholder="0.00" required
+                        class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
                 </div>
 
             </div>
 
             <div class="flex justify-start pt-4 border-t border-noireText/5">
-                <button type="submit" class="w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md">
-                    Commit to Catalog
+                <button type="submit"
+                    class="w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md">
+                    Add to Catalog
                 </button>
             </div>
 
         </form>
     </div>
 </div>
+
+<script>
+// --- Brand toggle logic ---
+function setBrandMode(mode) {
+    const existingWrap = document.getElementById('brandExistingWrap');
+    const newWrap = document.getElementById('brandNewWrap');
+    const toggleExisting = document.getElementById('brandToggleExisting');
+    const toggleNew = document.getElementById('brandToggleNew');
+
+    if (mode === 'existing') {
+        existingWrap.classList.remove('hidden');
+        newWrap.classList.add('hidden');
+        toggleExisting.className = 'px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-deepWine text-velvet border border-deepWine';
+        toggleNew.className = 'px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-white text-noireText border border-noireText/20 hover:border-dustyRose';
+    } else {
+        existingWrap.classList.add('hidden');
+        newWrap.classList.remove('hidden');
+        toggleNew.className = 'px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-deepWine text-velvet border border-deepWine';
+        toggleExisting.className = 'px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-white text-noireText border border-noireText/20 hover:border-dustyRose';
+    }
+}
+
+// --- Subcategory toggle logic ---
+function setSubcatMode(mode) {
+    const existingWrap = document.getElementById('subcatExistingWrap');
+    const newWrap = document.getElementById('subcatNewWrap');
+    const toggleExisting = document.getElementById('subcatToggleExisting');
+    const toggleNew = document.getElementById('subcatToggleNew');
+
+    if (mode === 'existing') {
+        existingWrap.classList.remove('hidden');
+        newWrap.classList.add('hidden');
+        toggleExisting.className = 'px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-deepWine text-velvet border border-deepWine';
+        toggleNew.className = 'px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-white text-noireText border border-noireText/20 hover:border-dustyRose';
+    } else {
+        existingWrap.classList.add('hidden');
+        newWrap.classList.remove('hidden');
+        toggleNew.className = 'px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-deepWine text-velvet border border-deepWine';
+        toggleExisting.className = 'px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-white text-noireText border border-noireText/20 hover:border-dustyRose';
+    }
+}
+
+// --- On submit: consolidate hidden brand/subcategory fields ---
+document.getElementById('catalogForm').addEventListener('submit', function(e) {
+    // Brand
+    const brandNewWrap = document.getElementById('brandNewWrap');
+    let brandValue;
+    if (brandNewWrap.classList.contains('hidden')) {
+        brandValue = document.getElementById('brand_existing').value.trim();
+    } else {
+        brandValue = document.getElementById('brand_new').value.trim();
+    }
+    if (!brandValue) {
+        e.preventDefault();
+        alert('Please select or enter a brand.');
+        return;
+    }
+    document.getElementById('brand').value = brandValue;
+
+    // Subcategory
+    const subcatNewWrap = document.getElementById('subcatNewWrap');
+    let subcatValue;
+    if (subcatNewWrap.classList.contains('hidden')) {
+        subcatValue = document.getElementById('subcategory_existing').value.trim();
+    } else {
+        subcatValue = document.getElementById('subcategory_new').value.trim();
+    }
+    if (!subcatValue) {
+        e.preventDefault();
+        alert('Please select or enter a subcategory.');
+        return;
+    }
+    document.getElementById('subcategory').value = subcatValue;
+});
+</script>
 {% endblock %}

@@ -536,7 +536,29 @@ def update_catalog():
         flash(f"Master product catalog expanded. Added '{p_name}' (ID: {p_id}) under brand '{brand}'.")
         return redirect(url_for('update_catalog'))
 
-    return render_template('catalog.html')
+    # Fetch existing brands and subcategories for dropdowns
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT brand_name FROM brands ORDER BY brand_name")
+        existing_brands = [r[0] for r in cursor.fetchall()]
+        cursor.execute("SELECT DISTINCT subcategory_name FROM subcategories ORDER BY subcategory_name")
+        existing_subcategories = [r[0] for r in cursor.fetchall()]
+        # Determine next product ID in P#### format
+        cursor.execute("SELECT product_id FROM products WHERE product_id GLOB 'P[0-9][0-9][0-9][0-9]' ORDER BY product_id DESC LIMIT 1")
+        row = cursor.fetchone()
+        if row:
+            next_num = int(row[0][1:]) + 1
+        else:
+            next_num = 71
+        next_product_id = f"P{next_num:04d}"
+
+    return render_template(
+        'catalog.html',
+        current_branch=session.get('branch', 'S001'),
+        existing_brands=existing_brands,
+        existing_subcategories=existing_subcategories,
+        next_product_id=next_product_id
+    )
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
