@@ -155,7 +155,7 @@ def init_db(db_path=DB_PATH):
         );
         """)
 
-        # 10. Inter-Branch Inventory Stock Transfers
+        # 10. Inter-Branch Inventory Stock Transfers (3-step lifecycle: PENDING -> IN_TRANSIT -> COMPLETED)
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS inventory_transfers (
             transfer_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -163,13 +163,26 @@ def init_db(db_path=DB_PATH):
             to_branch TEXT NOT NULL REFERENCES branches(branch_id),
             product_id TEXT NOT NULL REFERENCES products(product_id),
             quantity INTEGER NOT NULL CHECK(quantity > 0),
-            status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'COMPLETED', 'CANCELLED')),
+            status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'IN_TRANSIT', 'COMPLETED', 'CANCELLED')),
             requested_by TEXT NOT NULL,
+            approved_by TEXT,
             notes TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            dispatched_at DATETIME,
             completed_at DATETIME
         );
         """)
+
+        # Ensure schema backward compatibility / column migrations for existing SQLite DB files
+        existing_cols = [row[1] for row in cursor.execute("PRAGMA table_info(inventory_transfers);").fetchall()]
+        if 'approved_by' not in existing_cols:
+            cursor.execute("ALTER TABLE inventory_transfers ADD COLUMN approved_by TEXT;")
+        if 'dispatched_at' not in existing_cols:
+            cursor.execute("ALTER TABLE inventory_transfers ADD COLUMN dispatched_at DATETIME;")
+        if 'completed_at' not in existing_cols:
+            cursor.execute("ALTER TABLE inventory_transfers ADD COLUMN completed_at DATETIME;")
+        if 'dispatched_by' in existing_cols:
+            cursor.execute("UPDATE inventory_transfers SET approved_by = dispatched_by WHERE approved_by IS NULL AND dispatched_by IS NOT NULL;")
 
         # 11. Create Indexes for High Performance Querying
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventory_branch_prod ON inventory(branch_id, product_id);")
@@ -346,13 +359,14 @@ def db_update_inventory_stock(branch, brand_name, product_name, quantity_added, 
             """, (p_id, brand_id, subcat_id, product_name, base_p))
 
         # 4. Upsert Inventory Stock
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute("""
-        INSERT INTO inventory (branch_id, product_id, stock)
-        VALUES (?, ?, ?)
+        INSERT INTO inventory (branch_id, product_id, stock, last_updated)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(branch_id, product_id) DO UPDATE SET
             stock = stock + excluded.stock,
-            last_updated = CURRENT_TIMESTAMP;
-        """, (branch, p_id, int(quantity_added)))
+            last_updated = ?;
+        """, (branch, p_id, int(quantity_added), now_str, now_str))
 
         conn.commit()
         return True
@@ -369,11 +383,12 @@ def db_deduct_inventory_stock(branch, product_name, quantity_sold, db_path=DB_PA
 
         if p_row:
             p_id = p_row['product_id']
+            now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cursor.execute("""
             UPDATE inventory 
-            SET stock = MAX(0, stock - ?), last_updated = CURRENT_TIMESTAMP
+            SET stock = MAX(0, stock - ?), last_updated = ?
             WHERE branch_id = ? AND product_id = ?;
-            """, (int(quantity_sold), branch, p_id))
+            """, (int(quantity_sold), now_str, branch, p_id))
             conn.commit()
             return True
     return False
@@ -388,6 +403,7 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
         discount = 0.85
 
     today_date = datetime.now().strftime('%Y-%m-%d')
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     subtotal_before_discount = 0.0
     grand_total = 0.0
     processed_items = []
@@ -442,9 +458,9 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
 
         # 2. Insert Transaction Header
         cursor.execute("""
-        INSERT INTO transactions (transaction_id, username, branch_id, promo_code, discount_rate, grand_total, transaction_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?);
-        """, (tx_id, username, branch, promo_code, discount, grand_total, today_date))
+        INSERT INTO transactions (transaction_id, username, branch_id, promo_code, discount_rate, grand_total, transaction_date, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        """, (tx_id, username, branch, promo_code, discount, grand_total, today_date, now_str))
 
         # 3. Insert Transaction Items & Deduct Stock
         for p_id, p_name, shade, qty, unit_price, subtotal in processed_items:
@@ -455,9 +471,9 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
 
             cursor.execute("""
             UPDATE inventory 
-            SET stock = stock - ?, last_updated = CURRENT_TIMESTAMP
+            SET stock = stock - ?, last_updated = ?
             WHERE branch_id = ? AND product_id = ?;
-            """, (qty, branch, p_id))
+            """, (qty, now_str, branch, p_id))
 
         return True, {
             'transaction_id': tx_id,
@@ -614,15 +630,20 @@ def db_request_transfer(from_branch, to_branch, product_id, quantity, requested_
         if avail < qty:
             return False, f"Source branch {from_branch} only has {avail} units of '{prod_row['product_name']}' in stock (requested: {qty})."
 
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute("""
-        INSERT INTO inventory_transfers (from_branch, to_branch, product_id, quantity, requested_by, notes, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'PENDING');
-        """, (from_branch, to_branch, product_id, qty, requested_by, notes.strip()))
+        INSERT INTO inventory_transfers (from_branch, to_branch, product_id, quantity, requested_by, notes, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?);
+        """, (from_branch, to_branch, product_id, qty, requested_by, notes.strip(), now_str))
         conn.commit()
         return True, f"Transfer request for {qty} units of '{prod_row['product_name']}' created successfully."
 
-def db_complete_transfer(transfer_id, db_path=DB_PATH):
-    """Atomically debits source branch stock and credits destination branch stock upon transfer completion."""
+def db_dispatch_transfer(transfer_id, approved_by, db_path=DB_PATH):
+    """Step 2: Source branch approves the request, debits their stock, and marks the shipment IN_TRANSIT.
+    
+    The destination branch's stock is NOT credited yet because items are physically in transit.
+    This prevents the destination from showing phantom inventory before the delivery arrives.
+    """
     with get_db(db_path) as conn:
         cursor = conn.cursor()
         t_row = cursor.execute("""
@@ -633,68 +654,130 @@ def db_complete_transfer(transfer_id, db_path=DB_PATH):
         if not t_row:
             return False, "Transfer record not found."
         if t_row['status'] != 'PENDING':
-            return False, f"Transfer is already {t_row['status']}."
+            return False, f"Cannot dispatch: transfer is already '{t_row['status']}'."
 
         from_b = t_row['from_branch']
-        to_b = t_row['to_branch']
-        p_id = t_row['product_id']
-        qty = int(t_row['quantity'])
+        p_id   = t_row['product_id']
+        qty    = int(t_row['quantity'])
 
-        # Verify source branch still has sufficient stock
-        src_row = cursor.execute("SELECT stock FROM inventory WHERE branch_id = ? AND product_id = ?;", (from_b, p_id)).fetchone()
+        # Re-verify source still has sufficient stock at dispatch time
+        src_row = cursor.execute(
+            "SELECT stock FROM inventory WHERE branch_id = ? AND product_id = ?;",
+            (from_b, p_id)
+        ).fetchone()
         src_stock = src_row['stock'] if src_row else 0
         if src_stock < qty:
-            return False, f"Cannot complete transfer: Source branch {from_b} has insufficient stock ({src_stock} < {qty})."
+            return False, (
+                f"Cannot dispatch: Branch {from_b} now only has {src_stock} units in stock "
+                f"(originally approved for {qty}). Adjust quantity or cancel this request."
+            )
 
-        # 1. Debit source branch stock
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Debit source branch stock immediately — those units are now "on the truck"
         cursor.execute("""
-        UPDATE inventory 
-        SET stock = stock - ?, last_updated = CURRENT_TIMESTAMP 
+        UPDATE inventory
+        SET stock = stock - ?, last_updated = ?
         WHERE branch_id = ? AND product_id = ?;
-        """, (qty, from_b, p_id))
+        """, (qty, now_str, from_b, p_id))
 
-        # 2. Credit destination branch stock (upsert)
+        # Mark transfer as IN_TRANSIT with local timestamp
         cursor.execute("""
-        INSERT INTO inventory (branch_id, product_id, stock)
-        VALUES (?, ?, ?)
-        ON CONFLICT(branch_id, product_id) DO UPDATE SET
-            stock = stock + excluded.stock,
-            last_updated = CURRENT_TIMESTAMP;
-        """, (to_b, p_id, qty))
-
-        # 3. Mark transfer record completed
-        cursor.execute("""
-        UPDATE inventory_transfers 
-        SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP 
+        UPDATE inventory_transfers
+        SET status = 'IN_TRANSIT', approved_by = ?, dispatched_at = ?
         WHERE transfer_id = ?;
-        """, (int(transfer_id),))
+        """, (approved_by, now_str, int(transfer_id)))
 
         conn.commit()
-        return True, f"Transfer #{transfer_id} finalized: {qty} units transferred from {from_b} to {to_b}."
+        return True, (
+            f"Transfer #{transfer_id} dispatched: {qty} units debited from Branch {from_b} "
+            f"and are now in transit to Branch {t_row['to_branch']}."
+        )
 
-def db_cancel_transfer(transfer_id, db_path=DB_PATH):
-    """Cancels a pending transfer request."""
+def db_complete_transfer(transfer_id, db_path=DB_PATH):
+    """Step 3: Destination branch confirms physical receipt — credits their stock.
+    
+    Source stock was already debited at dispatch (Step 2). This step finalizes
+    the ledger by crediting the destination branch after they verify the delivery.
+    """
     with get_db(db_path) as conn:
         cursor = conn.cursor()
-        t_row = cursor.execute("SELECT status FROM inventory_transfers WHERE transfer_id = ?;", (int(transfer_id),)).fetchone()
+        t_row = cursor.execute("""
+        SELECT transfer_id, from_branch, to_branch, product_id, quantity, status
+        FROM inventory_transfers WHERE transfer_id = ?;
+        """, (int(transfer_id),)).fetchone()
+
         if not t_row:
             return False, "Transfer record not found."
-        if t_row['status'] != 'PENDING':
-            return False, f"Cannot cancel transfer in '{t_row['status']}' state."
+        if t_row['status'] != 'IN_TRANSIT':
+            return False, f"Cannot confirm receipt: transfer status is '{t_row['status']}' (must be IN_TRANSIT)."
+
+        to_b = t_row['to_branch']
+        p_id = t_row['product_id']
+        qty  = int(t_row['quantity'])
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Credit destination branch stock (upsert in case this is first time stocking this SKU)
+        cursor.execute("""
+        INSERT INTO inventory (branch_id, product_id, stock, last_updated)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(branch_id, product_id) DO UPDATE SET
+            stock = stock + excluded.stock,
+            last_updated = ?;
+        """, (to_b, p_id, qty, now_str, now_str))
+
+        # Mark transfer COMPLETED with local timestamp
+        cursor.execute("""
+        UPDATE inventory_transfers
+        SET status = 'COMPLETED', completed_at = ?
+        WHERE transfer_id = ?;
+        """, (now_str, int(transfer_id)))
+
+        conn.commit()
+        return True, (
+            f"Transfer #{transfer_id} completed: {qty} units received and credited to Branch {to_b}."
+        )
+
+def db_cancel_transfer(transfer_id, db_path=DB_PATH):
+    """Cancels a PENDING transfer request, or reverses an IN_TRANSIT shipment and restores source stock."""
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        t_row = cursor.execute(
+            "SELECT from_branch, product_id, quantity, status FROM inventory_transfers WHERE transfer_id = ?;",
+            (int(transfer_id),)
+        ).fetchone()
+
+        if not t_row:
+            return False, "Transfer record not found."
+        if t_row['status'] not in ('PENDING', 'IN_TRANSIT'):
+            return False, f"Cannot cancel a transfer in '{t_row['status']}' state."
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # If already dispatched, the source stock was debited — restore it
+        if t_row['status'] == 'IN_TRANSIT':
+            cursor.execute("""
+            UPDATE inventory
+            SET stock = stock + ?, last_updated = ?
+            WHERE branch_id = ? AND product_id = ?;
+            """, (int(t_row['quantity']), now_str, t_row['from_branch'], t_row['product_id']))
 
         cursor.execute("""
-        UPDATE inventory_transfers 
-        SET status = 'CANCELLED', completed_at = CURRENT_TIMESTAMP 
+        UPDATE inventory_transfers
+        SET status = 'CANCELLED', completed_at = ?
         WHERE transfer_id = ?;
-        """, (int(transfer_id),))
+        """, (now_str, int(transfer_id)))
         conn.commit()
+
+        if t_row['status'] == 'IN_TRANSIT':
+            return True, f"Transfer #{transfer_id} cancelled and {t_row['quantity']} units restored to Branch {t_row['from_branch']}."
         return True, f"Transfer #{transfer_id} cancelled."
 
 def db_load_transfers(branch=None, status=None, db_path=DB_PATH):
     """Loads inter-branch transfer logs joined with master product and brand names."""
     with get_db(db_path) as conn:
         query = """
-        SELECT 
+        SELECT
             t.transfer_id,
             t.from_branch,
             t.to_branch,
@@ -704,8 +787,10 @@ def db_load_transfers(branch=None, status=None, db_path=DB_PATH):
             t.quantity,
             t.status,
             t.requested_by,
+            t.approved_by,
             t.notes,
             t.created_at,
+            t.dispatched_at,
             t.completed_at
         FROM inventory_transfers t
         JOIN products p ON t.product_id = p.product_id
@@ -724,3 +809,11 @@ def db_load_transfers(branch=None, status=None, db_path=DB_PATH):
         rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
+# Convenience Aliases
+request_transfer = db_request_transfer
+dispatch_transfer = db_dispatch_transfer
+approve_transfer = db_dispatch_transfer
+complete_transfer = db_complete_transfer
+receive_transfer = db_complete_transfer
+cancel_transfer = db_cancel_transfer
+load_transfers = db_load_transfers

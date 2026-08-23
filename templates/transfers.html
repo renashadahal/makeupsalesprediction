@@ -29,16 +29,24 @@
             <form action="{{ url_for('stock_transfers') }}" method="POST" class="space-y-5 text-xs tracking-wide">
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <!-- Requesting Destination Branch (Auto-Filled) -->
+                    <!-- Requesting Destination Branch -->
                     <div>
                         <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
                             Destination Branch (Requesting Stock)
                         </label>
+                        {% if session.get('role') == 'admin' %}
+                        <select id="to_branch" name="to_branch" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-mono font-medium">
+                            {% for b in all_branches %}
+                            <option value="{{ b }}" {% if b == current_branch %}selected{% endif %}>Branch {{ b }} (Destination)</option>
+                            {% endfor %}
+                        </select>
+                        {% else %}
                         <div class="flex items-center justify-between px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText">
                             <span class="font-mono font-bold text-deepWine text-xs">Branch {{ current_branch }}</span>
                             <span class="text-[9px] bg-dustyRose/20 text-dustyRose px-1.5 py-0.5 rounded font-semibold tracking-wider uppercase">Auto-Filled</span>
                         </div>
                         <input type="hidden" name="to_branch" value="{{ current_branch }}">
+                        {% endif %}
                     </div>
 
                     <!-- Source Branch (Supplier Node) -->
@@ -49,7 +57,7 @@
                         <select id="from_branch" name="from_branch" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-mono font-medium">
                             <option value="" disabled selected>-- Select Source Branch --</option>
                             {% for b in all_branches %}
-                                {% if b != current_branch %}
+                                {% if session.get('role') == 'admin' or b != current_branch %}
                                 <option value="{{ b }}">Branch {{ b }}</option>
                                 {% endif %}
                             {% endfor %}
@@ -88,7 +96,7 @@
                     <label for="notes" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
                         Transfer Notes & Reason
                     </label>
-                    <input type="text" id="notes" name="notes" placeholder="e.g., Stock rebalancing for Teej festival surge demand"
+                    <input type="text" id="notes" name="notes" placeholder="e.g., Stock rebalancing for festival surge demand"
                            class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
                 </div>
 
@@ -106,18 +114,27 @@
             <div>
                 <h3 class="text-xl font-serif text-noireText mb-2">Transfer Workflow Policy</h3>
                 <p class="text-noireText/70 text-[11px] leading-relaxed mb-4">
-                    Inter-branch transfers ensure balanced inventory across operating nodes to prevent out-of-stock events during regional festival demand spikes.
+                    Strict 3-step physical custody lifecycle ensures zero phantom stock and complete ledger auditability across branch nodes.
                 </p>
 
                 <div class="space-y-3 text-[11px]">
                     <div class="p-3 bg-velvet/40 rounded-xl border border-noireText/5">
-                        <strong class="block text-noireText font-medium">1. Request Phase</strong>
-                        <span class="text-noireText/60">Transfer created with status <span class="font-mono text-amber-700 font-bold">PENDING</span>. Source branch stock must have sufficient units available.</span>
+                        <strong class="block text-noireText font-medium">1. Request Phase (<span class="font-mono text-amber-700 font-bold">PENDING</span>)</strong>
+                        <span class="text-noireText/60">Destination initiates request. Source branch inventory is checked for availability.</span>
                     </div>
 
                     <div class="p-3 bg-velvet/40 rounded-xl border border-noireText/5">
-                        <strong class="block text-noireText font-medium">2. Receipt Confirmation</strong>
-                        <span class="text-noireText/60">Upon receiving the shipment, destination branch staff or an admin clicks <span class="text-emerald-700 font-bold">Confirm Receipt</span> to atomically update both stock ledgers.</span>
+                        <strong class="block text-noireText font-medium">2. Dispatch Phase (<span class="font-mono text-blue-700 font-bold">IN_TRANSIT</span>)</strong>
+                        <span class="text-noireText/60">Source branch operator (or admin) approves & dispatches; source inventory is debited immediately.</span>
+                    </div>
+
+                    <div class="p-3 bg-velvet/40 rounded-xl border border-noireText/5">
+                        <strong class="block text-noireText font-medium">3. Confirmation Phase (<span class="font-mono text-emerald-700 font-bold">COMPLETED</span>)</strong>
+                        <span class="text-noireText/60">Destination branch operator (or admin) confirms physical arrival; destination inventory is credited.</span>
+                    </div>
+
+                    <div class="p-2.5 bg-amber-50/60 rounded-xl border border-amber-200/50 text-[10px] text-amber-900">
+                        <strong class="font-semibold">Admin Override:</strong> Administrators have override authority to approve dispatch, confirm receipt, or cancel transfers at any step.
                     </div>
                 </div>
             </div>
@@ -135,7 +152,7 @@
         <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex items-center justify-between">
             <div>
                 <h3 class="text-xl font-serif text-noireText">Transfer Audit Ledger</h3>
-                <p class="text-xs text-noireText/60 font-light">Real-time log of pending and completed stock movements.</p>
+                <p class="text-xs text-noireText/60 font-light">Real-time log of inter-branch shipments across the lifecycle.</p>
             </div>
         </div>
 
@@ -144,7 +161,7 @@
                 <thead>
                     <tr class="bg-parchment/20 border-b border-noireText/10 text-noireText/70 uppercase text-[10px] tracking-widest">
                         <th class="py-4 px-6 font-semibold">ID</th>
-                        <th class="py-4 px-6 font-semibold">Date</th>
+                        <th class="py-4 px-6 font-semibold">Date & Time</th>
                         <th class="py-4 px-6 font-semibold">Route</th>
                         <th class="py-4 px-6 font-semibold">Product Description</th>
                         <th class="py-4 px-6 font-semibold text-center">Qty</th>
@@ -158,7 +175,7 @@
                         {% for t in transfers %}
                         <tr class="hover:bg-velvet/20 transition-colors">
                             <td class="py-4 px-6 font-mono font-bold text-noireText">#{{ t.transfer_id }}</td>
-                            <td class="py-4 px-6 font-mono text-[11px] text-noireText/70 whitespace-nowrap">{{ t.created_at[:16] if t.created_at else '' }}</td>
+                            <td class="py-4 px-6 font-mono text-[11px] text-noireText/70 whitespace-nowrap" title="{{ t.created_at }}">{{ t.created_at[:16] if t.created_at else '' }}</td>
                             <td class="py-4 px-6 whitespace-nowrap font-mono font-semibold">
                                 <span class="px-2 py-0.5 rounded bg-parchment border border-noireText/10">{{ t.from_branch }}</span>
                                 <span class="text-dustyRose mx-1">→</span>
@@ -172,7 +189,11 @@
                             <td class="py-4 px-6 text-center whitespace-nowrap">
                                 {% if t.status == 'PENDING' %}
                                     <span class="text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-amber-200">
-                                        ⏳ Pending
+                                        ⏳ Pending Approval
+                                    </span>
+                                {% elif t.status == 'IN_TRANSIT' %}
+                                    <span class="text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-blue-200">
+                                        In Transit
                                     </span>
                                 {% elif t.status == 'COMPLETED' %}
                                     <span class="text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-emerald-200">
@@ -186,6 +207,9 @@
                             </td>
                             <td class="py-4 px-6 max-w-xs truncate text-[11px]">
                                 <span class="font-semibold text-noireText/80">{{ t.requested_by }}</span>
+                                {% if t.approved_by %}
+                                <span class="block text-[10px] text-blue-700 font-mono">Dispatched by: {{ t.approved_by }}</span>
+                                {% endif %}
                                 {% if t.notes %}
                                 <span class="block text-noireText/50 truncate" title="{{ t.notes }}">{{ t.notes }}</span>
                                 {% endif %}
@@ -193,20 +217,20 @@
                             <td class="py-4 px-6 text-right whitespace-nowrap">
                                 {% if t.status == 'PENDING' %}
                                     <div class="inline-flex items-center gap-1.5">
-                                        <!-- Approve & Release: Only accessible to Source Branch (from_branch) or Admin -->
+                                        <!-- Step 2: Approve & Dispatch (Source Branch or Admin) -->
                                         {% if session.get('role') == 'admin' or current_branch == t.from_branch %}
-                                        <form action="{{ url_for('complete_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
-                                            <button type="submit" class="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-semibold transition-all shadow-sm">
-                                                Approve & Release Stock
+                                        <form action="{{ url_for('dispatch_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
+                                            <button type="submit" class="px-2.5 py-1 bg-deepWine hover:bg-noireText text-white rounded-lg text-[11px] font-semibold transition-all shadow-sm">
+                                                Approve & Dispatch Stock
                                             </button>
                                         </form>
-                                        {% elif current_branch == t.to_branch %}
+                                        {% else %}
                                         <span class="text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Awaiting source branch staff or admin approval">
-                                            ⏳ Awaiting Branch {{ t.from_branch }} Approval
+                                            ⏳ Awaiting Branch {{ t.from_branch }} Dispatch
                                         </span>
                                         {% endif %}
 
-                                        <!-- Cancel action -->
+                                        <!-- Cancel action for PENDING -->
                                         {% if session.get('role') == 'admin' or current_branch == t.from_branch or current_branch == t.to_branch %}
                                         <form action="{{ url_for('cancel_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
                                             <button type="submit" onclick="return confirm('Cancel this transfer request?');" class="px-2 py-1 bg-white hover:bg-rose-50 hover:text-rose-700 text-noireText/60 border border-noireText/15 rounded-lg text-[11px] transition-all">
@@ -215,9 +239,33 @@
                                         </form>
                                         {% endif %}
                                     </div>
+                                {% elif t.status == 'IN_TRANSIT' %}
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <!-- Step 3: Confirm Receipt (Destination Branch or Admin) -->
+                                        {% if session.get('role') == 'admin' or current_branch == t.to_branch %}
+                                        <form action="{{ url_for('complete_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
+                                            <button type="submit" class="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-semibold transition-all shadow-sm">
+                                                Confirm Receipt & Restock
+                                            </button>
+                                        </form>
+                                        {% else %}
+                                        <span class="text-[10px] font-semibold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200" title="Shipment in transit to destination">
+                                            En Route to Branch {{ t.to_branch }}
+                                        </span>
+                                        {% endif %}
+
+                                        <!-- Cancel action for IN_TRANSIT (Reverses debit) -->
+                                        {% if session.get('role') == 'admin' or current_branch == t.from_branch %}
+                                        <form action="{{ url_for('cancel_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
+                                            <button type="submit" onclick="return confirm('Cancel this in-transit shipment? Debited units will be restored to source branch.');" class="px-2 py-1 bg-white hover:bg-rose-50 hover:text-rose-700 text-noireText/60 border border-noireText/15 rounded-lg text-[11px] transition-all" title="Recall/cancel shipment and return stock to source">
+                                                Recall
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
                                 {% else %}
-                                    <span class="text-noireText/30 text-[11px] italic font-mono">
-                                        {{ t.completed_at[:10] if t.completed_at else 'Closed' }}
+                                    <span class="text-noireText/40 text-[11px] italic font-mono">
+                                        {{ t.completed_at[:16] if t.completed_at else 'Closed' }}
                                     </span>
                                 {% endif %}
                             </td>

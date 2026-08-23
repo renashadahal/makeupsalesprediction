@@ -10,7 +10,7 @@ from src.database import (
     init_db, get_db, db_verify_user, db_load_users, db_save_user, db_update_user, db_delete_user,
     db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
     db_record_transaction, db_load_transactions, db_calculate_rolling_lags,
-    db_request_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
+    db_request_transfer, db_dispatch_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
     DB_PATH
 )
 from src.utils import get_catalog_shades
@@ -575,7 +575,10 @@ def stock_transfers():
 
     if request.method == 'POST':
         from_b = request.form.get('from_branch', '').strip()
-        to_b = current_branch  # The requesting branch is always autofilled/locked to the active session branch
+        # Admins can explicitly specify to_branch, or default to current_branch. Staff is locked to current_branch.
+        to_b = request.form.get('to_branch', current_branch).strip() if is_admin else current_branch
+        if not to_b:
+            to_b = current_branch
         product_id = request.form.get('product_id', '').strip()
         qty = request.form.get('quantity', '1').strip()
         notes = request.form.get('notes', '').strip()
@@ -609,20 +612,45 @@ def stock_transfers():
         all_branches=['S001', 'S002', 'S003', 'S004', 'S005']
     )
 
-@app.route('/transfers/complete/<int:transfer_id>', methods=['POST'])
+@app.route('/transfers/dispatch/<int:transfer_id>', methods=['POST'])
+@app.route('/transfers/approve/<int:transfer_id>', methods=['POST'])
 @login_required
-def complete_transfer_route(transfer_id):
+def dispatch_transfer_route(transfer_id):
+    """Step 2: Source branch or Administrator approves and dispatches the stock (marks IN_TRANSIT)."""
     current_branch = session.get('branch', 'S001')
     is_admin = session.get('role') == 'admin'
+    current_user = session.get('username', 'staff')
 
-    # Security check: Only the SOURCE branch operator (from_branch) or an Administrator can approve and allow the transfer
+    # Security check: Only the SOURCE branch operator (from_branch) or an Administrator can dispatch stock
     with get_db() as conn:
         t_row = conn.execute("SELECT from_branch, to_branch FROM inventory_transfers WHERE transfer_id = ?;", (transfer_id,)).fetchone()
         if not t_row:
             flash("Transfer not found.")
             return redirect(url_for('stock_transfers'))
         if not is_admin and t_row['from_branch'] != current_branch:
-            flash(f"Authorization Denied: Only the source branch operator (Branch {t_row['from_branch']}) or an administrator can approve and release stock.")
+            flash(f"Authorization Denied: Only the source branch operator (Branch {t_row['from_branch']}) or an administrator can approve and dispatch stock.")
+            return redirect(url_for('stock_transfers')), 403
+
+    success, msg = db_dispatch_transfer(transfer_id, approved_by=current_user)
+    flash(msg)
+    return redirect(url_for('stock_transfers'))
+
+@app.route('/transfers/complete/<int:transfer_id>', methods=['POST'])
+@app.route('/transfers/receive/<int:transfer_id>', methods=['POST'])
+@login_required
+def complete_transfer_route(transfer_id):
+    """Step 3: Destination branch or Administrator confirms receipt and restocks inventory (marks COMPLETED)."""
+    current_branch = session.get('branch', 'S001')
+    is_admin = session.get('role') == 'admin'
+
+    # Security check: Only the DESTINATION branch operator (to_branch) or an Administrator can confirm receipt
+    with get_db() as conn:
+        t_row = conn.execute("SELECT from_branch, to_branch FROM inventory_transfers WHERE transfer_id = ?;", (transfer_id,)).fetchone()
+        if not t_row:
+            flash("Transfer not found.")
+            return redirect(url_for('stock_transfers'))
+        if not is_admin and t_row['to_branch'] != current_branch:
+            flash(f"Authorization Denied: Only the destination branch operator (Branch {t_row['to_branch']}) or an administrator can confirm receipt and restock.")
             return redirect(url_for('stock_transfers')), 403
 
     success, msg = db_complete_transfer(transfer_id)

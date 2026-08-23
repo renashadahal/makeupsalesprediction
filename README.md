@@ -29,11 +29,13 @@ sequenceDiagram
         Web-->>Staff: Render Modal & Download Automated PDF Receipt
     end
 
-    Note over Staff,Admin: 2. Inter-Branch Stock Transfers
+    Note over Staff,Admin: 2. Inter-Branch Stock Transfers (3-Step Custody Lifecycle)
     Staff->>Web: Destination Branch Requests Stock (/transfers)
     Web->>DB: Record PENDING Transfer Request
-    Admin->>Web: Source Branch / Admin Authorizes Request (/transfers/complete)
-    Web->>DB: Atomically Debit Source Branch & Credit Destination Branch
+    Staff->>Web: Source Branch / Admin Dispatches Shipment (/transfers/dispatch)
+    Web->>DB: Status -> IN_TRANSIT & Debits Source Branch Stock
+    Staff->>Web: Destination Branch / Admin Confirms Receipt (/transfers/complete)
+    Web->>DB: Status -> COMPLETED & Credits Destination Branch Stock
 
     Note over Staff,ML: 3. AI Predictive Demand Forecasting
     Staff->>Web: Select SKU & Festival Event Context (/forecast)
@@ -53,10 +55,13 @@ sequenceDiagram
 * **Operator Context Switching**: Admins can seamlessly toggle active branch view; staff accounts are strictly locked to their assigned physical node.
 * **Per-Branch Stock Ledgers**: Physical stock tracking, search, multi-attribute filtering, and intake controls isolated by operating node.
 
-### Inter-Branch Stock Transfers & Rebalancing
-* **Pull-Based Transfer Requests**: Destination branches in need of inventory initiate stock requests with auto-filled destination identifiers.
-* **Two-Phase Authorization**: Transfer requests remain in `PENDING` state until authorized by the source branch staff or an administrator.
-* **Atomic Ledger Updates**: Approving a transfer atomically debits inventory from the source branch and credits the destination branch.
+### Inter-Branch Stock Transfers & Custody Lifecycle
+* **3-Step Custody Lifecycle (`PENDING` → `IN_TRANSIT` → `COMPLETED`)**:
+  1. **PENDING**: Destination branch requests stock; inventory availability at the source is pre-validated.
+  2. **IN_TRANSIT**: Source branch operator or administrator approves and dispatches stock; source inventory is debited immediately (preventing phantom stock at destination while on the truck).
+  3. **COMPLETED**: Destination branch operator or administrator confirms physical receipt; destination inventory is credited.
+* **Admin Override Authority**: Administrators possess full override power at any stage to initiate transfers, approve dispatch, confirm physical receipt, or cancel shipments.
+* **Reverse Debit on Cancellation**: Cancelling an `IN_TRANSIT` shipment automatically rolls back and restores debited units to the source branch.
 
 ### Transaction Terminal (POS)
 * **Multi-Item Cart Session**: Staging multiple product items, shades, and quantities in a single checkout session.

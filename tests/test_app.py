@@ -10,7 +10,7 @@ from src.utils import (
     verify_user, save_user, update_user, delete_user, load_users, 
     load_inventory, update_inventory_stock, deduct_inventory_stock,
     get_catalog_shades, calculate_rolling_lags,
-    request_transfer, complete_transfer, cancel_transfer, load_transfers
+    request_transfer, dispatch_transfer, approve_transfer, complete_transfer, receive_transfer, cancel_transfer, load_transfers
 )
 
 @pytest.fixture
@@ -530,6 +530,8 @@ def test_inventory_view_renders_sort_controls(client):
 
 # --- 10. INTER-BRANCH STOCK TRANSFER TESTS ---
 
+# --- 10. INTER-BRANCH STOCK TRANSFER TESTS ---
+
 def test_request_transfer_validation():
     unique_prod = f"LipGloss_{uuid.uuid4().hex[:4]}"
     unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
@@ -545,7 +547,7 @@ def test_request_transfer_validation():
     assert exceed_ok is False
     assert "only has 20 units" in exceed_msg
 
-    # 3. Successful transfer creation
+    # 3. Successful transfer creation (Status: PENDING)
     ok, msg = request_transfer("S001", "S003", unique_pid, 10, "staff_tester", notes="Restock transfer")
     assert ok is True
     assert "created successfully" in msg
@@ -557,14 +559,20 @@ def test_request_transfer_validation():
     assert match['from_branch'] == "S001"
     assert match['to_branch'] == "S003"
     assert match['quantity'] == 10
+    assert match['status'] == "PENDING"
 
-def test_complete_transfer_atomic_stock_movement():
+    # Source stock is not yet debited during PENDING stage
+    s001_items = load_inventory(branch="S001")
+    assert next(i for i in s001_items if i['product_id'] == unique_pid)['stock'] == 20
+
+def test_complete_transfer_3_step_lifecycle_and_atomic_stock_movement():
+    """Tests PENDING -> IN_TRANSIT (source stock debited) -> COMPLETED (dest stock credited)."""
     unique_prod = f"Perfume_{uuid.uuid4().hex[:4]}"
     unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
     update_inventory_stock("S002", "Chanel", unique_prod, 30, product_id=unique_pid)
     update_inventory_stock("S004", "Chanel", unique_prod, 5, product_id=unique_pid)
 
-    # Create transfer request from S002 -> S004 for 15 units
+    # Step 1: Create transfer request from S002 -> S004 for 15 units (PENDING)
     req_ok, _ = request_transfer("S002", "S004", unique_pid, 15, "staff_tester")
     assert req_ok is True
 
@@ -572,31 +580,44 @@ def test_complete_transfer_atomic_stock_movement():
     t_record = next(t for t in transfers if t['product_id'] == unique_pid)
     t_id = t_record['transfer_id']
 
-    # Complete the transfer
+    # Cannot complete a PENDING transfer directly without dispatching
+    comp_fail, fail_msg = complete_transfer(t_id)
+    assert comp_fail is False
+    assert "must be IN_TRANSIT" in fail_msg
+
+    # Step 2: Source branch approves & dispatches (IN_TRANSIT)
+    disp_ok, disp_msg = dispatch_transfer(t_id, approved_by="source_operator")
+    assert disp_ok is True
+    assert "dispatched" in disp_msg
+
+    # Verify source branch stock debited immediately (30 - 15 = 15)
+    s002_items = load_inventory(branch="S002")
+    assert next(i for i in s002_items if i['product_id'] == unique_pid)['stock'] == 15
+
+    # Verify destination branch stock NOT yet credited (still 5 units, in transit)
+    s004_items = load_inventory(branch="S004")
+    assert next(i for i in s004_items if i['product_id'] == unique_pid)['stock'] == 5
+
+    # Step 3: Destination branch confirms physical receipt (COMPLETED)
     comp_ok, comp_msg = complete_transfer(t_id)
     assert comp_ok is True
-    assert "finalized" in comp_msg
+    assert "completed" in comp_msg
 
-    # Verify source branch stock decremented (30 - 15 = 15)
-    s002_items = load_inventory(branch="S002")
-    s002_match = next(i for i in s002_items if i['product_id'] == unique_pid)
-    assert s002_match['stock'] == 15
-
-    # Verify destination branch stock incremented (5 + 15 = 20)
-    s004_items = load_inventory(branch="S004")
-    s004_match = next(i for i in s004_items if i['product_id'] == unique_pid)
-    assert s004_match['stock'] == 20
+    # Verify destination branch stock now credited (5 + 15 = 20)
+    s004_items_updated = load_inventory(branch="S004")
+    assert next(i for i in s004_items_updated if i['product_id'] == unique_pid)['stock'] == 20
 
     # Verify status is now COMPLETED
     all_t = load_transfers(branch="S002")
     updated_t = next(t for t in all_t if t['transfer_id'] == t_id)
     assert updated_t['status'] == 'COMPLETED'
 
-def test_cancel_transfer_workflow():
+def test_cancel_transfer_workflow_pending_and_intransit():
     unique_prod = f"Mascara_{uuid.uuid4().hex[:4]}"
     unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
     update_inventory_stock("S001", "Loreal", unique_prod, 15, product_id=unique_pid)
 
+    # 1. Cancel while PENDING
     req_ok, _ = request_transfer("S001", "S002", unique_pid, 5, "staff_tester")
     assert req_ok is True
 
@@ -607,9 +628,28 @@ def test_cancel_transfer_workflow():
     assert cancel_ok is True
     assert "cancelled" in cancel_msg
 
-    # Verify cannot complete a cancelled transfer
-    comp_ok, comp_msg = complete_transfer(t_id)
-    assert comp_ok is False
+    # Verify cannot dispatch or complete a cancelled transfer
+    assert dispatch_transfer(t_id, "admin")[0] is False
+    assert complete_transfer(t_id)[0] is False
+
+    # 2. Cancel while IN_TRANSIT (Reverses debit back to source branch)
+    unique_prod2 = f"Eyeliner_{uuid.uuid4().hex[:4]}"
+    unique_pid2 = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S001", "Loreal", unique_prod2, 20, product_id=unique_pid2)
+
+    req2_ok, _ = request_transfer("S001", "S002", unique_pid2, 8, "staff_tester")
+    assert req2_ok is True
+    t2_id = next(t for t in load_transfers(branch="S001", status="PENDING") if t['product_id'] == unique_pid2)['transfer_id']
+
+    # Dispatch (Debits 8 units -> stock becomes 12)
+    dispatch_transfer(t2_id, "staff_s001")
+    assert next(i for i in load_inventory("S001") if i['product_id'] == unique_pid2)['stock'] == 12
+
+    # Cancel in-transit -> Reverses debit (Restores 8 units -> stock becomes 20)
+    cancel2_ok, cancel2_msg = cancel_transfer(t2_id)
+    assert cancel2_ok is True
+    assert "restored" in cancel2_msg
+    assert next(i for i in load_inventory("S001") if i['product_id'] == unique_pid2)['stock'] == 20
 
 def test_transfers_route_authorization_and_view(client):
     with client.session_transaction() as sess:
@@ -623,13 +663,13 @@ def test_transfers_route_authorization_and_view(client):
     assert 'Inter-Branch Stock Transfers' in html
     assert 'Transfer Audit Ledger' in html
 
-def test_transfers_destination_cannot_self_approve(client):
+def test_transfers_role_based_permissions_and_lifecycle(client):
     unique_prod = f"EyeShadow_{uuid.uuid4().hex[:4]}"
     unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
     update_inventory_stock("S001", "Urban Decay", unique_prod, 25, product_id=unique_pid)
     update_inventory_stock("S003", "Urban Decay", unique_prod, 0, product_id=unique_pid)
 
-    # 1. Staff at S003 requests stock from S001
+    # 1. Staff at S003 (destination) requests stock from S001
     with client.session_transaction() as sess:
         sess['username'] = 'staff_s003'
         sess['role'] = 'staff'
@@ -648,24 +688,73 @@ def test_transfers_destination_cannot_self_approve(client):
     t_match = next(t for t in transfers if t['product_id'] == unique_pid)
     t_id = t_match['transfer_id']
 
-    # 2. Staff at S003 (requesting branch) attempts to self-approve -> Forbidden (403)
-    self_approve_resp = client.post(f'/transfers/complete/{t_id}')
-    assert self_approve_resp.status_code == 403
+    # 2. Staff at S003 (destination) attempts to dispatch -> Forbidden (403)
+    self_dispatch_resp = client.post(f'/transfers/dispatch/{t_id}')
+    assert self_dispatch_resp.status_code == 403
 
-    # 3. Staff at S001 (source branch) logs in and approves -> Success (302 redirect)
+    # 3. Staff at S001 (source branch) logs in and dispatches -> Success (302 redirect)
     with client.session_transaction() as sess:
         sess['username'] = 'staff_s001'
         sess['role'] = 'staff'
         sess['branch'] = 'S001'
 
-    src_approve_resp = client.post(f'/transfers/complete/{t_id}', follow_redirects=True)
-    assert src_approve_resp.status_code == 200
+    src_dispatch_resp = client.post(f'/transfers/dispatch/{t_id}', follow_redirects=True)
+    assert src_dispatch_resp.status_code == 200
 
-    # Verify inventory balances updated: S001 (25 - 10 = 15), S003 (0 + 10 = 10)
-    s001_items = load_inventory(branch="S001")
-    s003_items = load_inventory(branch="S003")
-    assert next(i for i in s001_items if i['product_id'] == unique_pid)['stock'] == 15
-    assert next(i for i in s003_items if i['product_id'] == unique_pid)['stock'] == 10
+    # Verify source stock debited (25 - 10 = 15), destination still 0
+    assert next(i for i in load_inventory("S001") if i['product_id'] == unique_pid)['stock'] == 15
+    assert next(i for i in load_inventory("S003") if i['product_id'] == unique_pid)['stock'] == 0
+
+    # 4. Staff at S001 (source) attempts to confirm receipt on behalf of destination -> Forbidden (403)
+    src_complete_resp = client.post(f'/transfers/complete/{t_id}')
+    assert src_complete_resp.status_code == 403
+
+    # 5. Staff at S003 (destination) logs in and confirms receipt -> Success (302 redirect)
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff_s003'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S003'
+
+    dest_complete_resp = client.post(f'/transfers/complete/{t_id}', follow_redirects=True)
+    assert dest_complete_resp.status_code == 200
+
+    # Verify destination stock credited (0 + 10 = 10)
+    assert next(i for i in load_inventory("S003") if i['product_id'] == unique_pid)['stock'] == 10
+
+def test_admin_override_authority_at_all_transfer_steps(client):
+    """Admin has full override power: request between any branches, dispatch for any source, complete for any dest."""
+    unique_prod = f"AdminProd_{uuid.uuid4().hex[:4]}"
+    unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S002", "Fenty", unique_prod, 50, product_id=unique_pid)
+    update_inventory_stock("S005", "Fenty", unique_prod, 5, product_id=unique_pid)
+
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin_boss'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'  # Admin's home branch is S001, but operates on S002 -> S005
+
+    # 1. Admin initiates transfer from S002 -> S005
+    req_resp = client.post('/transfers', data={
+        'from_branch': 'S002',
+        'to_branch': 'S005',
+        'product_id': unique_pid,
+        'quantity': '20',
+        'notes': 'Admin override rebalance'
+    }, follow_redirects=True)
+    assert req_resp.status_code == 200
+
+    t_id = next(t for t in load_transfers(branch="S002", status="PENDING") if t['product_id'] == unique_pid)['transfer_id']
+
+    # 2. Admin dispatches on behalf of S002
+    disp_resp = client.post(f'/transfers/dispatch/{t_id}', follow_redirects=True)
+    assert disp_resp.status_code == 200
+    assert next(i for i in load_inventory("S002") if i['product_id'] == unique_pid)['stock'] == 30
+
+    # 3. Admin confirms receipt on behalf of S005
+    comp_resp = client.post(f'/transfers/complete/{t_id}', follow_redirects=True)
+    assert comp_resp.status_code == 200
+    assert next(i for i in load_inventory("S005") if i['product_id'] == unique_pid)['stock'] == 25
+
 
 
 

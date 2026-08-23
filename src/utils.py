@@ -15,7 +15,7 @@ try:
         db_load_users, db_save_user, db_verify_user, db_update_user, db_delete_user,
         db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
         db_load_transactions, db_calculate_rolling_lags,
-        db_request_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
+        db_request_transfer, db_dispatch_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
         get_db, DB_PATH
     )
 except ModuleNotFoundError:
@@ -23,7 +23,7 @@ except ModuleNotFoundError:
         db_load_users, db_save_user, db_verify_user, db_update_user, db_delete_user,
         db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
         db_load_transactions, db_calculate_rolling_lags,
-        db_request_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
+        db_request_transfer, db_dispatch_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
         get_db, DB_PATH
     )
 
@@ -99,7 +99,16 @@ def calculate_rolling_lags(product_id, store_id, default_mean=15.0, db_path=DB_P
 def request_transfer(from_branch, to_branch, product_id, quantity, requested_by, notes='', db_path=DB_PATH):
     return db_request_transfer(from_branch=from_branch, to_branch=to_branch, product_id=product_id, quantity=quantity, requested_by=requested_by, notes=notes, db_path=db_path)
 
+def dispatch_transfer(transfer_id, approved_by, db_path=DB_PATH):
+    return db_dispatch_transfer(transfer_id=transfer_id, approved_by=approved_by, db_path=db_path)
+
+def approve_transfer(transfer_id, approved_by, db_path=DB_PATH):
+    return db_dispatch_transfer(transfer_id=transfer_id, approved_by=approved_by, db_path=db_path)
+
 def complete_transfer(transfer_id, db_path=DB_PATH):
+    return db_complete_transfer(transfer_id=transfer_id, db_path=db_path)
+
+def receive_transfer(transfer_id, db_path=DB_PATH):
     return db_complete_transfer(transfer_id=transfer_id, db_path=db_path)
 
 def cancel_transfer(transfer_id, db_path=DB_PATH):
