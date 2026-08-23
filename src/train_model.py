@@ -37,19 +37,21 @@ def load_training_data(db_path=DB_PATH):
         """
         hist_df = pd.read_sql_query(query_hist, conn)
 
-        # 2. Read live transaction items directly from SQLite
+        # 2. Convert POS transaction lines into the same daily demand grain as
+        # the baseline: one row per date, branch, and product.
         query_live = """
         SELECT 
             t.transaction_date as Date,
             t.branch_id as Store_ID,
             ti.product_id as Product_ID,
-            ti.quantity as Units_Sold,
+            SUM(ti.quantity) as Units_Sold,
             COALESCE(i.stock, 10) as Inventory_Level,
-            ti.unit_price as Price,
+            AVG(ti.unit_price) as Price,
             CASE WHEN strftime('%m', t.transaction_date) IN ('09', '10', '11') THEN 1 ELSE 0 END as Holiday_Promotion
         FROM transaction_items ti
         JOIN transactions t ON ti.transaction_id = t.transaction_id
-        LEFT JOIN inventory i ON t.branch_id = i.branch_id AND ti.product_id = i.product_id;
+        LEFT JOIN inventory i ON t.branch_id = i.branch_id AND ti.product_id = i.product_id
+        GROUP BY t.transaction_date, t.branch_id, ti.product_id;
         """
         live_df = pd.read_sql_query(query_live, conn)
 
@@ -227,12 +229,23 @@ def build_predictive_pipeline(df):
             'Cutoff_Date': str(cutoff_date.strftime('%Y-%m-%d'))
         }
     }
+    # Write both assets to temporary files and replace only after both writes
+    # succeed.  The active forecast model is therefore never left half-written.
     encoders_path = os.path.join(models_dir, 'encoders.pkl')
-    joblib.dump(encoders, encoders_path)
-
     demand_model_path = os.path.join(models_dir, 'demand_model.pkl')
-    joblib.dump(model, demand_model_path)
+    encoders_tmp = f'{encoders_path}.tmp'
+    model_tmp = f'{demand_model_path}.tmp'
+    joblib.dump(encoders, encoders_tmp)
+    joblib.dump(model, model_tmp)
+    os.replace(encoders_tmp, encoders_path)
+    os.replace(model_tmp, demand_model_path)
     print(f"Model and encoders serialized successfully to {models_dir}/")
+    return {
+        'training_records': int(len(df)),
+        'r2': float(r2),
+        'mae': float(mae),
+        'rmse': float(rmse),
+    }
 
 if __name__ == '__main__':
     df_ready_for_ai = load_training_data()

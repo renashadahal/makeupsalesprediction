@@ -2,12 +2,16 @@
 import sqlite3
 import os
 import csv
-from datetime import datetime
+from datetime import datetime, date
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from contextlib import contextmanager
 
-DB_PATH = os.environ.get('TEST_DB_PATH', os.path.join('data', 'noire_retail.db'))
+# Resolve the production database relative to this project, not the directory
+# from which Flask happens to be launched.  This keeps the POS, training job,
+# and Forecast page on the same SQLite file.
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+DB_PATH = os.environ.get('TEST_DB_PATH', os.path.join(PROJECT_ROOT, 'data', 'noire_retail.db'))
 
 @contextmanager
 def get_db(db_path=DB_PATH):
@@ -173,6 +177,25 @@ def init_db(db_path=DB_PATH):
         );
         """)
 
+        # 11. Weekly ML training audit.  This table contains metadata only; it
+        # never changes transactions, inventory, or the historical baseline.
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS model_training_runs (
+            run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_start DATE NOT NULL UNIQUE,
+            triggered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            completed_at DATETIME,
+            triggered_by TEXT NOT NULL,
+            trigger_branch TEXT NOT NULL REFERENCES branches(branch_id),
+            status TEXT NOT NULL CHECK(status IN ('RUNNING', 'SUCCEEDED', 'FAILED')),
+            training_records INTEGER,
+            r2 REAL,
+            mae REAL,
+            rmse REAL,
+            error_message TEXT
+        );
+        """)
+
         # Ensure schema backward compatibility / column migrations for existing SQLite DB files
         existing_cols = [row[1] for row in cursor.execute("PRAGMA table_info(inventory_transfers);").fetchall()]
         if 'approved_by' not in existing_cols:
@@ -184,15 +207,106 @@ def init_db(db_path=DB_PATH):
         if 'dispatched_by' in existing_cols:
             cursor.execute("UPDATE inventory_transfers SET approved_by = dispatched_by WHERE approved_by IS NULL AND dispatched_by IS NOT NULL;")
 
-        # 11. Create Indexes for High Performance Querying
+        training_cols = [row[1] for row in cursor.execute("PRAGMA table_info(model_training_runs);").fetchall()]
+        if 'completed_at' not in training_cols:
+            cursor.execute("ALTER TABLE model_training_runs ADD COLUMN completed_at DATETIME;")
+
+        # 12. Create Indexes for High Performance Querying
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventory_branch_prod ON inventory(branch_id, product_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_branch_date ON transactions(branch_id, transaction_date);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_historical_sales_lookup ON historical_sales(branch_id, product_id, date);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_brand_subcat ON products(brand_id, subcategory_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transfers_status ON inventory_transfers(status);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transfers_branches ON inventory_transfers(from_branch, to_branch);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_model_training_week ON model_training_runs(week_start, status);")
         
         conn.commit()
+
+
+def db_claim_sunday_training_run(triggered_by, trigger_branch, today=None, db_path=DB_PATH):
+    """Atomically claim this Sunday's weekly training run.
+
+    Returns ``True`` only to the first Sunday login.  A previous failed run may
+    be retried by a later login; successful and currently-running runs are not
+    duplicated.
+    """
+    today = today or date.today()
+    if today.weekday() != 6:  # Monday is 0; Sunday is 6.
+        return False
+
+    week_start = today.isoformat()
+    with get_db(db_path) as conn:
+        existing = conn.execute(
+            "SELECT status FROM model_training_runs WHERE week_start = ?;", (week_start,)
+        ).fetchone()
+        if existing is None:
+            try:
+                conn.execute(
+                    """INSERT INTO model_training_runs
+                       (week_start, triggered_by, trigger_branch, status)
+                       VALUES (?, ?, ?, 'RUNNING');""",
+                    (week_start, triggered_by, trigger_branch),
+                )
+                return True
+            except sqlite3.IntegrityError:
+                # Another branch login claimed this Sunday between the read and
+                # insert. Its training job is the only one that should proceed.
+                return False
+        if existing['status'] == 'FAILED':
+            result = conn.execute(
+                """UPDATE model_training_runs
+                   SET triggered_at = CURRENT_TIMESTAMP, triggered_by = ?, trigger_branch = ?,
+                       status = 'RUNNING', training_records = NULL, r2 = NULL, mae = NULL,
+                       rmse = NULL, error_message = NULL
+                   WHERE week_start = ? AND status = 'FAILED';""",
+                (triggered_by, trigger_branch, week_start),
+            )
+            return result.rowcount == 1
+    return False
+
+
+def db_finish_sunday_training_run(success, metrics=None, error_message=None, today=None, db_path=DB_PATH):
+    """Record the result of the currently claimed Sunday training run."""
+    today = today or date.today()
+    week_start = today.isoformat()
+    metrics = metrics or {}
+    with get_db(db_path) as conn:
+        conn.execute(
+            """UPDATE model_training_runs
+               SET status = ?, completed_at = CURRENT_TIMESTAMP, training_records = ?, r2 = ?, mae = ?, rmse = ?, error_message = ?
+               WHERE week_start = ? AND status = 'RUNNING';""",
+            (
+                'SUCCEEDED' if success else 'FAILED',
+                metrics.get('training_records'), metrics.get('r2'), metrics.get('mae'),
+                metrics.get('rmse'), error_message, week_start,
+            ),
+        )
+
+
+def db_get_sunday_training_status(today=None, db_path=DB_PATH):
+    """Return the current Sunday's training audit record, if one exists."""
+    today = today or date.today()
+    with get_db(db_path) as conn:
+        row = conn.execute(
+            """SELECT week_start, status, training_records, r2, mae, rmse, error_message
+               FROM model_training_runs WHERE week_start = ?;""",
+            (today.isoformat(),),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def db_get_latest_successful_training(db_path=DB_PATH):
+    """Return the latest completed model refresh for the Forecast page."""
+    with get_db(db_path) as conn:
+        row = conn.execute(
+            """SELECT week_start, COALESCE(completed_at, triggered_at) AS trained_at,
+                      training_records, r2, mae
+               FROM model_training_runs
+               WHERE status = 'SUCCEEDED'
+               ORDER BY COALESCE(completed_at, triggered_at) DESC
+               LIMIT 1;"""
+        ).fetchone()
+    return dict(row) if row else None
 
 # --- DATABASE CRUD OPERATIONS ---
 

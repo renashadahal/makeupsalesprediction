@@ -5,12 +5,15 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from functools import wraps
+from threading import Thread
 
 from src.database import (
     init_db, get_db, db_verify_user, db_load_users, db_save_user, db_update_user, db_delete_user,
     db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
     db_record_transaction, db_load_transactions, db_calculate_rolling_lags,
     db_request_transfer, db_dispatch_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
+    db_claim_sunday_training_run, db_finish_sunday_training_run, db_get_sunday_training_status,
+    db_get_latest_successful_training,
     DB_PATH
 )
 from src.utils import get_catalog_shades
@@ -20,6 +23,35 @@ app.secret_key = os.environ.get('SECRET_KEY', 'noire_intelligence_matrix_secure_
 
 # Initialize SQLite database schema on startup
 init_db(DB_PATH)
+
+
+def _run_sunday_training(run_date):
+    """Background worker for the weekly model refresh."""
+    try:
+        from src.train_model import load_training_data, build_predictive_pipeline
+
+        training_data = load_training_data()
+        metrics = build_predictive_pipeline(training_data)
+        if not metrics:
+            raise RuntimeError('No usable sales records were available for model training.')
+        db_finish_sunday_training_run(True, metrics=metrics, today=run_date)
+    except Exception as exc:
+        # Keep the currently saved model available if retraining fails.
+        db_finish_sunday_training_run(False, error_message=str(exc)[:500], today=run_date)
+
+
+def start_sunday_training_if_due(username, branch, today=None):
+    """Start Sunday training in the background after the first successful login.
+
+    The training job reads sales data only.  Its run status is stored separately
+    so it cannot alter POS transactions, inventory, or baseline history.
+    """
+    run_date = today or datetime.now().date()
+    if not db_claim_sunday_training_run(username, branch, today=run_date):
+        return False
+
+    Thread(target=_run_sunday_training, args=(run_date,), daemon=True).start()
+    return True
 
 # --- AUTHENTICATION & AUTHORIZATION DECORATORS ---
 
@@ -62,12 +94,21 @@ def login():
             session['role'] = user_info['role']
             session['branch'] = user_info.get('branch', 'S001')
             flash(f"Welcome back, {user_info['username']}. Active Branch: {session['branch']}")
+            if start_sunday_training_if_due(user_info['username'], session['branch']):
+                flash('Weekly AI retraining has started in the background. You can use the system normally.')
             return redirect(url_for('dashboard'))
         else:
             flash('Invalid access credentials. Please verify username and password.')
             return render_template('login.html'), 401
 
     return render_template('login.html')
+
+
+@app.route('/api/training-status')
+@login_required
+def training_status():
+    """Small polling endpoint used to notify staff when background training ends."""
+    return jsonify(db_get_sunday_training_status() or {'status': None})
 
 @app.route('/switch_branch/<branch_id>')
 @login_required
@@ -459,7 +500,12 @@ def inventory_view():
 @app.route('/forecast')
 @login_required
 def forecast():
-    return render_template('forecast.html', current_branch=session.get('branch', 'S001'))
+    latest_training = db_get_latest_successful_training()
+    return render_template(
+        'forecast.html',
+        current_branch=session.get('branch', 'S001'),
+        latest_training=latest_training,
+    )
 
 @app.route('/predict', methods=['POST'])
 @login_required

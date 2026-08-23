@@ -213,6 +213,19 @@ RMSE:      9.2312 units
 Model and encoders serialized successfully to models/
 ```
 
+### Weekly model refresh for the college-project setup
+
+No server or Windows scheduled task is required. The first successful login on
+each Sunday starts retraining in the background using the historical baseline
+and all sales recorded in the SQLite database. Staff can use the web app while
+it runs; the app shows an in-progress notice and a completion popup. Later
+logins that Sunday do not start another training run.
+
+The app stores the run status and metrics in `model_training_runs`. This is an
+audit-only table: it does not change existing sales, stock, or historical data.
+If retraining fails, the existing model stays active and a later Sunday login
+can retry it.
+
 ### 5. Launch the Web Application
 Start the Flask development server:
 

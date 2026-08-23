@@ -8,6 +8,17 @@
         <p class="text-xs text-noireText/60 mt-1">Random Forest regressor demand forecasting for Branch {{ current_branch }}.</p>
     </div>
 
+    {% if latest_training %}
+    <div class="max-w-2xl mx-auto rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-900 shadow-sm">
+        <span class="font-semibold">Forecast model last trained:</span>
+        {{ latest_training.trained_at }}
+    </div>
+    {% else %}
+    <div class="max-w-2xl mx-auto rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900 shadow-sm">
+        No completed weekly model training has been recorded yet. Forecasts use the currently saved model.
+    </div>
+    {% endif %}
+
     <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md max-w-2xl mx-auto">
         <form id="forecastForm" class="space-y-6">
             
