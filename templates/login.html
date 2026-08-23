@@ -4,152 +4,102 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>System Authentication Portal | Noire</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Editorial Typography Stack -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS Engine -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        velvet: '#f3e9e9',       /* Muted Rose-Tinted Cream */
+                        parchment: '#eae0e0',    /* Warm Tinted Plates */
+                        noireText: '#2e2528',    /* Vintage Charcoal Wine */
+                        dustyRose: '#a88189',    /* Muted Rose Accent */
+                        deepWine: '#423338'      /* Primary Deep Wine */
+                    },
+                    fontFamily: {
+                        serif: ['Cormorant Garamond', 'serif'],
+                        sans: ['Space Grotesk', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background: linear-gradient(135deg, #4a2e35 0%, #2b161a 100%);
-            margin: 0;
-            padding: 15px;
-            box-sizing: border-box;
-            font-family: 'Space Grotesk', sans-serif;
-        }
-
-        .login-card {
-            width: 100%;
-            max-width: 440px;
-            background: #ffffff;
-            padding: 45px 40px;
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(43, 22, 26, 0.35);
-            box-sizing: border-box;
-            border: 1px solid #e2d4d4;
-        }
-
-        .login-card h2 {
-            margin: 0 0 8px 0;
-            font-size: 28px;
-            color: #3a2226;
-            text-align: center;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-
-        .login-card .subtitle {
-            text-align: center;
-            color: #705a5d;
-            font-size: 15px;
-            margin-bottom: 30px;
-            margin-top: 0;
-        }
-
-        .form-group {
-            margin-bottom: 22px;
-        }
-
-        .form-group label {
-            display: block;
-            font-weight: 600;
-            font-size: 13px;
-            color: #5c4d50;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 12px 16px;
-            font-size: 15px;
-            border: 1px solid #e2d4d4;
-            border-radius: 8px;
-            box-sizing: border-box;
-            background-color: #fff;
-            color: #2d3748;
-            transition: all 0.2s ease-in-out;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #e5a9a9;
-            box-shadow: 0 0 0 4px rgba(229, 169, 169, 0.3);
-        }
-
-        .login-btn {
-            width: 100%;
-            padding: 14px;
-            font-size: 16px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            background-color: #b57c7c;
-            color: #ffffff;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color 0.15s ease-in-out, transform 0.1s ease;
-            margin-top: 10px;
-        }
-
-        .login-btn:hover {
-            background-color: #966161;
-        }
-
-        .login-btn:active {
-            transform: scale(0.99);
-        }
-
-        .flash-alert {
-            background-color: #fceeed;
-            border-left: 4px solid #cd5c5c;
-            color: #7a4f52;
-            padding: 14px;
-            border-radius: 8px;
-            margin-bottom: 25px;
-            font-size: 14px;
-            font-weight: 500;
-            box-sizing: border-box;
-            line-height: 1.4;
-        }
+        body { font-family: 'Space Grotesk', sans-serif; background-color: #f3e9e9; color: #2e2528; }
+        h1, h2, h3, .brand-font { font-family: 'Cormorant Garamond', serif; }
     </style>
 </head>
-<body>
-    <div class="login-card">
-        <h2>Noire Intelligence Portal</h2>
-        <p class="subtitle">Enter your operator credentials to authenticate</p>
+<body class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-velvet via-parchment to-dustyRose/20">
 
+    <div class="w-full max-w-md bg-white rounded-3xl border border-noireText/10 shadow-2xl p-8 sm:p-10 transition-all">
+        
+        <!-- Header & Branding -->
+        <div class="text-center pb-6 border-b border-noireText/10">
+            <h1 class="text-4xl sm:text-5xl font-serif font-bold text-deepWine tracking-wide">Noire</h1>
+            <p class="text-xs uppercase tracking-widest text-dustyRose font-semibold mt-1">Retail Intelligence Network</p>
+            <p class="text-xs text-noireText/60 mt-2">Enter your operator credentials to authenticate session</p>
+        </div>
+
+        <!-- Flash Notification Pipeline -->
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                <div class="flash-alert">
+                <div class="mt-5 bg-rose-50 border border-rose-300 text-rose-800 px-4 py-3 rounded-xl text-xs font-medium leading-relaxed">
                     {{ messages[0] }}
                 </div>
             {% endif %}
         {% endwith %}
 
-        <form action="{{ url_for('login') }}" method="POST">
-            <div class="form-group">
-                <label for="username">Operator Username</label>
-                <input type="text" id="username" name="username" placeholder="e.g., staff" required autocomplete="username">
+        <!-- Authentication Form -->
+        <form action="{{ url_for('login') }}" method="POST" class="mt-6 space-y-4 text-xs tracking-wide">
+            <div>
+                <label for="username" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                    Operator Identifier
+                </label>
+                <input type="text" id="username" name="username" placeholder="e.g. staff or admin" required autocomplete="username"
+                       class="w-full px-4 py-3 rounded-xl bg-velvet/30 border border-noireText/15 text-noireText focus:outline-none focus:border-dustyRose focus:ring-2 focus:ring-dustyRose/30 transition-all font-mono text-xs">
             </div>
-            
-            <div class="form-group">
-                <label for="password">Security Password</label>
-                <input type="password" id="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+
+            <div>
+                <label for="password" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                    Security Password
+                </label>
+                <input type="password" id="password" name="password" placeholder="••••••••" required autocomplete="current-password"
+                       class="w-full px-4 py-3 rounded-xl bg-velvet/30 border border-noireText/15 text-noireText focus:outline-none focus:border-dustyRose focus:ring-2 focus:ring-dustyRose/30 transition-all text-xs">
             </div>
-            
-            <button type="submit" class="login-btn">Authenticate Session</button>
+
+            <button type="submit"
+                    class="w-full mt-2 py-3.5 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md active:scale-[0.99]">
+                Authenticate Session
+            </button>
         </form>
-        
-        <div style="margin-top: 30px; background: #fffaf9; padding: 14px; border-radius: 8px; border: 1px dashed #e2d4d4;">
-            <p style="font-size: 11px; color: #8a7a7c; text-align: center; margin: 0; line-height: 1.6;">
-                <strong>System Default Operator Credentials:</strong><br>
-                Admin Node: <span style="font-family: monospace; color:#4a2e35; font-weight:bold;">admin</span> / <span style="font-family: monospace; color:#4a2e35; font-weight:bold;">admin123</span><br>
-                Staff Node: <span style="font-family: monospace; color:#4a2e35; font-weight:bold;">staff</span> / <span style="font-family: monospace; color:#4a2e35; font-weight:bold;">staff123</span>
-            </p>
+
+        <!-- Quick Demo Credentials Hint Box -->
+        <div class="mt-8 pt-6 border-t border-noireText/10 bg-velvet/40 -mx-8 -mb-8 sm:-mx-10 sm:-mb-10 p-6 rounded-b-3xl text-center text-[11px] text-noireText/70 space-y-2">
+            <span class="block font-bold uppercase tracking-widest text-[10px] text-noireText/50">System Default Operators</span>
+            <div class="flex items-center justify-center gap-2 flex-wrap">
+                <button type="button" onclick="fillCredentials('admin', 'admin123')"
+                        class="px-2.5 py-1 bg-white hover:bg-deepWine hover:text-velvet text-noireText border border-noireText/15 rounded-lg font-mono text-[10px] transition-all shadow-sm">
+                    <strong>Admin:</strong> admin / admin123
+                </button>
+                <button type="button" onclick="fillCredentials('staff', 'staff123')"
+                        class="px-2.5 py-1 bg-white hover:bg-deepWine hover:text-velvet text-noireText border border-noireText/15 rounded-lg font-mono text-[10px] transition-all shadow-sm">
+                    <strong>Staff:</strong> staff / staff123
+                </button>
+            </div>
         </div>
+
     </div>
+
+    <script>
+        function fillCredentials(u, p) {
+            document.getElementById('username').value = u;
+            document.getElementById('password').value = p;
+        }
+    </script>
 </body>
 </html>

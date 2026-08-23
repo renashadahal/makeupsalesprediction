@@ -14,13 +14,17 @@ try:
     from src.database import (
         db_load_users, db_save_user, db_verify_user, db_update_user, db_delete_user,
         db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
-        db_load_transactions, db_calculate_rolling_lags, get_db, DB_PATH
+        db_load_transactions, db_calculate_rolling_lags,
+        db_request_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
+        get_db, DB_PATH
     )
 except ModuleNotFoundError:
     from database import (
         db_load_users, db_save_user, db_verify_user, db_update_user, db_delete_user,
         db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
-        db_load_transactions, db_calculate_rolling_lags, get_db, DB_PATH
+        db_load_transactions, db_calculate_rolling_lags,
+        db_request_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
+        get_db, DB_PATH
     )
 
 USERS_CSV = 'users.csv'
@@ -89,3 +93,17 @@ def get_catalog_shades(product_name, db_path=DB_PATH):
 
 def calculate_rolling_lags(product_id, store_id, default_mean=15.0, db_path=DB_PATH):
     return db_calculate_rolling_lags(product_id=product_id, branch_id=store_id, default_mean=default_mean, db_path=db_path)
+
+# --- STOCK TRANSFER UTILITIES ---
+
+def request_transfer(from_branch, to_branch, product_id, quantity, requested_by, notes='', db_path=DB_PATH):
+    return db_request_transfer(from_branch=from_branch, to_branch=to_branch, product_id=product_id, quantity=quantity, requested_by=requested_by, notes=notes, db_path=db_path)
+
+def complete_transfer(transfer_id, db_path=DB_PATH):
+    return db_complete_transfer(transfer_id=transfer_id, db_path=db_path)
+
+def cancel_transfer(transfer_id, db_path=DB_PATH):
+    return db_cancel_transfer(transfer_id=transfer_id, db_path=db_path)
+
+def load_transfers(branch=None, status=None, db_path=DB_PATH):
+    return db_load_transfers(branch=branch, status=status, db_path=db_path)

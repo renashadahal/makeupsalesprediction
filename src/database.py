@@ -155,11 +155,29 @@ def init_db(db_path=DB_PATH):
         );
         """)
 
-        # 10. Create Indexes for High Performance Querying
+        # 10. Inter-Branch Inventory Stock Transfers
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS inventory_transfers (
+            transfer_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_branch TEXT NOT NULL REFERENCES branches(branch_id),
+            to_branch TEXT NOT NULL REFERENCES branches(branch_id),
+            product_id TEXT NOT NULL REFERENCES products(product_id),
+            quantity INTEGER NOT NULL CHECK(quantity > 0),
+            status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'COMPLETED', 'CANCELLED')),
+            requested_by TEXT NOT NULL,
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            completed_at DATETIME
+        );
+        """)
+
+        # 11. Create Indexes for High Performance Querying
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventory_branch_prod ON inventory(branch_id, product_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_branch_date ON transactions(branch_id, transaction_date);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_historical_sales_lookup ON historical_sales(branch_id, product_id, date);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_brand_subcat ON products(brand_id, subcategory_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_transfers_status ON inventory_transfers(status);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_transfers_branches ON inventory_transfers(from_branch, to_branch);")
         
         conn.commit()
 
@@ -361,7 +379,7 @@ def db_deduct_inventory_stock(branch, product_name, quantity_sold, db_path=DB_PA
     return False
 
 def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=DB_PATH):
-    """Executes atomic POS checkout transaction (header + items + stock deduction) and returns detailed receipt data."""
+    """Executes atomic POS checkout transaction (pre-validation + header + items + stock deduction) and returns (success, receipt/error)."""
     discount = 1.0
     promo_code = promo_code.strip().upper()
     if promo_code == "FESTIVE10":
@@ -378,10 +396,28 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
     with get_db(db_path) as conn:
         cursor = conn.cursor()
 
+        # 1. Pre-validate stock availability for all items in cart before committing
         for item in cart:
             p_name = item['product_name'].strip()
             brand_name = item['brand'].strip()
             qty = int(item['quantity'])
+
+            p_row = cursor.execute("""
+            SELECT p.product_id, COALESCE(i.stock, 0) as stock 
+            FROM products p 
+            JOIN brands b ON p.brand_id = b.brand_id
+            LEFT JOIN inventory i ON p.product_id = i.product_id AND i.branch_id = ?
+            WHERE b.brand_name = ? AND p.product_name = ?;
+            """, (branch, brand_name, p_name)).fetchone()
+
+            if not p_row:
+                return False, f"Product '{p_name}' ({brand_name}) not found in catalog."
+
+            avail_stock = int(p_row['stock'])
+            if avail_stock < qty:
+                return False, f"Insufficient stock for '{p_name}' at Branch {branch}. Available: {avail_stock} units, Requested: {qty} units."
+
+            p_id = p_row['product_id']
             orig_price = float(item['price'])
             final_unit_price = orig_price * discount
             
@@ -392,14 +428,6 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
             grand_total += final_subtotal
             shade = item.get('shade', 'Default').strip() or 'Default'
 
-            # Lookup product_id
-            p_row = cursor.execute("""
-            SELECT p.product_id FROM products p 
-            JOIN brands b ON p.brand_id = b.brand_id
-            WHERE b.brand_name = ? AND p.product_name = ?;
-            """, (brand_name, p_name)).fetchone()
-
-            p_id = p_row['product_id'] if p_row else "P0001"
             processed_items.append((p_id, p_name, shade, qty, final_unit_price, final_subtotal))
             receipt_items.append({
                 'product_id': p_id,
@@ -412,13 +440,13 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
                 'subtotal': final_subtotal
             })
 
-        # Insert Transaction Header
+        # 2. Insert Transaction Header
         cursor.execute("""
         INSERT INTO transactions (transaction_id, username, branch_id, promo_code, discount_rate, grand_total, transaction_date)
         VALUES (?, ?, ?, ?, ?, ?, ?);
         """, (tx_id, username, branch, promo_code, discount, grand_total, today_date))
 
-        # Insert Transaction Items & Deduct Stock
+        # 3. Insert Transaction Items & Deduct Stock
         for p_id, p_name, shade, qty, unit_price, subtotal in processed_items:
             cursor.execute("""
             INSERT INTO transaction_items (transaction_id, product_id, shade, quantity, unit_price, subtotal)
@@ -427,11 +455,11 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
 
             cursor.execute("""
             UPDATE inventory 
-            SET stock = MAX(0, stock - ?), last_updated = CURRENT_TIMESTAMP
+            SET stock = stock - ?, last_updated = CURRENT_TIMESTAMP
             WHERE branch_id = ? AND product_id = ?;
             """, (qty, branch, p_id))
 
-        return {
+        return True, {
             'transaction_id': tx_id,
             'username': username,
             'branch_id': branch,
@@ -552,4 +580,147 @@ def db_load_transactions(branch=None, limit=None, db_path=DB_PATH):
             })
 
         return transactions
+
+# --- INTER-BRANCH INVENTORY TRANSFERS ---
+
+def db_request_transfer(from_branch, to_branch, product_id, quantity, requested_by, notes='', db_path=DB_PATH):
+    """Creates a new inter-branch stock transfer request."""
+    if from_branch == to_branch:
+        return False, "Source and destination branch cannot be the same."
+
+    try:
+        qty = int(quantity)
+    except (ValueError, TypeError):
+        return False, "Invalid transfer quantity."
+
+    if qty <= 0:
+        return False, "Transfer quantity must be greater than zero."
+
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        
+        # Verify product exists
+        prod_row = cursor.execute("SELECT product_name FROM products WHERE product_id = ?;", (product_id,)).fetchone()
+        if not prod_row:
+            return False, f"Product SKU '{product_id}' not found."
+
+        # Verify source branch stock
+        row = cursor.execute(
+            "SELECT stock FROM inventory WHERE branch_id = ? AND product_id = ?;",
+            (from_branch, product_id)
+        ).fetchone()
+
+        avail = row['stock'] if row else 0
+        if avail < qty:
+            return False, f"Source branch {from_branch} only has {avail} units of '{prod_row['product_name']}' in stock (requested: {qty})."
+
+        cursor.execute("""
+        INSERT INTO inventory_transfers (from_branch, to_branch, product_id, quantity, requested_by, notes, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'PENDING');
+        """, (from_branch, to_branch, product_id, qty, requested_by, notes.strip()))
+        conn.commit()
+        return True, f"Transfer request for {qty} units of '{prod_row['product_name']}' created successfully."
+
+def db_complete_transfer(transfer_id, db_path=DB_PATH):
+    """Atomically debits source branch stock and credits destination branch stock upon transfer completion."""
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        t_row = cursor.execute("""
+        SELECT transfer_id, from_branch, to_branch, product_id, quantity, status
+        FROM inventory_transfers WHERE transfer_id = ?;
+        """, (int(transfer_id),)).fetchone()
+
+        if not t_row:
+            return False, "Transfer record not found."
+        if t_row['status'] != 'PENDING':
+            return False, f"Transfer is already {t_row['status']}."
+
+        from_b = t_row['from_branch']
+        to_b = t_row['to_branch']
+        p_id = t_row['product_id']
+        qty = int(t_row['quantity'])
+
+        # Verify source branch still has sufficient stock
+        src_row = cursor.execute("SELECT stock FROM inventory WHERE branch_id = ? AND product_id = ?;", (from_b, p_id)).fetchone()
+        src_stock = src_row['stock'] if src_row else 0
+        if src_stock < qty:
+            return False, f"Cannot complete transfer: Source branch {from_b} has insufficient stock ({src_stock} < {qty})."
+
+        # 1. Debit source branch stock
+        cursor.execute("""
+        UPDATE inventory 
+        SET stock = stock - ?, last_updated = CURRENT_TIMESTAMP 
+        WHERE branch_id = ? AND product_id = ?;
+        """, (qty, from_b, p_id))
+
+        # 2. Credit destination branch stock (upsert)
+        cursor.execute("""
+        INSERT INTO inventory (branch_id, product_id, stock)
+        VALUES (?, ?, ?)
+        ON CONFLICT(branch_id, product_id) DO UPDATE SET
+            stock = stock + excluded.stock,
+            last_updated = CURRENT_TIMESTAMP;
+        """, (to_b, p_id, qty))
+
+        # 3. Mark transfer record completed
+        cursor.execute("""
+        UPDATE inventory_transfers 
+        SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP 
+        WHERE transfer_id = ?;
+        """, (int(transfer_id),))
+
+        conn.commit()
+        return True, f"Transfer #{transfer_id} finalized: {qty} units transferred from {from_b} to {to_b}."
+
+def db_cancel_transfer(transfer_id, db_path=DB_PATH):
+    """Cancels a pending transfer request."""
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        t_row = cursor.execute("SELECT status FROM inventory_transfers WHERE transfer_id = ?;", (int(transfer_id),)).fetchone()
+        if not t_row:
+            return False, "Transfer record not found."
+        if t_row['status'] != 'PENDING':
+            return False, f"Cannot cancel transfer in '{t_row['status']}' state."
+
+        cursor.execute("""
+        UPDATE inventory_transfers 
+        SET status = 'CANCELLED', completed_at = CURRENT_TIMESTAMP 
+        WHERE transfer_id = ?;
+        """, (int(transfer_id),))
+        conn.commit()
+        return True, f"Transfer #{transfer_id} cancelled."
+
+def db_load_transfers(branch=None, status=None, db_path=DB_PATH):
+    """Loads inter-branch transfer logs joined with master product and brand names."""
+    with get_db(db_path) as conn:
+        query = """
+        SELECT 
+            t.transfer_id,
+            t.from_branch,
+            t.to_branch,
+            t.product_id,
+            p.product_name,
+            b.brand_name,
+            t.quantity,
+            t.status,
+            t.requested_by,
+            t.notes,
+            t.created_at,
+            t.completed_at
+        FROM inventory_transfers t
+        JOIN products p ON t.product_id = p.product_id
+        JOIN brands b ON p.brand_id = b.brand_id
+        WHERE 1=1
+        """
+        params = []
+        if branch and branch != 'ALL':
+            query += " AND (t.from_branch = ? OR t.to_branch = ?)"
+            params.extend([branch, branch])
+        if status:
+            query += " AND t.status = ?"
+            params.append(status)
+
+        query += " ORDER BY t.created_at DESC, t.transfer_id DESC;"
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
 

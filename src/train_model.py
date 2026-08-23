@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import joblib
 
 try:
@@ -174,23 +175,18 @@ def build_predictive_pipeline(df):
     ]
     target = 'Units_Sold'
 
-    encoders = {
-        'Product_ID': le_prod,
-        'Store_ID': le_store,
-        'Global_Sales_Mean': global_sales_mean,
-        'Event_Categories': EVENT_CATEGORIES,
-        'Event_Feature_Cols': event_feature_cols,
-        'Feature_Names': features
-    }
-    encoders_path = os.path.join(models_dir, 'encoders.pkl')
-    joblib.dump(encoders, encoders_path)
-
     X = df[features]
     y = df[target]
 
-    split_index = int(len(df) * 0.80)
-    X_train, X_test = X.iloc[:split_index], X.iloc[split_index:]
-    y_train, y_test = y.iloc[:split_index], y.iloc[split_index:]
+    # Chronological time-series split by Date (80% historical training -> 20% future testing)
+    unique_dates = df['Date'].drop_duplicates().sort_values()
+    cutoff_date = unique_dates.iloc[int(len(unique_dates) * 0.80)]
+
+    train_mask = df['Date'] <= cutoff_date
+    test_mask = df['Date'] > cutoff_date
+
+    X_train, X_test = X[train_mask], X[test_mask]
+    y_train, y_test = y[train_mask], y[test_mask]
 
     model = RandomForestRegressor(
         n_estimators=100,
@@ -202,12 +198,41 @@ def build_predictive_pipeline(df):
     )
     model.fit(X_train, y_train)
 
-    score = model.score(X_test, y_test)
-    print(f"Peak Optimized Random Forest R^2 validation score achieved: {score:.4f}")
+    y_pred = model.predict(X_test)
+    r2 = r2_score(y_test, y_pred)
+    mae = mean_absolute_error(y_test, y_pred)
+    rmse = float(np.sqrt(mean_squared_error(y_test, y_pred)))
+
+    print("-" * 60)
+    print("AI DEMAND FORECASTING - MODEL EVALUATION REPORT")
+    print("-" * 60)
+    print(f"Train Set: {len(X_train):,} records ({df[train_mask]['Date'].min().strftime('%Y-%m-%d')} to {df[train_mask]['Date'].max().strftime('%Y-%m-%d')})")
+    print(f"Test Set:  {len(X_test):,} records ({df[test_mask]['Date'].min().strftime('%Y-%m-%d')} to {df[test_mask]['Date'].max().strftime('%Y-%m-%d')})")
+    print(f"R² Score:  {r2:.4f}")
+    print(f"MAE:       {mae:.4f} units")
+    print(f"RMSE:      {rmse:.4f} units")
+    print("-" * 60)
+
+    encoders = {
+        'Product_ID': le_prod,
+        'Store_ID': le_store,
+        'Global_Sales_Mean': global_sales_mean,
+        'Event_Categories': EVENT_CATEGORIES,
+        'Event_Feature_Cols': event_feature_cols,
+        'Feature_Names': features,
+        'Metrics': {
+            'R2': float(r2),
+            'MAE': float(mae),
+            'RMSE': float(rmse),
+            'Cutoff_Date': str(cutoff_date.strftime('%Y-%m-%d'))
+        }
+    }
+    encoders_path = os.path.join(models_dir, 'encoders.pkl')
+    joblib.dump(encoders, encoders_path)
 
     demand_model_path = os.path.join(models_dir, 'demand_model.pkl')
     joblib.dump(model, demand_model_path)
-    print(f"Model serialized and outputted to disk successfully as {demand_model_path}.")
+    print(f"Model and encoders serialized successfully to {models_dir}/")
 
 if __name__ == '__main__':
     df_ready_for_ai = load_training_data()

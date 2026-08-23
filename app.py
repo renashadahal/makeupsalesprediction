@@ -9,7 +9,9 @@ from functools import wraps
 from src.database import (
     init_db, get_db, db_verify_user, db_load_users, db_save_user, db_update_user, db_delete_user,
     db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
-    db_record_transaction, db_load_transactions, db_calculate_rolling_lags, DB_PATH
+    db_record_transaction, db_load_transactions, db_calculate_rolling_lags,
+    db_request_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
+    DB_PATH
 )
 from src.utils import get_catalog_shades
 
@@ -278,10 +280,12 @@ def record_sale():
         current_branch = session.get('branch', 'S001')
         current_user = session.get('username', 'staff')
 
-        # Execute atomic POS transaction in SQLite
-        receipt = db_record_transaction(tx_id, current_user, current_branch, cart, promo_code=promo)
+        # Execute atomic POS transaction in SQLite with pre-checkout stock validation
+        success, result = db_record_transaction(tx_id, current_user, current_branch, cart, promo_code=promo)
+        if not success:
+            return jsonify({'status': 'error', 'message': result}), 400
 
-        return jsonify({'status': 'success', 'transaction_id': tx_id, 'receipt': receipt})
+        return jsonify({'status': 'success', 'transaction_id': tx_id, 'receipt': result})
         
     return render_template('record_sale.html')
 
@@ -559,6 +563,90 @@ def update_catalog():
         existing_subcategories=existing_subcategories,
         next_product_id=next_product_id
     )
+
+# --- INTER-BRANCH STOCK TRANSFERS ---
+
+@app.route('/transfers', methods=['GET', 'POST'])
+@login_required
+def stock_transfers():
+    current_branch = session.get('branch', 'S001')
+    is_admin = session.get('role') == 'admin'
+    current_user = session.get('username', 'staff')
+
+    if request.method == 'POST':
+        from_b = request.form.get('from_branch', '').strip()
+        to_b = current_branch  # The requesting branch is always autofilled/locked to the active session branch
+        product_id = request.form.get('product_id', '').strip()
+        qty = request.form.get('quantity', '1').strip()
+        notes = request.form.get('notes', '').strip()
+
+        if from_b == to_b:
+            flash("Source and destination branch cannot be the same.")
+            return redirect(url_for('stock_transfers'))
+
+        success, msg = db_request_transfer(from_b, to_b, product_id, qty, requested_by=current_user, notes=notes)
+        flash(msg)
+        return redirect(url_for('stock_transfers'))
+
+    # Load transfers based on role scope
+    branch_filter = None if is_admin else current_branch
+    transfers = db_load_transfers(branch=branch_filter)
+
+    # Load available products and inventory stock for the form
+    with get_db() as conn:
+        all_products = conn.execute("""
+        SELECT p.product_id, p.product_name, b.brand_name 
+        FROM products p 
+        JOIN brands b ON p.brand_id = b.brand_id 
+        ORDER BY b.brand_name, p.product_name;
+        """).fetchall()
+
+    return render_template(
+        'transfers.html',
+        transfers=transfers,
+        all_products=[dict(p) for p in all_products],
+        current_branch=current_branch,
+        all_branches=['S001', 'S002', 'S003', 'S004', 'S005']
+    )
+
+@app.route('/transfers/complete/<int:transfer_id>', methods=['POST'])
+@login_required
+def complete_transfer_route(transfer_id):
+    current_branch = session.get('branch', 'S001')
+    is_admin = session.get('role') == 'admin'
+
+    # Security check: Only the SOURCE branch operator (from_branch) or an Administrator can approve and allow the transfer
+    with get_db() as conn:
+        t_row = conn.execute("SELECT from_branch, to_branch FROM inventory_transfers WHERE transfer_id = ?;", (transfer_id,)).fetchone()
+        if not t_row:
+            flash("Transfer not found.")
+            return redirect(url_for('stock_transfers'))
+        if not is_admin and t_row['from_branch'] != current_branch:
+            flash(f"Authorization Denied: Only the source branch operator (Branch {t_row['from_branch']}) or an administrator can approve and release stock.")
+            return redirect(url_for('stock_transfers')), 403
+
+    success, msg = db_complete_transfer(transfer_id)
+    flash(msg)
+    return redirect(url_for('stock_transfers'))
+
+@app.route('/transfers/cancel/<int:transfer_id>', methods=['POST'])
+@login_required
+def cancel_transfer_route(transfer_id):
+    current_branch = session.get('branch', 'S001')
+    is_admin = session.get('role') == 'admin'
+
+    with get_db() as conn:
+        t_row = conn.execute("SELECT from_branch, to_branch, requested_by FROM inventory_transfers WHERE transfer_id = ?;", (transfer_id,)).fetchone()
+        if not t_row:
+            flash("Transfer not found.")
+            return redirect(url_for('stock_transfers'))
+        if not is_admin and t_row['from_branch'] != current_branch and t_row['to_branch'] != current_branch:
+            flash("Unauthorized to cancel this transfer.")
+            return redirect(url_for('stock_transfers')), 403
+
+    success, msg = db_cancel_transfer(transfer_id)
+    flash(msg)
+    return redirect(url_for('stock_transfers'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

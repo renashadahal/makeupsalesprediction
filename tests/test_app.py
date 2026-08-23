@@ -9,7 +9,8 @@ from app import app
 from src.utils import (
     verify_user, save_user, update_user, delete_user, load_users, 
     load_inventory, update_inventory_stock, deduct_inventory_stock,
-    get_catalog_shades, calculate_rolling_lags
+    get_catalog_shades, calculate_rolling_lags,
+    request_transfer, complete_transfer, cancel_transfer, load_transfers
 )
 
 @pytest.fixture
@@ -258,14 +259,14 @@ def test_predict_status_color_states(client):
     assert data_red['status_color'] == 'red'
     assert data_red['status'] == 'deficit'
 
-    # 3. YELLOW test: Stock at hand equals predicted demand exactly (stock=9, pred=9)
+    # 3. YELLOW test: Stock at hand equals predicted demand exactly (stock=8, pred=8)
     res_yellow = client.post('/predict', data=json.dumps({
-        'product_id': 'P0001', 'price': 25.00, 'stock': 9, 'holiday_context': 'none'
+        'product_id': 'P0001', 'price': 25.00, 'stock': 8, 'holiday_context': 'none'
     }), content_type='application/json')
     data_yellow = res_yellow.get_json()
     assert data_yellow['status_color'] == 'yellow'
     assert data_yellow['status'] == 'balanced'
-    assert data_yellow['predicted_demand'] == 9
+    assert data_yellow['predicted_demand'] == 8
 
 def test_record_sale_negative_quantity_rejection(client):
     with client.session_transaction() as sess:
@@ -286,6 +287,58 @@ def test_record_sale_negative_quantity_rejection(client):
     assert response.status_code == 400
     res_json = response.get_json()
     assert res_json['status'] == 'error'
+
+def test_record_sale_insufficient_stock_rejection(client):
+    unique_prod = f"RareLip_{uuid.uuid4().hex[:4]}"
+    update_inventory_stock("S001", "Rare Beauty", unique_prod, 3)
+
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S001'
+
+    # Attempt to buy 5 units when only 3 exist
+    payload = {
+        'cart': [{
+            'brand': 'Rare Beauty',
+            'product_name': unique_prod,
+            'shade': 'Default',
+            'price': 24.00,
+            'quantity': 5
+        }]
+    }
+    response = client.post('/record_sale', data=json.dumps(payload), content_type='application/json')
+    assert response.status_code == 400
+    res_json = response.get_json()
+    assert res_json['status'] == 'error'
+    assert 'Insufficient stock' in res_json['message']
+    assert 'Available: 3' in res_json['message']
+
+    # Ensure stock was not decremented
+    s001_items = load_inventory(branch="S001")
+    match = next(i for i in s001_items if i['product_name'] == unique_prod)
+    assert match['stock'] == 3
+
+def test_record_sale_uncataloged_product_rejection(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S001'
+
+    payload = {
+        'cart': [{
+            'brand': 'NonExistentBrand',
+            'product_name': 'Ghost Product 999',
+            'shade': 'Default',
+            'price': 100.00,
+            'quantity': 1
+        }]
+    }
+    response = client.post('/record_sale', data=json.dumps(payload), content_type='application/json')
+    assert response.status_code == 400
+    res_json = response.get_json()
+    assert res_json['status'] == 'error'
+    assert 'not found in catalog' in res_json['message']
 
 def test_catalog_metadata_preservation():
     unique_prod = f"Blush_{uuid.uuid4().hex[:4]}"
@@ -474,6 +527,147 @@ def test_inventory_view_renders_sort_controls(client):
     assert 'Low Stock on Top' in html
     assert 'data-updated' in html
     assert 'data-stock' in html
+
+# --- 10. INTER-BRANCH STOCK TRANSFER TESTS ---
+
+def test_request_transfer_validation():
+    unique_prod = f"LipGloss_{uuid.uuid4().hex[:4]}"
+    unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S001", "Dior", unique_prod, 20, product_id=unique_pid)
+
+    # 1. Reject transfer to same branch
+    same_ok, same_msg = request_transfer("S001", "S001", unique_pid, 5, "staff_tester")
+    assert same_ok is False
+    assert "cannot be the same" in same_msg
+
+    # 2. Reject transfer exceeding available source stock
+    exceed_ok, exceed_msg = request_transfer("S001", "S003", unique_pid, 50, "staff_tester")
+    assert exceed_ok is False
+    assert "only has 20 units" in exceed_msg
+
+    # 3. Successful transfer creation
+    ok, msg = request_transfer("S001", "S003", unique_pid, 10, "staff_tester", notes="Restock transfer")
+    assert ok is True
+    assert "created successfully" in msg
+
+    # Verify transfer in pending list
+    transfers = load_transfers(branch="S001", status="PENDING")
+    match = next((t for t in transfers if t['product_id'] == unique_pid), None)
+    assert match is not None
+    assert match['from_branch'] == "S001"
+    assert match['to_branch'] == "S003"
+    assert match['quantity'] == 10
+
+def test_complete_transfer_atomic_stock_movement():
+    unique_prod = f"Perfume_{uuid.uuid4().hex[:4]}"
+    unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S002", "Chanel", unique_prod, 30, product_id=unique_pid)
+    update_inventory_stock("S004", "Chanel", unique_prod, 5, product_id=unique_pid)
+
+    # Create transfer request from S002 -> S004 for 15 units
+    req_ok, _ = request_transfer("S002", "S004", unique_pid, 15, "staff_tester")
+    assert req_ok is True
+
+    transfers = load_transfers(branch="S002", status="PENDING")
+    t_record = next(t for t in transfers if t['product_id'] == unique_pid)
+    t_id = t_record['transfer_id']
+
+    # Complete the transfer
+    comp_ok, comp_msg = complete_transfer(t_id)
+    assert comp_ok is True
+    assert "finalized" in comp_msg
+
+    # Verify source branch stock decremented (30 - 15 = 15)
+    s002_items = load_inventory(branch="S002")
+    s002_match = next(i for i in s002_items if i['product_id'] == unique_pid)
+    assert s002_match['stock'] == 15
+
+    # Verify destination branch stock incremented (5 + 15 = 20)
+    s004_items = load_inventory(branch="S004")
+    s004_match = next(i for i in s004_items if i['product_id'] == unique_pid)
+    assert s004_match['stock'] == 20
+
+    # Verify status is now COMPLETED
+    all_t = load_transfers(branch="S002")
+    updated_t = next(t for t in all_t if t['transfer_id'] == t_id)
+    assert updated_t['status'] == 'COMPLETED'
+
+def test_cancel_transfer_workflow():
+    unique_prod = f"Mascara_{uuid.uuid4().hex[:4]}"
+    unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S001", "Loreal", unique_prod, 15, product_id=unique_pid)
+
+    req_ok, _ = request_transfer("S001", "S002", unique_pid, 5, "staff_tester")
+    assert req_ok is True
+
+    transfers = load_transfers(branch="S001", status="PENDING")
+    t_id = next(t for t in transfers if t['product_id'] == unique_pid)['transfer_id']
+
+    cancel_ok, cancel_msg = cancel_transfer(t_id)
+    assert cancel_ok is True
+    assert "cancelled" in cancel_msg
+
+    # Verify cannot complete a cancelled transfer
+    comp_ok, comp_msg = complete_transfer(t_id)
+    assert comp_ok is False
+
+def test_transfers_route_authorization_and_view(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff_s003'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S003'
+
+    resp = client.get('/transfers')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'Inter-Branch Stock Transfers' in html
+    assert 'Transfer Audit Ledger' in html
+
+def test_transfers_destination_cannot_self_approve(client):
+    unique_prod = f"EyeShadow_{uuid.uuid4().hex[:4]}"
+    unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S001", "Urban Decay", unique_prod, 25, product_id=unique_pid)
+    update_inventory_stock("S003", "Urban Decay", unique_prod, 0, product_id=unique_pid)
+
+    # 1. Staff at S003 requests stock from S001
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff_s003'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S003'
+
+    req_resp = client.post('/transfers', data={
+        'from_branch': 'S001',
+        'product_id': unique_pid,
+        'quantity': '10',
+        'notes': 'Urgent requirement'
+    }, follow_redirects=True)
+    assert req_resp.status_code == 200
+
+    # Retrieve transfer ID
+    transfers = load_transfers(branch="S003", status="PENDING")
+    t_match = next(t for t in transfers if t['product_id'] == unique_pid)
+    t_id = t_match['transfer_id']
+
+    # 2. Staff at S003 (requesting branch) attempts to self-approve -> Forbidden (403)
+    self_approve_resp = client.post(f'/transfers/complete/{t_id}')
+    assert self_approve_resp.status_code == 403
+
+    # 3. Staff at S001 (source branch) logs in and approves -> Success (302 redirect)
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff_s001'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S001'
+
+    src_approve_resp = client.post(f'/transfers/complete/{t_id}', follow_redirects=True)
+    assert src_approve_resp.status_code == 200
+
+    # Verify inventory balances updated: S001 (25 - 10 = 15), S003 (0 + 10 = 10)
+    s001_items = load_inventory(branch="S001")
+    s003_items = load_inventory(branch="S003")
+    assert next(i for i in s001_items if i['product_id'] == unique_pid)['stock'] == 15
+    assert next(i for i in s003_items if i['product_id'] == unique_pid)['stock'] == 10
+
+
 
 
 

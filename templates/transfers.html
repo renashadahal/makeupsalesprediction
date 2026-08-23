@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-8 max-w-7xl mx-auto pb-12 px-4">
+
+    <!-- Top Header -->
+    <div class="border-b border-noireText/10 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-3xl sm:text-4xl text-noireText font-serif">Inter-Branch Stock Transfers</h2>
+            <p class="text-xs text-noireText/60 font-light mt-1">Request, authorize, and track physical inventory shipments across branch nodes.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-xs bg-white/80 border border-noireText/10 px-3 py-1.5 rounded-xl font-mono text-noireText">
+                Active Node: <strong class="text-deepWine">{{ current_branch }}</strong>
+            </span>
+        </div>
+    </div>
+
+    <!-- Top Grid: Request Form Card + Quick Summary -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left: Create Transfer Form (Spans 2 columns) -->
+        <div class="lg:col-span-2 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
+            <div class="border-b border-noireText/10 pb-3 mb-5">
+                <h3 class="text-2xl text-noireText font-serif">Initiate Transfer Request</h3>
+                <p class="text-xs text-noireText/60 font-light">Transfer physical inventory units from a source branch to a destination branch.</p>
+            </div>
+
+            <form action="{{ url_for('stock_transfers') }}" method="POST" class="space-y-5 text-xs tracking-wide">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Requesting Destination Branch (Auto-Filled) -->
+                    <div>
+                        <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                            Destination Branch (Requesting Stock)
+                        </label>
+                        <div class="flex items-center justify-between px-4 py-2.5 rounded-xl bg-velvet/40 border border-noireText/10 text-noireText">
+                            <span class="font-mono font-bold text-deepWine text-xs">Branch {{ current_branch }}</span>
+                            <span class="text-[9px] bg-dustyRose/20 text-dustyRose px-1.5 py-0.5 rounded font-semibold tracking-wider uppercase">Auto-Filled</span>
+                        </div>
+                        <input type="hidden" name="to_branch" value="{{ current_branch }}">
+                    </div>
+
+                    <!-- Source Branch (Supplier Node) -->
+                    <div>
+                        <label for="from_branch" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                            Source Branch (Request From)
+                        </label>
+                        <select id="from_branch" name="from_branch" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-mono font-medium">
+                            <option value="" disabled selected>-- Select Source Branch --</option>
+                            {% for b in all_branches %}
+                                {% if b != current_branch %}
+                                <option value="{{ b }}">Branch {{ b }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- Target SKU / Product -->
+                    <div class="sm:col-span-2">
+                        <label for="product_id" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                            Target Product Catalog SKU
+                        </label>
+                        <select id="product_id" name="product_id" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
+                            <option value="" disabled selected>-- Select Product --</option>
+                            {% for p in all_products %}
+                            <option value="{{ p.product_id }}">
+                                [{{ p.brand_name }}] {{ p.product_name }} ({{ p.product_id }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Quantity -->
+                    <div>
+                        <label for="quantity" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                            Transfer Quantity
+                        </label>
+                        <input type="number" id="quantity" name="quantity" min="1" value="1" required
+                               class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-medium">
+                    </div>
+                </div>
+
+                <!-- Transfer Notes -->
+                <div>
+                    <label for="notes" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
+                        Transfer Notes & Reason
+                    </label>
+                    <input type="text" id="notes" name="notes" placeholder="e.g., Stock rebalancing for Teej festival surge demand"
+                           class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
+                </div>
+
+                <div class="pt-2 border-t border-noireText/5 flex justify-end">
+                    <button type="submit" class="w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md">
+                        Submit Transfer Request
+                    </button>
+                </div>
+
+            </form>
+        </div>
+
+        <!-- Right: Policy & Overview Guidelines -->
+        <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-sm flex flex-col justify-between space-y-4 text-xs">
+            <div>
+                <h3 class="text-xl font-serif text-noireText mb-2">Transfer Workflow Policy</h3>
+                <p class="text-noireText/70 text-[11px] leading-relaxed mb-4">
+                    Inter-branch transfers ensure balanced inventory across operating nodes to prevent out-of-stock events during regional festival demand spikes.
+                </p>
+
+                <div class="space-y-3 text-[11px]">
+                    <div class="p-3 bg-velvet/40 rounded-xl border border-noireText/5">
+                        <strong class="block text-noireText font-medium">1. Request Phase</strong>
+                        <span class="text-noireText/60">Transfer created with status <span class="font-mono text-amber-700 font-bold">PENDING</span>. Source branch stock must have sufficient units available.</span>
+                    </div>
+
+                    <div class="p-3 bg-velvet/40 rounded-xl border border-noireText/5">
+                        <strong class="block text-noireText font-medium">2. Receipt Confirmation</strong>
+                        <span class="text-noireText/60">Upon receiving the shipment, destination branch staff or an admin clicks <span class="text-emerald-700 font-bold">Confirm Receipt</span> to atomically update both stock ledgers.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-3 bg-parchment/60 rounded-xl border border-noireText/10 text-center">
+                <span class="text-[10px] uppercase tracking-widest text-noireText/60 font-bold block">Total Recorded Transfers</span>
+                <span class="text-2xl font-mono font-bold text-noireText">{{ transfers|length if transfers else 0 }}</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Transfer Records Audit Table -->
+    <div class="bg-white rounded-2xl border border-noireText/10 shadow-md overflow-hidden">
+        <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex items-center justify-between">
+            <div>
+                <h3 class="text-xl font-serif text-noireText">Transfer Audit Ledger</h3>
+                <p class="text-xs text-noireText/60 font-light">Real-time log of pending and completed stock movements.</p>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto w-full">
+            <table class="w-full text-left text-xs tracking-wide border-collapse min-w-[700px]">
+                <thead>
+                    <tr class="bg-parchment/20 border-b border-noireText/10 text-noireText/70 uppercase text-[10px] tracking-widest">
+                        <th class="py-4 px-6 font-semibold">ID</th>
+                        <th class="py-4 px-6 font-semibold">Date</th>
+                        <th class="py-4 px-6 font-semibold">Route</th>
+                        <th class="py-4 px-6 font-semibold">Product Description</th>
+                        <th class="py-4 px-6 font-semibold text-center">Qty</th>
+                        <th class="py-4 px-6 font-semibold text-center">Status</th>
+                        <th class="py-4 px-6 font-semibold">Initiator / Notes</th>
+                        <th class="py-4 px-6 font-semibold text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-noireText/5 text-noireText">
+                    {% if transfers %}
+                        {% for t in transfers %}
+                        <tr class="hover:bg-velvet/20 transition-colors">
+                            <td class="py-4 px-6 font-mono font-bold text-noireText">#{{ t.transfer_id }}</td>
+                            <td class="py-4 px-6 font-mono text-[11px] text-noireText/70 whitespace-nowrap">{{ t.created_at[:16] if t.created_at else '' }}</td>
+                            <td class="py-4 px-6 whitespace-nowrap font-mono font-semibold">
+                                <span class="px-2 py-0.5 rounded bg-parchment border border-noireText/10">{{ t.from_branch }}</span>
+                                <span class="text-dustyRose mx-1">→</span>
+                                <span class="px-2 py-0.5 rounded bg-deepWine text-velvet">{{ t.to_branch }}</span>
+                            </td>
+                            <td class="py-4 px-6">
+                                <strong class="font-semibold text-noireText">{{ t.brand_name }}</strong> {{ t.product_name }}
+                                <span class="block text-[10px] font-mono text-noireText/50">{{ t.product_id }}</span>
+                            </td>
+                            <td class="py-4 px-6 text-center font-mono font-bold">{{ t.quantity }}</td>
+                            <td class="py-4 px-6 text-center whitespace-nowrap">
+                                {% if t.status == 'PENDING' %}
+                                    <span class="text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-amber-200">
+                                        ⏳ Pending
+                                    </span>
+                                {% elif t.status == 'COMPLETED' %}
+                                    <span class="text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-emerald-200">
+                                        ✓ Completed
+                                    </span>
+                                {% else %}
+                                    <span class="text-rose-800 bg-rose-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-rose-200">
+                                        ✕ Cancelled
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-6 max-w-xs truncate text-[11px]">
+                                <span class="font-semibold text-noireText/80">{{ t.requested_by }}</span>
+                                {% if t.notes %}
+                                <span class="block text-noireText/50 truncate" title="{{ t.notes }}">{{ t.notes }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-6 text-right whitespace-nowrap">
+                                {% if t.status == 'PENDING' %}
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <!-- Approve & Release: Only accessible to Source Branch (from_branch) or Admin -->
+                                        {% if session.get('role') == 'admin' or current_branch == t.from_branch %}
+                                        <form action="{{ url_for('complete_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
+                                            <button type="submit" class="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-semibold transition-all shadow-sm">
+                                                Approve & Release Stock
+                                            </button>
+                                        </form>
+                                        {% elif current_branch == t.to_branch %}
+                                        <span class="text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Awaiting source branch staff or admin approval">
+                                            ⏳ Awaiting Branch {{ t.from_branch }} Approval
+                                        </span>
+                                        {% endif %}
+
+                                        <!-- Cancel action -->
+                                        {% if session.get('role') == 'admin' or current_branch == t.from_branch or current_branch == t.to_branch %}
+                                        <form action="{{ url_for('cancel_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
+                                            <button type="submit" onclick="return confirm('Cancel this transfer request?');" class="px-2 py-1 bg-white hover:bg-rose-50 hover:text-rose-700 text-noireText/60 border border-noireText/15 rounded-lg text-[11px] transition-all">
+                                                Cancel
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-noireText/30 text-[11px] italic font-mono">
+                                        {{ t.completed_at[:10] if t.completed_at else 'Closed' }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="py-10 text-center text-noireText/40 italic text-xs">
+                                No stock transfer records found.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
