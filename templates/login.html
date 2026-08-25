@@ -78,23 +78,7 @@
             </button>
         </form>
 
-        <!-- Quick Demo Credentials Hint Box -->
-        <div class="mt-8 pt-6 border-t border-noireText/10 bg-velvet/40 -mx-8 -mb-8 sm:-mx-10 sm:-mb-10 p-6 rounded-b-3xl text-center text-[11px] text-noireText/70 space-y-2">
-            <span class="block font-bold uppercase tracking-widest text-[10px] text-noireText/50">System Default Operators</span>
-            <div class="flex items-center justify-center gap-2 flex-wrap">
-                <button type="button" onclick="fillCredentials('admin', 'admin123')"
-                        class="px-2.5 py-1 bg-white hover:bg-deepWine hover:text-velvet text-noireText border border-noireText/15 rounded-lg font-mono text-[10px] transition-all shadow-sm">
-                    <strong>Admin:</strong> admin / admin123
-                </button>
-                <button type="button" onclick="fillCredentials('staff', 'staff123')"
-                        class="px-2.5 py-1 bg-white hover:bg-deepWine hover:text-velvet text-noireText border border-noireText/15 rounded-lg font-mono text-[10px] transition-all shadow-sm">
-                    <strong>Staff:</strong> staff / staff123
-                </button>
-            </div>
-        </div>
-
     </div>
-
     <script>
         function fillCredentials(u, p) {
             document.getElementById('username').value = u;
