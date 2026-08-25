@@ -177,7 +177,21 @@ def init_db(db_path=DB_PATH):
         );
         """)
 
-        # 11. Weekly ML training audit.  This table contains metadata only; it
+        # 11. Branch notification inbox.  Transfer notifications are stored
+        # separately from the stock ledger so they never affect stock movement.
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS branch_notifications (
+            notification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recipient_branch TEXT NOT NULL REFERENCES branches(branch_id) ON UPDATE CASCADE,
+            transfer_id INTEGER REFERENCES inventory_transfers(transfer_id) ON DELETE SET NULL,
+            event_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # 12. Weekly ML training audit.  This table contains metadata only; it
         # never changes transactions, inventory, or the historical baseline.
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS model_training_runs (
@@ -218,6 +232,7 @@ def init_db(db_path=DB_PATH):
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_brand_subcat ON products(brand_id, subcategory_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transfers_status ON inventory_transfers(status);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transfers_branches ON inventory_transfers(from_branch, to_branch);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_branch_created ON branch_notifications(recipient_branch, created_at DESC);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_model_training_week ON model_training_runs(week_start, status);")
         
         conn.commit()
@@ -749,6 +764,17 @@ def db_request_transfer(from_branch, to_branch, product_id, quantity, requested_
         INSERT INTO inventory_transfers (from_branch, to_branch, product_id, quantity, requested_by, notes, status, created_at)
         VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?);
         """, (from_branch, to_branch, product_id, qty, requested_by, notes.strip(), now_str))
+        transfer_id = cursor.lastrowid
+        cursor.execute("""
+        INSERT INTO branch_notifications (recipient_branch, transfer_id, event_type, title, message, created_at)
+        VALUES (?, ?, 'REQUESTED', ?, ?, ?);
+        """, (
+            from_branch,
+            transfer_id,
+            'New stock request',
+            f"Branch {to_branch} requested {qty} units of {prod_row['product_name']} from your branch.",
+            now_str,
+        ))
         conn.commit()
         return True, f"Transfer request for {qty} units of '{prod_row['product_name']}' created successfully."
 
@@ -802,6 +828,18 @@ def db_dispatch_transfer(transfer_id, approved_by, db_path=DB_PATH):
         WHERE transfer_id = ?;
         """, (approved_by, now_str, int(transfer_id)))
 
+        prod_row = cursor.execute("SELECT product_name FROM products WHERE product_id = ?;", (p_id,)).fetchone()
+        cursor.execute("""
+        INSERT INTO branch_notifications (recipient_branch, transfer_id, event_type, title, message, created_at)
+        VALUES (?, ?, 'APPROVED', ?, ?, ?);
+        """, (
+            t_row['to_branch'],
+            int(transfer_id),
+            'Transfer approved & dispatched',
+            f"Branch {from_b} approved and dispatched {qty} units of {prod_row['product_name']} to your branch.",
+            now_str,
+        ))
+
         conn.commit()
         return True, (
             f"Transfer #{transfer_id} dispatched: {qty} units debited from Branch {from_b} "
@@ -846,6 +884,18 @@ def db_complete_transfer(transfer_id, db_path=DB_PATH):
         SET status = 'COMPLETED', completed_at = ?
         WHERE transfer_id = ?;
         """, (now_str, int(transfer_id)))
+
+        prod_row = cursor.execute("SELECT product_name FROM products WHERE product_id = ?;", (p_id,)).fetchone()
+        cursor.execute("""
+        INSERT INTO branch_notifications (recipient_branch, transfer_id, event_type, title, message, created_at)
+        VALUES (?, ?, 'RECEIVED', ?, ?, ?);
+        """, (
+            t_row['from_branch'],
+            int(transfer_id),
+            'Stock received & logged',
+            f"Branch {to_b} received and logged {qty} units of {prod_row['product_name']} for transfer #{transfer_id}.",
+            now_str,
+        ))
 
         conn.commit()
         return True, (

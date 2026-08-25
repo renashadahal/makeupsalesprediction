@@ -285,6 +285,17 @@ def dashboard():
         """, (selected_branch, selected_branch)).fetchall()
         low_stock_items = [dict(r) for r in low_stock_rows]
 
+        # Recent transfer updates for the current dashboard scope.  These are
+        # operational messages only and do not modify the inventory ledger.
+        notification_rows = conn.execute("""
+        SELECT notification_id, recipient_branch, transfer_id, event_type, title, message, created_at
+        FROM branch_notifications
+        WHERE recipient_branch = ? OR ? = 'ALL'
+        ORDER BY created_at DESC, notification_id DESC
+        LIMIT 6;
+        """, (selected_branch, selected_branch)).fetchall()
+        notifications = [dict(row) for row in notification_rows]
+
     return render_template(
         'dashboard.html',
         selected_branch=selected_branch,
@@ -296,6 +307,7 @@ def dashboard():
         total_skus=total_skus,
         low_stock_count=low_stock_count,
         low_stock_items=low_stock_items,
+        notifications=notifications,
         inventory_value=inventory_value,
         total_pos_checkouts=total_pos_checkouts,
         total_pos_units_sold=total_pos_units_sold,

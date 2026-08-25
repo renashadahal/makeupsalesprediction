@@ -30,6 +30,46 @@
         </div>
     </div>
 
+    <!-- Transfer notification inbox: scoped to the active branch/dashboard filter. -->
+    <section class="bg-white rounded-2xl border border-noireText/10 shadow-sm overflow-hidden" aria-labelledby="notifications-heading">
+        <div class="px-5 py-4 bg-gradient-to-r from-deepWine to-noireText flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-velvet/15 border border-velvet/20 flex items-center justify-center text-lg" aria-hidden="true">🔔</div>
+                <div>
+                    <h3 id="notifications-heading" class="text-xl font-serif text-velvet">Branch Notifications</h3>
+                    <p class="text-[10px] text-velvet/65 uppercase tracking-widest font-semibold">Transfer activity for {{ selected_branch if selected_branch != 'ALL' else 'all branches' }}</p>
+                </div>
+            </div>
+            <a href="{{ url_for('stock_transfers') }}" class="inline-flex items-center justify-center rounded-lg border border-dustyRose/50 bg-velvet/10 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-dustyRose hover:bg-velvet hover:text-deepWine transition-colors whitespace-nowrap">
+                View Transfer Requests &amp; Updates →
+            </a>
+        </div>
+
+        <div class="divide-y divide-noireText/5 max-h-[300px] overflow-y-auto">
+            {% for notification in notifications %}
+            <div class="p-4 sm:px-5 flex gap-3 hover:bg-velvet/35 transition-colors">
+                <div class="mt-0.5 w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-xs {% if notification.event_type == 'REQUESTED' %}bg-amber-100 text-amber-800{% elif notification.event_type == 'APPROVED' %}bg-sky-100 text-sky-800{% else %}bg-emerald-100 text-emerald-800{% endif %}" aria-hidden="true">
+                    {% if notification.event_type == 'REQUESTED' %}↗{% elif notification.event_type == 'APPROVED' %}✓{% else %}✓✓{% endif %}
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                        <p class="text-sm font-semibold text-noireText">{{ notification.title }}</p>
+                        <time class="text-[10px] text-noireText/45 font-mono whitespace-nowrap">{{ notification.created_at }}</time>
+                    </div>
+                    <p class="mt-0.5 text-xs leading-5 text-noireText/65">{{ notification.message }}</p>
+                    <span class="inline-block mt-2 text-[9px] font-bold uppercase tracking-wider text-noireText/45">Branch {{ notification.recipient_branch }} · Transfer #{{ notification.transfer_id }}</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="px-5 py-8 text-center">
+                <div class="text-2xl mb-2" aria-hidden="true">✦</div>
+                <p class="text-sm font-medium text-noireText/70">No new transfer notifications</p>
+                <p class="mt-1 text-xs text-noireText/45">Requests, dispatch approvals, and receipt confirmations will appear here.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
     <!-- 4-Card KPI Metric Matrix -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         

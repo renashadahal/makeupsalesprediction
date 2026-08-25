@@ -12,6 +12,7 @@ from src.utils import (
     get_catalog_shades, calculate_rolling_lags,
     request_transfer, dispatch_transfer, approve_transfer, complete_transfer, receive_transfer, cancel_transfer, load_transfers
 )
+from src.database import get_db
 
 @pytest.fixture
 def client():
@@ -632,6 +633,23 @@ def test_complete_transfer_3_step_lifecycle_and_atomic_stock_movement():
     all_t = load_transfers(branch="S002")
     updated_t = next(t for t in all_t if t['transfer_id'] == t_id)
     assert updated_t['status'] == 'COMPLETED'
+
+    # Each completed lifecycle step notifies the branch that needs to act next.
+    with get_db() as conn:
+        notices = conn.execute("""
+            SELECT recipient_branch, event_type, message
+            FROM branch_notifications
+            WHERE transfer_id = ?
+            ORDER BY notification_id;
+        """, (t_id,)).fetchall()
+    assert [(n['recipient_branch'], n['event_type']) for n in notices] == [
+        ('S002', 'REQUESTED'),
+        ('S004', 'APPROVED'),
+        ('S002', 'RECEIVED'),
+    ]
+    assert 'requested 15 units' in notices[0]['message']
+    assert 'approved and dispatched 15 units' in notices[1]['message']
+    assert 'received and logged 15 units' in notices[2]['message']
 
 def test_cancel_transfer_workflow_pending_and_intransit():
     unique_prod = f"Mascara_{uuid.uuid4().hex[:4]}"
