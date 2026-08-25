@@ -234,37 +234,45 @@
             </div>
         </div>
 
-        <div class="overflow-x-auto w-full">
-            <table class="w-full text-left text-xs tracking-wide border-collapse min-w-[700px]">
+        <div class="w-full overflow-hidden">
+            <table class="w-full table-fixed text-left text-xs tracking-wide border-collapse">
+                <colgroup>
+                    <col class="w-[6%]">
+                    <col class="w-[12%]">
+                    <col class="w-[11%]">
+                    <col class="w-[19%]">
+                    <col class="w-[5%]">
+                    <col class="w-[12%]">
+                    <col class="w-[16%]">
+                    <col class="w-[19%]">
+                </colgroup>
                 <thead>
                     <tr class="bg-parchment/20 border-b border-noireText/10 text-noireText/70 uppercase text-[10px] tracking-widest">
-                        <th class="py-4 px-6 font-semibold">ID</th>
-                        <th class="py-4 px-6 font-semibold">Date & Time</th>
-                        <th class="py-4 px-6 font-semibold">Route</th>
-                        <th class="py-4 px-6 font-semibold">Product Description</th>
-                        <th class="py-4 px-6 font-semibold text-center">Qty</th>
-                        <th class="py-4 px-6 font-semibold text-center">Status</th>
-                        <th class="py-4 px-6 font-semibold">Initiator / Notes</th>
-                        <th class="py-4 px-6 font-semibold text-right">Actions</th>
+                        <th class="py-3 px-3 font-semibold">ID</th>
+                        <th class="py-3 px-3 font-semibold">Date & Time</th>
+                        <th class="py-3 px-3 font-semibold">Route</th>
+                        <th class="py-3 px-3 font-semibold">Product Description</th>
+                        <th class="py-3 px-3 font-semibold text-center">Qty</th>
+                        <th class="py-3 px-3 font-semibold text-center">Status</th>
+                        <th class="py-3 px-3 font-semibold">Initiator / Notes</th>
+                        <th class="py-3 px-3 font-semibold text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-noireText/5 text-noireText">
                     {% if transfers %}
                         {% for t in transfers %}
                         <tr class="hover:bg-velvet/20 transition-colors">
-                            <td class="py-4 px-6 font-mono font-bold text-noireText">#{{ t.transfer_id }}</td>
-                            <td class="py-4 px-6 font-mono text-[11px] text-noireText/70 whitespace-nowrap" title="{{ t.created_at }}">{{ t.created_at[:16] if t.created_at else '' }}</td>
-                            <td class="py-4 px-6 whitespace-nowrap font-mono font-semibold">
-                                <span class="px-2 py-0.5 rounded bg-parchment border border-noireText/10">{{ t.from_branch }}</span>
-                                <span class="text-dustyRose mx-1">→</span>
-                                <span class="px-2 py-0.5 rounded bg-deepWine text-velvet">{{ t.to_branch }}</span>
+                            <td class="py-3 px-3 font-mono font-bold text-noireText truncate">#{{ t.transfer_id }}</td>
+                            <td class="py-3 px-3 font-mono text-[10px] text-noireText/70 truncate" title="{{ t.created_at }}">{{ t.created_at[:16] if t.created_at else '' }}</td>
+                            <td class="py-3 px-3 font-mono font-semibold truncate" title="{{ t.from_branch }} to {{ t.to_branch }}">
+                                <span class="text-[10px]">{{ t.from_branch }} <span class="text-dustyRose">→</span> {{ t.to_branch }}</span>
                             </td>
-                            <td class="py-4 px-6">
+                            <td class="py-3 px-3 text-[10px] leading-tight text-noireText/75 truncate" title="{{ t.brand_name }} {{ t.product_name }}">
                                 <strong class="font-semibold text-noireText">{{ t.brand_name }}</strong> {{ t.product_name }}
-                                <span class="block text-[10px] font-mono text-noireText/50">{{ t.product_id }}</span>
+                                <span class="block truncate text-[9px] font-mono text-noireText/50">{{ t.product_id }}</span>
                             </td>
-                            <td class="py-4 px-6 text-center font-mono font-bold">{{ t.quantity }}</td>
-                            <td class="py-4 px-6 text-center whitespace-nowrap">
+                            <td class="py-3 px-3 text-center font-mono font-bold">{{ t.quantity }}</td>
+                            <td class="py-3 px-3 text-center truncate">
                                 {% if t.status == 'PENDING' %}
                                     <span class="text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-amber-200">
                                         ⏳ Pending Approval
@@ -283,8 +291,8 @@
                                     </span>
                                 {% endif %}
                             </td>
-                            <td class="py-4 px-6 max-w-xs truncate text-[11px]">
-                                <span class="font-semibold text-noireText/80">{{ t.requested_by }}</span>
+                            <td class="py-3 px-3 truncate text-[10px]">
+                                <span class="block truncate font-semibold text-noireText/80" title="{{ t.requested_by }}">{{ t.requested_by }}</span>
                                 {% if t.approved_by %}
                                 <span class="block text-[10px] text-blue-700 font-mono">Dispatched by: {{ t.approved_by }}</span>
                                 {% endif %}
@@ -292,14 +300,14 @@
                                 <span class="block text-noireText/50 truncate" title="{{ t.notes }}">{{ t.notes }}</span>
                                 {% endif %}
                             </td>
-                            <td class="py-4 px-6 text-right whitespace-nowrap">
+                            <td class="py-3 px-3 text-right">
                                 {% if t.status == 'PENDING' %}
-                                    <div class="inline-flex items-center gap-1.5">
+                                    <div class="inline-flex max-w-full items-center justify-end gap-1">
                                         <!-- Step 2: Approve & Dispatch (Source Branch or Admin) -->
                                         {% if session.get('role') == 'admin' or current_branch == t.from_branch %}
                                         <form action="{{ url_for('dispatch_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
-                                            <button type="submit" class="px-2.5 py-1 bg-deepWine hover:bg-noireText text-white rounded-lg text-[11px] font-semibold transition-all shadow-sm">
-                                                Approve & Dispatch Stock
+                                            <button type="submit" class="px-2 py-1 bg-deepWine hover:bg-noireText text-white rounded-lg text-[10px] leading-tight font-semibold transition-all shadow-sm">
+                                                Approve &amp; Dispatch
                                             </button>
                                         </form>
                                         {% else %}
@@ -311,19 +319,19 @@
                                         <!-- Cancel action for PENDING -->
                                         {% if session.get('role') == 'admin' or current_branch == t.from_branch or current_branch == t.to_branch %}
                                         <form action="{{ url_for('cancel_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
-                                            <button type="submit" onclick="return confirm('Cancel this transfer request?');" class="px-2 py-1 bg-white hover:bg-rose-50 hover:text-rose-700 text-noireText/60 border border-noireText/15 rounded-lg text-[11px] transition-all">
-                                                Cancel
+                                            <button type="submit" onclick="return confirm('Cancel this transfer request?');" class="inline-flex h-7 w-7 items-center justify-center bg-white hover:bg-rose-50 hover:text-rose-700 text-noireText/60 border border-noireText/15 rounded-lg transition-all" title="Cancel transfer" aria-label="Cancel transfer">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 6 12 12M18 6 6 18"/></svg>
                                             </button>
                                         </form>
                                         {% endif %}
                                     </div>
                                 {% elif t.status == 'IN_TRANSIT' %}
-                                    <div class="inline-flex items-center gap-1.5">
+                                    <div class="inline-flex max-w-full items-center justify-end gap-1">
                                         <!-- Step 3: Confirm Receipt (Destination Branch or Admin) -->
                                         {% if session.get('role') == 'admin' or current_branch == t.to_branch %}
                                         <form action="{{ url_for('complete_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
-                                            <button type="submit" class="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-semibold transition-all shadow-sm">
-                                                Confirm Receipt & Restock
+                                            <button type="submit" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] leading-tight font-semibold transition-all shadow-sm">
+                                                Confirm &amp; Restock
                                             </button>
                                         </form>
                                         {% else %}
@@ -335,8 +343,8 @@
                                         <!-- Cancel action for IN_TRANSIT (Reverses debit) -->
                                         {% if session.get('role') == 'admin' or current_branch == t.from_branch %}
                                         <form action="{{ url_for('cancel_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
-                                            <button type="submit" onclick="return confirm('Cancel this in-transit shipment? Debited units will be restored to source branch.');" class="px-2 py-1 bg-white hover:bg-rose-50 hover:text-rose-700 text-noireText/60 border border-noireText/15 rounded-lg text-[11px] transition-all" title="Recall/cancel shipment and return stock to source">
-                                                Recall
+                                            <button type="submit" onclick="return confirm('Cancel this in-transit shipment? Debited units will be restored to source branch.');" class="inline-flex h-7 w-7 items-center justify-center bg-white hover:bg-rose-50 hover:text-rose-700 text-noireText/60 border border-noireText/15 rounded-lg transition-all" title="Recall/cancel shipment and return stock to source" aria-label="Recall and cancel shipment">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 6 12 12M18 6 6 18"/></svg>
                                             </button>
                                         </form>
                                         {% endif %}
