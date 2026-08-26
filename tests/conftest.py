@@ -1,6 +1,7 @@
 import os
 import shutil
 import pytest
+from src.database import init_db
 
 TEST_DB = os.path.join('data', 'test_isolated_suite.db')
 PROD_DB = os.path.join('data', 'noire_retail.db')
@@ -12,6 +13,8 @@ def setup_test_environment():
     if os.path.exists(PROD_DB):
         shutil.copyfile(PROD_DB, TEST_DB)
     
+    init_db(TEST_DB)
+    
     yield
 
     if os.path.exists(TEST_DB):
@@ -19,3 +22,4 @@ def setup_test_environment():
             os.remove(TEST_DB)
         except Exception:
             pass
+

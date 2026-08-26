@@ -14,6 +14,8 @@ from src.database import (
     db_request_transfer, db_dispatch_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
     db_claim_sunday_training_run, db_finish_sunday_training_run, db_get_sunday_training_status,
     db_get_latest_successful_training,
+    db_load_discounts, db_get_discount_by_id, db_get_discount_by_code, db_validate_discount_code,
+    db_create_discount, db_update_discount, db_delete_discount, db_toggle_discount_status,
     DB_PATH
 )
 from src.utils import get_catalog_shades
@@ -718,6 +720,180 @@ def update_catalog():
         existing_subcategories=existing_subcategories,
         next_product_id=next_product_id
     )
+
+# --- DISCOUNT CODES & PROMOTIONS MANAGEMENT (ADMIN ONLY) ---
+
+@app.route('/admin/discounts', methods=['GET', 'POST'])
+@app.route('/discounts', methods=['GET', 'POST'])
+@admin_required
+def manage_discounts():
+    if request.method == 'POST':
+        action = request.form.get('action', 'create').strip()
+
+        if action == 'create':
+            code = request.form.get('code', '').strip()
+            percent = request.form.get('discount_percent', '').strip()
+            valid_from = request.form.get('valid_from', '').strip()
+            valid_to = request.form.get('valid_to', '').strip()
+            is_active = 1 if request.form.get('is_active') in ('1', 'on', 'true', True) else 0
+            description = request.form.get('description', '').strip()
+
+            success, msg, _ = db_create_discount(
+                code=code,
+                discount_percent=percent,
+                valid_from=valid_from,
+                valid_to=valid_to,
+                is_active=is_active,
+                description=description
+            )
+            flash(msg)
+            return redirect(url_for('manage_discounts'))
+
+        elif action == 'edit':
+            discount_id = request.form.get('discount_id', '').strip()
+            code = request.form.get('code', '').strip()
+            percent = request.form.get('discount_percent', '').strip()
+            valid_from = request.form.get('valid_from', '').strip()
+            valid_to = request.form.get('valid_to', '').strip()
+            is_active = 1 if request.form.get('is_active') in ('1', 'on', 'true', True) else 0
+            description = request.form.get('description', '').strip()
+
+            success, msg = db_update_discount(
+                discount_id=discount_id,
+                code=code,
+                discount_percent=percent,
+                valid_from=valid_from,
+                valid_to=valid_to,
+                is_active=is_active,
+                description=description
+            )
+            flash(msg)
+            return redirect(url_for('manage_discounts'))
+
+        elif action == 'delete':
+            discount_id = request.form.get('discount_id', '').strip()
+            success, msg = db_delete_discount(discount_id)
+            flash(msg)
+            return redirect(url_for('manage_discounts'))
+
+        elif action == 'toggle':
+            discount_id = request.form.get('discount_id', '').strip()
+            success, msg = db_toggle_discount_status(discount_id)
+            flash(msg)
+            return redirect(url_for('manage_discounts'))
+
+    discounts = db_load_discounts()
+    total_count = len(discounts)
+    active_count = sum(1 for d in discounts if d.get('status_code') == 'ACTIVE')
+    upcoming_count = sum(1 for d in discounts if d.get('status_code') == 'UPCOMING')
+    expired_count = sum(1 for d in discounts if d.get('status_code') == 'EXPIRED')
+    disabled_count = sum(1 for d in discounts if d.get('status_code') == 'DISABLED')
+
+    return render_template(
+        'manage_discounts.html',
+        discounts=discounts,
+        total_count=total_count,
+        active_count=active_count,
+        upcoming_count=upcoming_count,
+        expired_count=expired_count,
+        disabled_count=disabled_count
+    )
+
+
+@app.route('/admin/discounts/edit', methods=['POST'])
+@admin_required
+def edit_discount_direct():
+    discount_id = request.form.get('discount_id', '').strip()
+    code = request.form.get('code', '').strip()
+    percent = request.form.get('discount_percent', '').strip()
+    valid_from = request.form.get('valid_from', '').strip()
+    valid_to = request.form.get('valid_to', '').strip()
+    is_active = 1 if request.form.get('is_active') in ('1', 'on', 'true', True) else 0
+    description = request.form.get('description', '').strip()
+
+    success, msg = db_update_discount(
+        discount_id=discount_id,
+        code=code,
+        discount_percent=percent,
+        valid_from=valid_from,
+        valid_to=valid_to,
+        is_active=is_active,
+        description=description
+    )
+    flash(msg)
+    return redirect(url_for('manage_discounts'))
+
+
+@app.route('/admin/discounts/delete/<int:discount_id>', methods=['POST'])
+@admin_required
+def delete_discount_direct(discount_id):
+    success, msg = db_delete_discount(discount_id)
+    flash(msg)
+    return redirect(url_for('manage_discounts'))
+
+
+@app.route('/admin/discounts/toggle/<int:discount_id>', methods=['POST'])
+@admin_required
+def toggle_discount_direct(discount_id):
+    success, msg = db_toggle_discount_status(discount_id)
+    flash(msg)
+    return redirect(url_for('manage_discounts'))
+
+
+# --- REALTIME PROMO VALIDATION API ---
+
+@app.route('/api/discounts/validate', methods=['GET', 'POST'])
+@app.route('/api/validate_promo', methods=['GET', 'POST'])
+@login_required
+def api_validate_promo():
+    """Real-time discount validation endpoint for POS checkout and preview."""
+    if request.method == 'POST':
+        payload = request.get_json(silent=True) or {}
+        code = payload.get('code') or request.form.get('code', '')
+    else:
+        code = request.args.get('code', '')
+
+    code = (code or '').strip()
+    if not code:
+        return jsonify({'valid': False, 'message': 'Promo code cannot be empty.'}), 400
+
+    is_valid, disc, msg = db_validate_discount_code(code)
+    if not is_valid:
+        return jsonify({
+            'valid': False,
+            'code': code.upper(),
+            'message': msg
+        }), 200
+
+    return jsonify({
+        'valid': True,
+        'code': disc['code'],
+        'discount_percent': disc['discount_percent'],
+        'discount_rate': disc['discount_rate'],
+        'valid_from': disc['valid_from_display'],
+        'valid_to': disc['valid_to_display'],
+        'status': disc['status_code'],
+        'description': disc.get('description', ''),
+        'message': msg
+    }), 200
+
+
+@app.route('/api/discounts/active')
+@login_required
+def api_active_discounts():
+    """Returns currently valid discount promotional codes for POS assistance."""
+    all_discounts = db_load_discounts()
+    active = [
+        {
+            'code': d['code'],
+            'discount_percent': d['discount_percent'],
+            'description': d.get('description', ''),
+            'valid_to': d['valid_to_display']
+        }
+        for d in all_discounts if d.get('status_code') == 'ACTIVE'
+    ]
+    return jsonify(active)
+
 
 # --- INTER-BRANCH STOCK TRANSFERS ---
 

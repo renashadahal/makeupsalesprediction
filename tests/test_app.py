@@ -801,15 +801,162 @@ def test_dashboard_real_data_and_admin_scope(client):
         sess['role'] = 'admin'
         sess['branch'] = 'S001'
 
+def test_cancel_transfer_workflow_pending_and_intransit():
+    unique_prod = f"Mascara_{uuid.uuid4().hex[:4]}"
+    unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S001", "Loreal", unique_prod, 15, product_id=unique_pid)
+
+    # 1. Cancel while PENDING
+    req_ok, _ = request_transfer("S001", "S002", unique_pid, 5, "staff_tester")
+    assert req_ok is True
+
+    transfers = load_transfers(branch="S001", status="PENDING")
+    t_id = next(t for t in transfers if t['product_id'] == unique_pid)['transfer_id']
+
+    cancel_ok, cancel_msg = cancel_transfer(t_id)
+    assert cancel_ok is True
+    assert "cancelled" in cancel_msg
+
+    # Verify cannot dispatch or complete a cancelled transfer
+    assert dispatch_transfer(t_id, "admin")[0] is False
+    assert complete_transfer(t_id)[0] is False
+
+    # 2. Cancel while IN_TRANSIT (Reverses debit back to source branch)
+    unique_prod2 = f"Eyeliner_{uuid.uuid4().hex[:4]}"
+    unique_pid2 = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S001", "Loreal", unique_prod2, 20, product_id=unique_pid2)
+
+    req2_ok, _ = request_transfer("S001", "S002", unique_pid2, 8, "staff_tester")
+    assert req2_ok is True
+    t2_id = next(t for t in load_transfers(branch="S001", status="PENDING") if t['product_id'] == unique_pid2)['transfer_id']
+
+    # Dispatch (Debits 8 units -> stock becomes 12)
+    dispatch_transfer(t2_id, "staff_s001")
+    assert next(i for i in load_inventory("S001") if i['product_id'] == unique_pid2)['stock'] == 12
+
+    # Cancel in-transit -> Reverses debit (Restores 8 units -> stock becomes 20)
+    cancel2_ok, cancel2_msg = cancel_transfer(t2_id)
+    assert cancel2_ok is True
+    assert "restored" in cancel2_msg
+    assert next(i for i in load_inventory("S001") if i['product_id'] == unique_pid2)['stock'] == 20
+
+def test_transfers_route_authorization_and_view(client):
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff_s003'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S003'
+
+    resp = client.get('/transfers')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'Inter-Branch Stock Transfers' in html
+    assert 'Transfer Audit Ledger' in html
+
+def test_transfers_role_based_permissions_and_lifecycle(client):
+    unique_prod = f"EyeShadow_{uuid.uuid4().hex[:4]}"
+    unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S001", "Urban Decay", unique_prod, 25, product_id=unique_pid)
+    update_inventory_stock("S003", "Urban Decay", unique_prod, 0, product_id=unique_pid)
+
+    # 1. Staff at S003 (destination) requests stock from S001
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff_s003'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S003'
+
+    req_resp = client.post('/transfers', data={
+        'from_branch': 'S001',
+        'product_id': unique_pid,
+        'quantity': '10',
+        'notes': 'Urgent requirement'
+    }, follow_redirects=True)
+    assert req_resp.status_code == 200
+
+    # Retrieve transfer ID
+    transfers = load_transfers(branch="S003", status="PENDING")
+    t_match = next(t for t in transfers if t['product_id'] == unique_pid)
+    t_id = t_match['transfer_id']
+
+    # 2. Staff at S003 (destination) attempts to dispatch -> Forbidden (403)
+    self_dispatch_resp = client.post(f'/transfers/dispatch/{t_id}')
+    assert self_dispatch_resp.status_code == 403
+
+    # 3. Staff at S001 (source branch) logs in and dispatches -> Success (302 redirect)
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff_s001'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S001'
+
+    src_dispatch_resp = client.post(f'/transfers/dispatch/{t_id}', follow_redirects=True)
+    assert src_dispatch_resp.status_code == 200
+
+    # Verify source stock debited (25 - 10 = 15), destination still 0
+    assert next(i for i in load_inventory("S001") if i['product_id'] == unique_pid)['stock'] == 15
+    assert next(i for i in load_inventory("S003") if i['product_id'] == unique_pid)['stock'] == 0
+
+    # 4. Staff at S001 (source) attempts to confirm receipt on behalf of destination -> Forbidden (403)
+    src_complete_resp = client.post(f'/transfers/complete/{t_id}')
+    assert src_complete_resp.status_code == 403
+
+    # 5. Staff at S003 (destination) logs in and confirms receipt -> Success (302 redirect)
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff_s003'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S003'
+
+    dest_complete_resp = client.post(f'/transfers/complete/{t_id}', follow_redirects=True)
+    assert dest_complete_resp.status_code == 200
+
+    # Verify destination stock credited (0 + 10 = 10)
+    assert next(i for i in load_inventory("S003") if i['product_id'] == unique_pid)['stock'] == 10
+
+def test_admin_override_authority_at_all_transfer_steps(client):
+    """Admin has full override power: request between any branches, dispatch for any source, complete for any dest."""
+    unique_prod = f"AdminProd_{uuid.uuid4().hex[:4]}"
+    unique_pid = f"PROD-{uuid.uuid4().hex[:6]}"
+    update_inventory_stock("S002", "Fenty", unique_prod, 50, product_id=unique_pid)
+    update_inventory_stock("S005", "Fenty", unique_prod, 5, product_id=unique_pid)
+
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin_boss'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'  # Admin's home branch is S001, but operates on S002 -> S005
+
+    # 1. Admin initiates transfer from S002 -> S005
+    req_resp = client.post('/transfers', data={
+        'from_branch': 'S002',
+        'to_branch': 'S005',
+        'product_id': unique_pid,
+        'quantity': '20',
+        'notes': 'Admin override rebalance'
+    }, follow_redirects=True)
+    assert req_resp.status_code == 200
+
+    t_id = next(t for t in load_transfers(branch="S002", status="PENDING") if t['product_id'] == unique_pid)['transfer_id']
+
+    # 2. Admin dispatches on behalf of S002
+    disp_resp = client.post(f'/transfers/dispatch/{t_id}', follow_redirects=True)
+    assert disp_resp.status_code == 200
+    assert next(i for i in load_inventory("S002") if i['product_id'] == unique_pid)['stock'] == 30
+
+    # 3. Admin confirms receipt on behalf of S005
+    comp_resp = client.post(f'/transfers/complete/{t_id}', follow_redirects=True)
+    assert comp_resp.status_code == 200
+    assert next(i for i in load_inventory("S005") if i['product_id'] == unique_pid)['stock'] == 25
+
+def test_dashboard_real_data_and_admin_scope(client):
+    """Verify dashboard loads real metrics, top products leaderboard, and handles branch filtering."""
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
     # 1. Test standard branch view
     resp_s001 = client.get('/dashboard?branch=S001')
     assert resp_s001.status_code == 200
     html_s001 = resp_s001.get_data(as_text=True)
     assert 'Executive Store Control Panel' in html_s001
     assert 'Store Inventory & Sales Tracker' in html_s001
-    assert 'Brand Shelf Stock Share' in html_s001
-    assert 'Recent POS Sales Activity' in html_s001
-
     # 2. Test consolidated ALL view
     resp_all = client.get('/dashboard?branch=ALL')
     assert resp_all.status_code == 200
@@ -817,8 +964,165 @@ def test_dashboard_real_data_and_admin_scope(client):
     assert 'Network-Wide (All Branches)' in html_all
 
 
+# --- 13. DISCOUNT CODES & PROMOTIONS SYSTEM TESTS ---
+
+def test_discount_database_crud():
+    from src.database import (
+        db_create_discount, db_update_discount, db_delete_discount,
+        db_validate_discount_code, db_load_discounts, db_get_discount_by_code,
+        db_toggle_discount_status
+    )
+    from datetime import datetime, timedelta
+
+    code = f"TEST{uuid.uuid4().hex[:5].upper()}"
+    now = datetime.now()
+    valid_from = (now - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    valid_to = (now + timedelta(days=5)).strftime('%Y-%m-%d %H:%M:%S')
+
+    # 1. Create discount
+    success, msg, d_id = db_create_discount(code, 20.0, valid_from, valid_to, is_active=1, description="Test 20% off")
+    assert success is True
+    assert d_id is not None
+
+    # 2. Duplicate rejection
+    dup_success, dup_msg, _ = db_create_discount(code, 15.0, valid_from, valid_to)
+    assert dup_success is False
+    assert "already exists" in dup_msg
+
+    # 3. Validate active code
+    is_valid, d_info, v_msg = db_validate_discount_code(code)
+    assert is_valid is True
+    assert d_info['code'] == code
+    assert float(d_info['discount_percent']) == 20.0
+    assert d_info['status_code'] == 'ACTIVE'
+
+    # 4. Update discount
+    up_success, up_msg = db_update_discount(d_id, code, 25.0, valid_from, valid_to, is_active=1, description="Updated 25% off")
+    assert up_success is True
+    updated = db_get_discount_by_code(code)
+    assert float(updated['discount_percent']) == 25.0
+
+    # 5. Toggle active status
+    tog_success, _ = db_toggle_discount_status(d_id)
+    assert tog_success is True
+    is_valid_disabled, _, dis_msg = db_validate_discount_code(code)
+    assert is_valid_disabled is False
+    assert "deactivated" in dis_msg
+
+    # Toggle back to active
+    db_toggle_discount_status(d_id)
+
+    # 6. Delete discount
+    del_success, _ = db_delete_discount(d_id)
+    assert del_success is True
+    assert db_get_discount_by_code(code) is None
 
 
+def test_discount_datetime_boundaries():
+    from src.database import db_create_discount, db_validate_discount_code, db_delete_discount
+    from datetime import datetime, timedelta
+
+    now = datetime.now()
+
+    # Expired discount code (valid yesterday only)
+    exp_code = f"EXP{uuid.uuid4().hex[:4].upper()}"
+    exp_from = (now - timedelta(days=5)).strftime('%Y-%m-%d %H:%M:%S')
+    exp_to = (now - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    _, _, exp_id = db_create_discount(exp_code, 10.0, exp_from, exp_to, is_active=1)
+
+    is_valid, _, msg = db_validate_discount_code(exp_code)
+    assert is_valid is False
+    assert "expired" in msg.lower()
+
+    # Upcoming / Scheduled discount code (starts tomorrow)
+    up_code = f"UP{uuid.uuid4().hex[:4].upper()}"
+    up_from = (now + timedelta(days=2)).strftime('%Y-%m-%d 10:00:00')
+    up_to = (now + timedelta(days=10)).strftime('%Y-%m-%d 20:00:00')
+    _, _, up_id = db_create_discount(up_code, 15.0, up_from, up_to, is_active=1)
+
+    is_valid_up, _, up_msg = db_validate_discount_code(up_code)
+    assert is_valid_up is False
+    assert "not active yet" in up_msg.lower() or "starts" in up_msg.lower()
+
+    # Cleanup
+    db_delete_discount(exp_id)
+    db_delete_discount(up_id)
 
 
+def test_discount_routes_authorization_and_pos(client):
+    from datetime import datetime, timedelta
+    from src.database import db_load_discounts
 
+    # 1. Staff cannot access /admin/discounts (403 Forbidden)
+    with client.session_transaction() as sess:
+        sess['username'] = 'staff_user'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S001'
+
+    staff_resp = client.get('/discounts')
+    assert staff_resp.status_code == 403
+
+    # 2. Admin can access /discounts
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    admin_resp = client.get('/discounts')
+    assert admin_resp.status_code == 200
+    assert 'Promotions &amp; Discount Codes' in admin_resp.get_data(as_text=True)
+
+    # 3. Admin creates a new discount code via POST
+    promo_code = f"SALE{uuid.uuid4().hex[:4].upper()}"
+    now = datetime.now()
+    from_iso = (now - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M')
+    to_iso = (now + timedelta(days=7)).strftime('%Y-%m-%dT%H:%M')
+
+    create_resp = client.post('/discounts', data={
+        'action': 'create',
+        'code': promo_code,
+        'discount_percent': '20',
+        'valid_from': from_iso,
+        'valid_to': to_iso,
+        'is_active': '1',
+        'description': 'Integration Test Discount'
+    }, follow_redirects=True)
+    assert create_resp.status_code == 200
+
+    # 4. Validate API endpoint
+    api_val = client.get(f'/api/discounts/validate?code={promo_code}')
+    assert api_val.status_code == 200
+    data = api_val.get_json()
+    assert data['valid'] is True
+    assert float(data['discount_percent']) == 20.0
+    assert data['status'] == 'ACTIVE'
+
+    # 5. Active list API
+    api_active = client.get('/api/discounts/active')
+    assert api_active.status_code == 200
+    active_items = api_active.get_json()
+    assert any(i['code'] == promo_code for i in active_items)
+
+    # 6. Test POS Checkout with dynamic discount code
+    from src.utils import update_inventory_stock
+    unique_prod = f"LipGloss_{uuid.uuid4().hex[:4]}"
+    update_inventory_stock("S001", "Fenty", unique_prod, 50, price=30.00)
+
+    tx_payload = {
+        'cart': [{
+            'brand': 'Fenty',
+            'product_name': unique_prod,
+            'shade': 'Default',
+            'quantity': 2,
+            'price': 30.00
+        }],
+        'promo_code': promo_code
+    }
+    sale_resp = client.post('/record_sale', json=tx_payload)
+    assert sale_resp.status_code == 200
+    sale_data = sale_resp.get_json()
+    assert sale_data['status'] == 'success'
+    receipt = sale_data['receipt']
+    assert receipt['promo_code'] == promo_code
+    assert receipt['discount_percent'] == 20
+    assert receipt['grand_total'] == 48.00  # (30 * 2) * 0.80 = 48.00

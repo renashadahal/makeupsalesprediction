@@ -1,0 +1,440 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="space-y-8 max-w-7xl mx-auto pb-12 px-4">
+    
+    <!-- Top Header -->
+    <div class="border-b border-noireText/10 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h2 class="text-3xl sm:text-4xl text-noireText font-serif">Promotions &amp; Discount Codes</h2>
+            <p class="text-xs text-noireText/60 font-light mt-1">Configure time-bounded promotional discounts, seasonal sales, and register checkout coupons.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{{ url_for('record_sale') }}" class="px-3.5 py-2 bg-white text-noireText border border-noireText/15 hover:bg-velvet/50 text-center font-medium rounded-xl text-xs uppercase tracking-wider transition-all shadow-sm">
+                Open POS Terminal →
+            </a>
+        </div>
+    </div>
+
+    <!-- 4-Card KPI Summary Metrics -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-parchment p-4 rounded-2xl border border-noireText/5 shadow-sm">
+            <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Total Campaigns</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-2xl sm:text-3xl font-mono font-bold text-noireText">{{ total_count }}</span>
+                <span class="text-xs text-noireText/50 font-medium">registered</span>
+            </div>
+        </div>
+
+        <div class="bg-parchment p-4 rounded-2xl border border-emerald-900/10 shadow-sm">
+            <div class="flex items-center justify-between">
+                <span class="block text-[10px] font-bold tracking-widest uppercase text-emerald-800">Active Now</span>
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            </div>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-2xl sm:text-3xl font-mono font-bold text-emerald-800">{{ active_count }}</span>
+                <span class="text-xs text-emerald-700/60 font-medium">valid codes</span>
+            </div>
+        </div>
+
+        <div class="bg-parchment p-4 rounded-2xl border border-amber-900/10 shadow-sm">
+            <span class="block text-[10px] font-bold tracking-widest uppercase text-amber-800">Scheduled</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-2xl sm:text-3xl font-mono font-bold text-amber-800">{{ upcoming_count }}</span>
+                <span class="text-xs text-amber-700/60 font-medium">upcoming</span>
+            </div>
+        </div>
+
+        <div class="bg-parchment p-4 rounded-2xl border border-noireText/5 shadow-sm">
+            <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Expired / Inactive</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-2xl sm:text-3xl font-mono font-bold text-noireText/60">{{ expired_count + disabled_count }}</span>
+                <span class="text-xs text-noireText/40 font-medium">concluded</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Workspace Grid: Create Form on Left, Catalog Table on Right -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left Panel: Create Discount Form -->
+        <div class="lg:col-span-4 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md h-fit space-y-5">
+            <div>
+                <h3 class="text-2xl text-noireText font-serif">Create Discount Code</h3>
+                <p class="text-xs text-noireText/60 font-light mt-0.5">Specify day &amp; time boundaries for promotional applicability.</p>
+            </div>
+
+            <form action="{{ url_for('manage_discounts') }}" method="POST" class="space-y-4 text-xs tracking-wide" id="createDiscountForm">
+                <input type="hidden" name="action" value="create">
+
+                <!-- Promo Code -->
+                <div>
+                    <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">
+                        Promo Code <span class="text-rose-600">*</span>
+                    </label>
+                    <input type="text" name="code" required placeholder="e.g. SUMMER20, FESTIVE10" 
+                           class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono font-bold uppercase placeholder-noireText/30 focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <p class="text-[10px] text-noireText/40 mt-1 font-mono">Alphanumeric, uppercase coupon code.</p>
+                </div>
+
+                <!-- Discount Percentage -->
+                <div>
+                    <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">
+                        Discount Rate (%) <span class="text-rose-600">*</span>
+                    </label>
+                    <div class="relative">
+                        <input type="number" name="discount_percent" min="0.1" max="100" step="0.5" required placeholder="e.g. 15"
+                               class="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono font-bold focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                        <span class="absolute right-4 top-2.5 text-noireText/50 font-bold">%</span>
+                    </div>
+                </div>
+
+                <!-- Valid From (Date & Time Limit) -->
+                <div>
+                    <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">
+                        Valid From (Start Date &amp; Time) <span class="text-rose-600">*</span>
+                    </label>
+                    <input type="datetime-local" name="valid_from" id="create_valid_from" required
+                           class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <p class="text-[10px] text-noireText/40 mt-1">Specify day and time start (e.g. Aug 25, 2026 00:00).</p>
+                </div>
+
+                <!-- Valid To (Date & Time Limit) -->
+                <div>
+                    <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">
+                        Valid To (End Date &amp; Time) <span class="text-rose-600">*</span>
+                    </label>
+                    <input type="datetime-local" name="valid_to" id="create_valid_to" required
+                           class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <p class="text-[10px] text-noireText/40 mt-1">Specify day and time cutoff (e.g. Sep 04, 2026 23:59).</p>
+                </div>
+
+                <!-- Quick Date Presets Helper -->
+                <div class="pt-1">
+                    <span class="text-[10px] text-noireText/60 font-semibold uppercase tracking-wider block mb-1.5">Quick Validity Presets:</span>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button type="button" onclick="setQuickPreset(7)" class="px-2 py-1 bg-white hover:bg-velvet border border-noireText/10 rounded-lg text-[10px] font-mono transition-colors">+7 Days</button>
+                        <button type="button" onclick="setQuickPreset(14)" class="px-2 py-1 bg-white hover:bg-velvet border border-noireText/10 rounded-lg text-[10px] font-mono transition-colors">+14 Days</button>
+                        <button type="button" onclick="setQuickPreset(30)" class="px-2 py-1 bg-white hover:bg-velvet border border-noireText/10 rounded-lg text-[10px] font-mono transition-colors">+30 Days</button>
+                        <button type="button" onclick="setQuickPreset(90)" class="px-2 py-1 bg-white hover:bg-velvet border border-noireText/10 rounded-lg text-[10px] font-mono transition-colors">+3 Months</button>
+                    </div>
+                </div>
+
+                <!-- Description / Campaign Notes -->
+                <div>
+                    <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Description / Note</label>
+                    <textarea name="description" rows="2" placeholder="e.g. Festive Holiday 15% discount for retail customers"
+                              class="w-full px-4 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all"></textarea>
+                </div>
+
+                <!-- Active Status Toggle -->
+                <div class="flex items-center gap-3 pt-1">
+                    <input type="checkbox" name="is_active" id="create_is_active" checked value="1"
+                           class="w-4 h-4 rounded text-deepWine focus:ring-dustyRose border-noireText/20 cursor-pointer">
+                    <label for="create_is_active" class="font-medium text-noireText select-none cursor-pointer">
+                        Enable discount code immediately
+                    </label>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="w-full bg-deepWine hover:bg-noireText text-velvet py-3 rounded-xl font-medium uppercase tracking-widest transition-colors shadow-md mt-2 flex items-center justify-center gap-2">
+                    <span>Commit Discount Code</span>
+                    <span>→</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Right Panel: Live Discounts Table -->
+        <div class="lg:col-span-8 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md overflow-hidden flex flex-col">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                    <h3 class="text-2xl text-noireText font-serif">Promotional Codes Catalog</h3>
+                    <p class="text-xs text-noireText/60 font-light">All active, scheduled, and past promotional discount limits.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-mono font-bold bg-white/80 border border-noireText/10 px-3 py-1 rounded-lg text-noireText">
+                        {{ discounts|length }} Registered
+                    </span>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="overflow-x-auto -mx-6 px-6">
+                <table class="w-full text-left text-xs tracking-wide">
+                    <thead>
+                        <tr class="border-b border-noireText/10 text-noireText/60 uppercase text-[10px] tracking-widest">
+                            <th class="pb-3 px-3 font-semibold">Code &amp; Rate</th>
+                            <th class="pb-3 px-3 font-semibold">Validity Window (Date &amp; Time)</th>
+                            <th class="pb-3 px-3 font-semibold">Status</th>
+                            <th class="pb-3 px-3 font-semibold">Description</th>
+                            <th class="pb-3 px-3 font-semibold text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-noireText/5 text-noireText">
+                        {% if discounts %}
+                            {% for d in discounts %}
+                            <tr class="hover:bg-velvet/40 transition-colors">
+                                <!-- Code & Rate -->
+                                <td class="py-3 px-3 whitespace-nowrap">
+                                    <div class="flex flex-col">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="font-mono font-bold text-sm text-deepWine tracking-wide">{{ d.code }}</span>
+                                        </div>
+                                        <span class="font-mono text-emerald-700 font-semibold text-xs">{{ d.discount_percent|round|int if d.discount_percent == d.discount_percent|round else d.discount_percent }}% OFF</span>
+                                    </div>
+                                </td>
+
+                                <!-- Validity Window -->
+                                <td class="py-3 px-3 whitespace-nowrap">
+                                    <div class="flex flex-col font-mono text-[11px] leading-tight">
+                                        <div class="flex items-center gap-1 text-noireText/80">
+                                            <span class="text-noireText/40 uppercase text-[9px] w-8">From:</span>
+                                            <span>{{ d.valid_from_display }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-1 text-noireText/80 mt-1">
+                                            <span class="text-noireText/40 uppercase text-[9px] w-8">To:</span>
+                                            <span>{{ d.valid_to_display }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- Status Badge -->
+                                <td class="py-3 px-3 whitespace-nowrap">
+                                    {% if d.status_code == 'ACTIVE' %}
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                            ACTIVE
+                                        </span>
+                                    {% elif d.status_code == 'UPCOMING' %}
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                            SCHEDULED
+                                        </span>
+                                    {% elif d.status_code == 'EXPIRED' %}
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-rose-100 text-rose-800 border border-rose-200">
+                                            EXPIRED
+                                        </span>
+                                    {% else %}
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-zinc-200 text-zinc-700 border border-zinc-300">
+                                            DISABLED
+                                        </span>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Description -->
+                                <td class="py-3 px-3 max-w-[180px] truncate text-[11px] text-noireText/70" title="{{ d.description or 'No notes provided' }}">
+                                    {{ d.description or '—' }}
+                                </td>
+
+                                <!-- Actions -->
+                                <td class="py-3 px-3 text-right whitespace-nowrap">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        
+                                        <!-- Toggle Status Button -->
+                                        <form action="{{ url_for('toggle_discount_direct', discount_id=d.discount_id) }}" method="POST" class="inline">
+                                            <button type="submit" 
+                                                    title="{% if d.is_active %}Deactivate Code{% else %}Activate Code{% endif %}"
+                                                    class="px-2 py-1 rounded-lg text-[10px] font-medium border transition-all shadow-sm {% if d.is_active %}bg-white hover:bg-zinc-100 text-zinc-700 border-zinc-200{% else %}bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200{% endif %}">
+                                                {% if d.is_active %}Disable{% else %}Enable{% endif %}
+                                            </button>
+                                        </form>
+
+                                        <!-- Edit Button -->
+                                        <button type="button" 
+                                                onclick='openEditModal({{ d|tojson|safe }})'
+                                                class="px-2.5 py-1 bg-white hover:bg-deepWine hover:text-velvet text-noireText border border-noireText/15 rounded-lg text-xs font-medium transition-all shadow-sm">
+                                            Edit
+                                        </button>
+
+                                        <!-- Delete Button -->
+                                        <button type="button" 
+                                                onclick="openDeleteModal('{{ d.discount_id }}', '{{ d.code }}')"
+                                                class="px-2.5 py-1 bg-rose-50 hover:bg-rose-700 hover:text-white text-rose-800 border border-rose-200 rounded-lg text-xs font-medium transition-all shadow-sm">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="py-8 text-center text-noireText/50 italic text-xs">
+                                    No promotional discount codes found in database. Use the form on the left to create your first discount campaign.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT DISCOUNT MODAL POPUP -->
+<div id="editModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-parchment w-full max-w-lg rounded-2xl border border-noireText/10 shadow-2xl p-6 relative">
+        <div class="flex items-center justify-between border-b border-noireText/10 pb-3 mb-4">
+            <h3 class="text-2xl text-noireText font-serif">Modify Discount Campaign</h3>
+            <button onclick="closeEditModal()" class="text-noireText/50 hover:text-noireText text-lg font-bold">✕</button>
+        </div>
+
+        <form action="{{ url_for('edit_discount_direct') }}" method="POST" class="space-y-4 text-xs tracking-wide" id="editForm">
+            <input type="hidden" name="discount_id" id="edit_discount_id">
+
+            <!-- Code -->
+            <div>
+                <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Promo Code</label>
+                <input type="text" name="code" id="edit_code" required
+                       class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono font-bold uppercase focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+            </div>
+
+            <!-- Discount Percent -->
+            <div>
+                <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Discount Rate (%)</label>
+                <div class="relative">
+                    <input type="number" name="discount_percent" id="edit_discount_percent" min="0.1" max="100" step="0.5" required
+                           class="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono font-bold focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <span class="absolute right-4 top-2.5 text-noireText/50 font-bold">%</span>
+                </div>
+            </div>
+
+            <!-- Valid From -->
+            <div>
+                <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Valid From (Date &amp; Time)</label>
+                <input type="datetime-local" name="valid_from" id="edit_valid_from" required
+                       class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+            </div>
+
+            <!-- Valid To -->
+            <div>
+                <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Valid To (Date &amp; Time)</label>
+                <input type="datetime-local" name="valid_to" id="edit_valid_to" required
+                       class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+            </div>
+
+            <!-- Description -->
+            <div>
+                <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Description</label>
+                <textarea name="description" id="edit_description" rows="2"
+                          class="w-full px-4 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all"></textarea>
+            </div>
+
+            <!-- Is Active -->
+            <div class="flex items-center gap-3">
+                <input type="checkbox" name="is_active" id="edit_is_active" value="1"
+                       class="w-4 h-4 rounded text-deepWine focus:ring-dustyRose border-noireText/20 cursor-pointer">
+                <label for="edit_is_active" class="font-medium text-noireText select-none cursor-pointer">
+                    Enable discount code
+                </label>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-noireText/10">
+                <button type="button" onclick="closeEditModal()" class="px-4 py-2.5 bg-white text-noireText border border-noireText/20 rounded-xl hover:bg-velvet transition-colors font-medium">
+                    Cancel
+                </button>
+                <button type="submit" class="px-6 py-2.5 bg-deepWine hover:bg-noireText text-velvet rounded-xl font-medium uppercase tracking-wider transition-colors shadow-md">
+                    Update Discount
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- DELETE CONFIRMATION MODAL -->
+<div id="deleteModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl border border-rose-200 shadow-2xl p-6 text-center space-y-4">
+        <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-xl font-bold">
+            ⚠
+        </div>
+        <div>
+            <h3 class="text-xl font-serif text-noireText font-semibold">Delete Discount Code</h3>
+            <p class="text-xs text-noireText/60 mt-1">
+                Are you sure you want to permanently delete <strong id="delete_code_label" class="font-mono text-deepWine"></strong>? This action cannot be undone.
+            </p>
+        </div>
+        <form id="deleteForm" method="POST" class="flex items-center justify-center gap-3 pt-2">
+            <button type="button" onclick="closeDeleteModal()" class="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl text-xs font-medium transition-colors">
+                Cancel
+            </button>
+            <button type="submit" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-medium uppercase tracking-wider transition-colors shadow-md">
+                Confirm Delete
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Initialize default timestamps on Create form
+    document.addEventListener('DOMContentLoaded', () => {
+        const now = new Date();
+        const startIso = formatLocalDateTime(now);
+        
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + 10);
+        futureDate.setHours(23, 59, 0, 0);
+        const endIso = formatLocalDateTime(futureDate);
+
+        const fromInput = document.getElementById('create_valid_from');
+        const toInput = document.getElementById('create_valid_to');
+        if (fromInput && !fromInput.value) fromInput.value = startIso;
+        if (toInput && !toInput.value) toInput.value = endIso;
+    });
+
+    function formatLocalDateTime(date) {
+        const pad = (n) => String(n).padStart(2, '0');
+        const year = date.getFullYear();
+        const month = pad(date.getMonth() + 1);
+        const day = pad(date.getDate());
+        const hours = pad(date.getHours());
+        const minutes = pad(date.getMinutes());
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
+    function setQuickPreset(days) {
+        const fromInput = document.getElementById('create_valid_from');
+        const toInput = document.getElementById('create_valid_to');
+        
+        const start = new Date();
+        const end = new Date();
+        end.setDate(start.getDate() + days);
+        end.setHours(23, 59, 0, 0);
+
+        fromInput.value = formatLocalDateTime(start);
+        toInput.value = formatLocalDateTime(end);
+    }
+
+    function openEditModal(d) {
+        document.getElementById('edit_discount_id').value = d.discount_id;
+        document.getElementById('edit_code').value = d.code;
+        document.getElementById('edit_discount_percent').value = d.discount_percent;
+        document.getElementById('edit_valid_from').value = d.valid_from_input;
+        document.getElementById('edit_valid_to').value = d.valid_to_input;
+        document.getElementById('edit_description').value = d.description || '';
+        document.getElementById('edit_is_active').checked = Boolean(d.is_active);
+
+        const modal = document.getElementById('editModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeEditModal() {
+        const modal = document.getElementById('editModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function openDeleteModal(id, code) {
+        document.getElementById('delete_code_label').textContent = code;
+        document.getElementById('deleteForm').action = `/admin/discounts/delete/${id}`;
+        
+        const modal = document.getElementById('deleteModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeDeleteModal() {
+        const modal = document.getElementById('deleteModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+</script>
+{% endblock %}

@@ -16,6 +16,8 @@ try:
         db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
         db_load_transactions, db_calculate_rolling_lags,
         db_request_transfer, db_dispatch_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
+        db_load_discounts, db_get_discount_by_id, db_get_discount_by_code, db_validate_discount_code,
+        db_create_discount, db_update_discount, db_delete_discount, db_toggle_discount_status,
         get_db, DB_PATH
     )
 except ModuleNotFoundError:
@@ -24,6 +26,8 @@ except ModuleNotFoundError:
         db_load_inventory, db_update_inventory_stock, db_deduct_inventory_stock,
         db_load_transactions, db_calculate_rolling_lags,
         db_request_transfer, db_dispatch_transfer, db_complete_transfer, db_cancel_transfer, db_load_transfers,
+        db_load_discounts, db_get_discount_by_id, db_get_discount_by_code, db_validate_discount_code,
+        db_create_discount, db_update_discount, db_delete_discount, db_toggle_discount_status,
         get_db, DB_PATH
     )
 
@@ -260,3 +264,30 @@ def cancel_transfer(transfer_id, db_path=DB_PATH):
 
 def load_transfers(branch=None, status=None, db_path=DB_PATH):
     return db_load_transfers(branch=branch, status=status, db_path=db_path)
+
+# --- DISCOUNT CODES & PROMOTIONS UTILITIES ---
+
+def load_discounts(db_path=DB_PATH):
+    return db_load_discounts(db_path=db_path)
+
+def get_discount_by_id(discount_id, db_path=DB_PATH):
+    return db_get_discount_by_id(discount_id, db_path=db_path)
+
+def get_discount_by_code(code, db_path=DB_PATH):
+    return db_get_discount_by_code(code, db_path=db_path)
+
+def validate_discount_code(code, check_time=None, db_path=DB_PATH):
+    return db_validate_discount_code(code, check_time=check_time, db_path=db_path)
+
+def create_discount(code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=DB_PATH):
+    return db_create_discount(code, discount_type=discount_type, discount_value=discount_value, valid_from=valid_from, valid_to=valid_to, is_active=is_active, description=description, db_path=db_path)
+
+def update_discount(discount_id, code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=DB_PATH):
+    return db_update_discount(discount_id, code, discount_type=discount_type, discount_value=discount_value, valid_from=valid_from, valid_to=valid_to, is_active=is_active, description=description, db_path=db_path)
+
+def delete_discount(discount_id, db_path=DB_PATH):
+    return db_delete_discount(discount_id, db_path=db_path)
+
+def toggle_discount_status(discount_id, db_path=DB_PATH):
+    return db_toggle_discount_status(discount_id, db_path=db_path)
+

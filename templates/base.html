@@ -85,6 +85,7 @@
                     <a href="{{ url_for('forecast') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">AI Forecast</a>
                     
                     {% if session.get('role') == 'admin' %}
+                        <a href="{{ url_for('manage_discounts') }}" class="px-2.5 py-1.5 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20 whitespace-nowrap">Discounts</a>
                         <a href="{{ url_for('manage_users') }}" class="px-2.5 py-1.5 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20 whitespace-nowrap">Users</a>
                         <a href="{{ url_for('update_catalog') }}" class="px-2.5 py-1.5 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20 whitespace-nowrap">Catalog</a>
                     {% endif %}

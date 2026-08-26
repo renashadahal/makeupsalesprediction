@@ -210,6 +210,40 @@ def init_db(db_path=DB_PATH):
         );
         """)
 
+        # 13. Promotional Discounts & Campaigns (Supports both Percentage and Fixed Cash Discounts)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS discounts (
+            discount_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT UNIQUE NOT NULL,
+            discount_type TEXT NOT NULL DEFAULT 'PERCENTAGE' CHECK(discount_type IN ('PERCENTAGE', 'FIXED')),
+            discount_value REAL NOT NULL DEFAULT 0.0 CHECK(discount_value > 0),
+            discount_percent REAL,
+            valid_from DATETIME NOT NULL,
+            valid_to DATETIME NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+            description TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # Migration: Ensure discount_type and discount_value columns exist for existing tables
+        discount_cols = [row[1] for row in cursor.execute("PRAGMA table_info(discounts);").fetchall()]
+        if 'discount_type' not in discount_cols:
+            cursor.execute("ALTER TABLE discounts ADD COLUMN discount_type TEXT NOT NULL DEFAULT 'PERCENTAGE';")
+        if 'discount_value' not in discount_cols:
+            cursor.execute("ALTER TABLE discounts ADD COLUMN discount_value REAL NOT NULL DEFAULT 0.0;")
+            cursor.execute("UPDATE discounts SET discount_value = COALESCE(discount_percent, 10.0) WHERE discount_value = 0.0 OR discount_value IS NULL;")
+
+        # Seed default discounts if not already present
+        cursor.execute("""
+        INSERT OR IGNORE INTO discounts (code, discount_type, discount_value, discount_percent, valid_from, valid_to, is_active, description)
+        VALUES 
+            ('FESTIVE10', 'PERCENTAGE', 10.0, 10.0, '2026-01-01 00:00:00', '2030-12-31 23:59:59', 1, 'Festive Season 10% Off Promotion'),
+            ('VALENTINE15', 'PERCENTAGE', 15.0, 15.0, '2026-01-01 00:00:00', '2030-12-31 23:59:59', 1, 'Valentine Special 15% Off Promotion'),
+            ('WELCOME5', 'FIXED', 5.0, 0.0, '2026-01-01 00:00:00', '2030-12-31 23:59:59', 1, 'Welcome Gift $5.00 Off Coupon');
+        """)
+
         # Ensure schema backward compatibility / column migrations for existing SQLite DB files
         existing_cols = [row[1] for row in cursor.execute("PRAGMA table_info(inventory_transfers);").fetchall()]
         if 'approved_by' not in existing_cols:
@@ -234,6 +268,8 @@ def init_db(db_path=DB_PATH):
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transfers_branches ON inventory_transfers(from_branch, to_branch);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_notifications_branch_created ON branch_notifications(recipient_branch, created_at DESC);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_model_training_week ON model_training_runs(week_start, status);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_discounts_code ON discounts(code);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_discounts_validity ON discounts(is_active, valid_from, valid_to);")
         
         conn.commit()
 
@@ -524,17 +560,16 @@ def db_deduct_inventory_stock(branch, product_name, quantity_sold, db_path=DB_PA
 
 def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=DB_PATH):
     """Executes atomic POS checkout transaction (pre-validation + header + items + stock deduction) and returns (success, receipt/error)."""
-    discount = 1.0
-    promo_code = promo_code.strip().upper()
-    if promo_code == "FESTIVE10":
-        discount = 0.90
-    elif promo_code == "VALENTINE15":
-        discount = 0.85
+    promo_code = (promo_code or '').strip().upper()
+    disc_info = None
+    if promo_code:
+        is_valid, disc_info, err_msg = db_validate_discount_code(promo_code, db_path=db_path)
+        if not is_valid:
+            return False, err_msg
 
     today_date = datetime.now().strftime('%Y-%m-%d')
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     subtotal_before_discount = 0.0
-    grand_total = 0.0
     processed_items = []
     receipt_items = []
 
@@ -564,23 +599,48 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
 
             p_id = p_row['product_id']
             orig_price = float(item['price'])
-            final_unit_price = orig_price * discount
-            
             raw_subtotal = orig_price * qty
-            final_subtotal = final_unit_price * qty
-            
             subtotal_before_discount += raw_subtotal
-            grand_total += final_subtotal
             shade = item.get('shade', 'Default').strip() or 'Default'
 
-            processed_items.append((p_id, p_name, shade, qty, final_unit_price, final_subtotal))
-            receipt_items.append({
+            processed_items.append({
                 'product_id': p_id,
-                'brand': brand_name,
+                'brand_name': brand_name,
                 'product_name': p_name,
                 'shade': shade,
                 'quantity': qty,
-                'original_price': orig_price,
+                'orig_price': orig_price,
+                'raw_subtotal': raw_subtotal
+            })
+
+        # Calculate discount totals (supports PERCENTAGE and FIXED cash discount)
+        if disc_info:
+            disc_type = disc_info.get('discount_type', 'PERCENTAGE')
+            disc_val = float(disc_info.get('discount_value', disc_info.get('discount_percent', 0.0)))
+            if disc_type == 'FIXED':
+                discount_amount = min(subtotal_before_discount, disc_val)
+                grand_total = max(0.0, subtotal_before_discount - discount_amount)
+                effective_rate = (grand_total / subtotal_before_discount) if subtotal_before_discount > 0 else 1.0
+            else:
+                effective_rate = max(0.0, 1.0 - (disc_val / 100.0))
+                grand_total = round(subtotal_before_discount * effective_rate, 2)
+                discount_amount = round(subtotal_before_discount - grand_total, 2)
+        else:
+            effective_rate = 1.0
+            discount_amount = 0.0
+            grand_total = subtotal_before_discount
+
+        # Compute per-item unit price & subtotals based on effective rate
+        for item in processed_items:
+            final_unit_price = round(item['orig_price'] * effective_rate, 2)
+            final_subtotal = round(final_unit_price * item['quantity'], 2)
+            receipt_items.append({
+                'product_id': item['product_id'],
+                'brand': item['brand_name'],
+                'product_name': item['product_name'],
+                'shade': item['shade'],
+                'quantity': item['quantity'],
+                'original_price': item['orig_price'],
                 'final_unit_price': final_unit_price,
                 'subtotal': final_subtotal
             })
@@ -589,31 +649,34 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
         cursor.execute("""
         INSERT INTO transactions (transaction_id, username, branch_id, promo_code, discount_rate, grand_total, transaction_date, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-        """, (tx_id, username, branch, promo_code, discount, grand_total, today_date, now_str))
+        """, (tx_id, username, branch, promo_code, effective_rate, grand_total, today_date, now_str))
 
         # 3. Insert Transaction Items & Deduct Stock
-        for p_id, p_name, shade, qty, unit_price, subtotal in processed_items:
+        for r_item in receipt_items:
             cursor.execute("""
             INSERT INTO transaction_items (transaction_id, product_id, shade, quantity, unit_price, subtotal)
             VALUES (?, ?, ?, ?, ?, ?);
-            """, (tx_id, p_id, shade, qty, unit_price, subtotal))
+            """, (tx_id, r_item['product_id'], r_item['shade'], r_item['quantity'], r_item['final_unit_price'], r_item['subtotal']))
 
             cursor.execute("""
             UPDATE inventory 
             SET stock = stock - ?, last_updated = ?
             WHERE branch_id = ? AND product_id = ?;
-            """, (qty, now_str, branch, p_id))
+            """, (r_item['quantity'], now_str, branch, r_item['product_id']))
 
         return True, {
             'transaction_id': tx_id,
             'username': username,
             'branch_id': branch,
             'transaction_date': today_date,
-            'promo_code': promo_code if discount < 1.0 else '',
-            'discount_rate': discount,
-            'discount_percent': int(round((1.0 - discount) * 100)),
+            'promo_code': promo_code if discount_amount > 0 else '',
+            'discount_type': disc_info.get('discount_type', 'PERCENTAGE') if disc_info else 'PERCENTAGE',
+            'discount_value': disc_info.get('discount_value', 0) if disc_info else 0,
+            'discount_label': disc_info.get('discount_label', '') if disc_info else '',
+            'discount_rate': effective_rate,
+            'discount_percent': int(round((1.0 - effective_rate) * 100)),
             'subtotal_before_discount': round(subtotal_before_discount, 2),
-            'discount_amount': round(subtotal_before_discount - grand_total, 2),
+            'discount_amount': round(discount_amount, 2),
             'grand_total': round(grand_total, 2),
             'items': receipt_items
         }
@@ -973,6 +1036,334 @@ def db_load_transfers(branch=None, status=None, db_path=DB_PATH):
         rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
+# --- DISCOUNT CODES & PROMOTIONS SYSTEM ---
+
+def _normalize_datetime_str(dt_input, is_end=False):
+    """Normalizes various date/time input formats into ISO standard 'YYYY-MM-DD HH:MM:SS'."""
+    if dt_input is None or str(dt_input).strip() == '':
+        return None
+    
+    if isinstance(dt_input, datetime):
+        return dt_input.strftime('%Y-%m-%d %H:%M:%S')
+    if isinstance(dt_input, date):
+        suffix = '23:59:59' if is_end else '00:00:00'
+        return f"{dt_input.strftime('%Y-%m-%d')} {suffix}"
+    
+    val_str = str(dt_input).strip().replace('T', ' ')
+    if len(val_str) == 10:  # YYYY-MM-DD
+        suffix = '23:59:59' if is_end else '00:00:00'
+        val_str = f"{val_str} {suffix}"
+    elif len(val_str) == 16:  # YYYY-MM-DD HH:MM
+        suffix = ':59' if is_end else ':00'
+        val_str = f"{val_str}{suffix}"
+    
+    # Validate timestamp format
+    try:
+        parsed = datetime.strptime(val_str[:19], '%Y-%m-%d %H:%M:%S')
+        return parsed.strftime('%Y-%m-%d %H:%M:%S')
+    except ValueError as exc:
+        raise ValueError(f"Invalid date/time format: '{dt_input}'. Expected YYYY-MM-DD or YYYY-MM-DD HH:MM.") from exc
+
+
+def _format_discount_row(row, check_dt=None):
+    """Formats a discount database row into a rich dictionary with status and display strings."""
+    if not row:
+        return None
+    d = dict(row)
+    now_dt = check_dt or datetime.now()
+    
+    # Parse validity timestamps
+    try:
+        from_dt = datetime.strptime(str(d['valid_from'])[:19], '%Y-%m-%d %H:%M:%S')
+    except Exception:
+        from_dt = now_dt
+    try:
+        to_dt = datetime.strptime(str(d['valid_to'])[:19], '%Y-%m-%d %H:%M:%S')
+    except Exception:
+        to_dt = now_dt
+
+    is_active = bool(d.get('is_active', 1))
+    if not is_active:
+        status_code = 'DISABLED'
+        status_label = 'Disabled'
+    elif now_dt < from_dt:
+        status_code = 'UPCOMING'
+        status_label = 'Upcoming'
+    elif now_dt > to_dt:
+        status_code = 'EXPIRED'
+        status_label = 'Expired'
+    else:
+        status_code = 'ACTIVE'
+        status_label = 'Active Now'
+
+    discount_type = str(d.get('discount_type') or 'PERCENTAGE').upper()
+    if discount_type not in ('PERCENTAGE', 'FIXED'):
+        discount_type = 'PERCENTAGE'
+    
+    val_raw = d.get('discount_value')
+    if val_raw is None or val_raw == 0:
+        val_raw = d.get('discount_percent', 0.0)
+    val_float = float(val_raw or 0.0)
+
+    if discount_type == 'FIXED':
+        discount_label = f"${val_float:.2f} Off"
+        discount_badge = f"${val_float:.2f} OFF"
+        discount_percent = 0.0
+        discount_rate = 1.0
+    else:
+        val_display = int(val_float) if val_float.is_integer() else val_float
+        discount_label = f"{val_display}% Off"
+        discount_badge = f"{val_display}% OFF"
+        discount_percent = val_float
+        discount_rate = round(1.0 - (val_float / 100.0), 4)
+
+    d['discount_type'] = discount_type
+    d['discount_value'] = val_float
+    d['discount_percent'] = discount_percent
+    d['discount_rate'] = discount_rate
+    d['discount_label'] = discount_label
+    d['discount_badge'] = discount_badge
+    d['status_code'] = status_code
+    d['status_label'] = status_label
+    d['is_currently_valid'] = (status_code == 'ACTIVE')
+    d['valid_from_display'] = from_dt.strftime('%b %d, %Y %I:%M %p')
+    d['valid_to_display'] = to_dt.strftime('%b %d, %Y %I:%M %p')
+    d['valid_from_date'] = from_dt.strftime('%b %d, %Y')
+    d['valid_to_date'] = to_dt.strftime('%b %d, %Y')
+    d['valid_from_time'] = from_dt.strftime('%I:%M %p')
+    d['valid_to_time'] = to_dt.strftime('%I:%M %p')
+    d['valid_from_input'] = from_dt.strftime('%Y-%m-%dT%H:%M')
+    d['valid_to_input'] = to_dt.strftime('%Y-%m-%dT%H:%M')
+    d['valid_from_date_only'] = from_dt.strftime('%Y-%m-%d')
+    d['valid_to_date_only'] = to_dt.strftime('%Y-%m-%d')
+    d['valid_from_time_only'] = from_dt.strftime('%H:%M')
+    d['valid_to_time_only'] = to_dt.strftime('%H:%M')
+    return d
+
+
+def db_load_discounts(db_path=DB_PATH):
+    """Loads all discount promotional codes ordered by activity and expiration."""
+    with get_db(db_path) as conn:
+        rows = conn.execute("""
+        SELECT * FROM discounts 
+        ORDER BY is_active DESC, valid_to DESC, discount_id DESC;
+        """).fetchall()
+        now_dt = datetime.now()
+        return [_format_discount_row(r, check_dt=now_dt) for r in rows]
+
+
+def db_get_discount_by_id(discount_id, db_path=DB_PATH):
+    """Fetches a specific discount code by ID with enriched metadata."""
+    with get_db(db_path) as conn:
+        row = conn.execute("SELECT * FROM discounts WHERE discount_id = ?;", (int(discount_id),)).fetchone()
+        if not row:
+            return None
+        return _format_discount_row(row)
+
+
+def db_get_discount_by_code(code, db_path=DB_PATH):
+    """Fetches a discount code record by exact code name."""
+    if not code:
+        return None
+    with get_db(db_path) as conn:
+        row = conn.execute("SELECT * FROM discounts WHERE UPPER(code) = UPPER(?);", (code.strip(),)).fetchone()
+        if not row:
+            return None
+        return _format_discount_row(row)
+
+
+def db_validate_discount_code(code, check_time=None, db_path=DB_PATH):
+    """Validates if a discount code exists, is enabled, and is within its valid date and time window."""
+    code_clean = (code or '').strip().upper()
+    if not code_clean:
+        return False, None, "Discount code cannot be empty."
+
+    with get_db(db_path) as conn:
+        row = conn.execute("SELECT * FROM discounts WHERE UPPER(code) = UPPER(?);", (code_clean,)).fetchone()
+        if not row:
+            return False, None, f"Invalid discount code '{code_clean}'."
+
+        disc = _format_discount_row(row, check_dt=check_time)
+        now_dt = check_time or datetime.now()
+
+        if not bool(disc.get('is_active', 1)):
+            return False, disc, f"Discount code '{code_clean}' is currently deactivated."
+
+        try:
+            from_dt = datetime.strptime(str(disc['valid_from'])[:19], '%Y-%m-%d %H:%M:%S')
+            to_dt = datetime.strptime(str(disc['valid_to'])[:19], '%Y-%m-%d %H:%M:%S')
+        except Exception:
+            return False, disc, f"Discount code '{code_clean}' has an invalid schedule configuration."
+
+        if now_dt < from_dt:
+            return False, disc, f"Discount code '{code_clean}' is not active yet (valid from {from_dt.strftime('%b %d, %Y %I:%M %p')})."
+
+        if now_dt > to_dt:
+            return False, disc, f"Discount code '{code_clean}' expired on {to_dt.strftime('%b %d, %Y %I:%M %p')}."
+
+        return True, disc, f"Discount code '{code_clean}' applied ({disc['discount_label']})."
+
+
+def db_create_discount(code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=DB_PATH):
+    """Creates a new discount promotional campaign in SQLite with day and time limits (Percentage or Fixed Cash)."""
+    # Backward compatibility if positional args passed as (code, 20.0, valid_from, valid_to, is_active, description)
+    if isinstance(discount_type, (int, float)) or (isinstance(discount_type, str) and discount_type.replace('.', '', 1).isdigit()):
+        val = float(discount_type)
+        disc_type = 'PERCENTAGE'
+        v_from = discount_value
+        v_to = valid_from
+        act = is_active if valid_to is None else valid_to
+        desc = description if is_active == 1 else is_active
+    else:
+        disc_type = 'FIXED' if str(discount_type).upper() in ('FIXED', 'CASH', 'AMOUNT', 'DOLLAR', '$') else 'PERCENTAGE'
+        val = float(discount_value if discount_value is not None else 0.0)
+        v_from = valid_from
+        v_to = valid_to
+        act = is_active
+        desc = description
+
+    code_clean = (code or '').strip().upper()
+    if not code_clean or len(code_clean) < 2 or len(code_clean) > 30:
+        return False, "Discount code must be between 2 and 30 characters in length.", None
+
+    if not all(c.isalnum() or c in ('_', '-') for c in code_clean):
+        return False, "Discount code must contain only alphanumeric characters, underscores, or hyphens.", None
+
+    if disc_type == 'PERCENTAGE':
+        if val <= 0 or val > 100:
+            return False, "Discount percentage must be greater than 0% and at most 100%.", None
+    else:
+        if val <= 0:
+            return False, "Fixed cash discount amount must be greater than $0.00.", None
+
+    try:
+        norm_from = _normalize_datetime_str(v_from, is_end=False)
+        norm_to = _normalize_datetime_str(v_to, is_end=True)
+    except ValueError as val_err:
+        return False, str(val_err), None
+
+    if not norm_from or not norm_to:
+        return False, "Both valid from and valid to dates/times must be provided.", None
+
+    dt_from = datetime.strptime(norm_from, '%Y-%m-%d %H:%M:%S')
+    dt_to = datetime.strptime(norm_to, '%Y-%m-%d %H:%M:%S')
+    if dt_from > dt_to:
+        return False, "Valid From date/time must be earlier than or equal to Valid To date/time.", None
+
+    active_int = 1 if act in (1, '1', True, 'true', 'on') else 0
+    desc_str = (desc or '').strip()
+    pct_val = val if disc_type == 'PERCENTAGE' else 0.0
+
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        existing = cursor.execute("SELECT discount_id FROM discounts WHERE UPPER(code) = UPPER(?);", (code_clean,)).fetchone()
+        if existing:
+            return False, f"Discount code '{code_clean}' already exists in the system.", None
+
+        cursor.execute("""
+        INSERT INTO discounts (code, discount_type, discount_value, discount_percent, valid_from, valid_to, is_active, description)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        """, (code_clean, disc_type, val, pct_val, norm_from, norm_to, active_int, desc_str))
+        conn.commit()
+        new_id = cursor.lastrowid
+        val_label = f"{val:.0f}%" if disc_type == 'PERCENTAGE' and val.is_integer() else (f"{val}%" if disc_type == 'PERCENTAGE' else f"${val:.2f}")
+        return True, f"Discount code '{code_clean}' ({val_label} off) successfully created.", new_id
+
+
+def db_update_discount(discount_id, code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=DB_PATH):
+    """Updates an existing discount code campaign in SQLite."""
+    # Backward compatibility if positional args passed as (discount_id, code, 20.0, valid_from, valid_to, is_active, description)
+    if isinstance(discount_type, (int, float)) or (isinstance(discount_type, str) and discount_type.replace('.', '', 1).isdigit()):
+        val = float(discount_type)
+        disc_type = 'PERCENTAGE'
+        v_from = discount_value
+        v_to = valid_from
+        act = is_active if valid_to is None else valid_to
+        desc = description if is_active == 1 else is_active
+    else:
+        disc_type = 'FIXED' if str(discount_type).upper() in ('FIXED', 'CASH', 'AMOUNT', 'DOLLAR', '$') else 'PERCENTAGE'
+        val = float(discount_value if discount_value is not None else 0.0)
+        v_from = valid_from
+        v_to = valid_to
+        act = is_active
+        desc = description
+
+    code_clean = (code or '').strip().upper()
+    if not code_clean or len(code_clean) < 2 or len(code_clean) > 30:
+        return False, "Discount code must be between 2 and 30 characters in length."
+
+    if not all(c.isalnum() or c in ('_', '-') for c in code_clean):
+        return False, "Discount code must contain only alphanumeric characters, underscores, or hyphens."
+
+    if disc_type == 'PERCENTAGE':
+        if val <= 0 or val > 100:
+            return False, "Discount percentage must be greater than 0% and at most 100%."
+    else:
+        if val <= 0:
+            return False, "Fixed cash discount amount must be greater than $0.00."
+
+    try:
+        norm_from = _normalize_datetime_str(v_from, is_end=False)
+        norm_to = _normalize_datetime_str(v_to, is_end=True)
+    except ValueError as val_err:
+        return False, str(val_err)
+
+    if not norm_from or not norm_to:
+        return False, "Both valid from and valid to dates/times must be provided."
+
+    dt_from = datetime.strptime(norm_from, '%Y-%m-%d %H:%M:%S')
+    dt_to = datetime.strptime(norm_to, '%Y-%m-%d %H:%M:%S')
+    if dt_from > dt_to:
+        return False, "Valid From date/time must be earlier than or equal to Valid To date/time."
+
+    active_int = 1 if act in (1, '1', True, 'true', 'on') else 0
+    desc_str = (desc or '').strip()
+    pct_val = val if disc_type == 'PERCENTAGE' else 0.0
+
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        existing = cursor.execute("SELECT discount_id FROM discounts WHERE UPPER(code) = UPPER(?) AND discount_id != ?;", 
+                                  (code_clean, int(discount_id))).fetchone()
+        if existing:
+            return False, f"Another discount code '{code_clean}' already exists."
+
+        cursor.execute("""
+        UPDATE discounts 
+        SET code = ?, discount_type = ?, discount_value = ?, discount_percent = ?, valid_from = ?, valid_to = ?, is_active = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE discount_id = ?;
+        """, (code_clean, disc_type, val, pct_val, norm_from, norm_to, active_int, desc_str, int(discount_id)))
+        conn.commit()
+        if cursor.rowcount == 0:
+            return False, f"Discount ID #{discount_id} not found."
+        return True, f"Discount code '{code_clean}' updated successfully."
+
+
+def db_delete_discount(discount_id, db_path=DB_PATH):
+    """Deletes a discount record from the database."""
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM discounts WHERE discount_id = ?;", (int(discount_id),))
+        conn.commit()
+        if cursor.rowcount == 0:
+            return False, f"Discount #{discount_id} not found."
+        return True, f"Discount code #{discount_id} permanently deleted."
+
+
+def db_toggle_discount_status(discount_id, db_path=DB_PATH):
+    """Toggles active state (1 -> 0 or 0 -> 1) of a discount."""
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        UPDATE discounts 
+        SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END, updated_at = CURRENT_TIMESTAMP
+        WHERE discount_id = ?;
+        """, (int(discount_id),))
+        conn.commit()
+        if cursor.rowcount == 0:
+            return False, f"Discount #{discount_id} not found."
+        return True, "Discount status updated successfully."
+
+
 # Convenience Aliases
 request_transfer = db_request_transfer
 dispatch_transfer = db_dispatch_transfer
@@ -981,3 +1372,9 @@ complete_transfer = db_complete_transfer
 receive_transfer = db_complete_transfer
 cancel_transfer = db_cancel_transfer
 load_transfers = db_load_transfers
+load_discounts = db_load_discounts
+create_discount = db_create_discount
+update_discount = db_update_discount
+delete_discount = db_delete_discount
+validate_discount_code = db_validate_discount_code
+
