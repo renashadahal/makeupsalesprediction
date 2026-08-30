@@ -78,35 +78,54 @@
             </div>
 
             <!-- Lower Row: Status Tabs & Inline Sort Control -->
-            <div class="flex flex-col sm:flex-row gap-3 sm:items-center justify-between pt-2 border-t border-noireText/10">
-                <!-- Status Tabs -->
-                <div class="flex items-center gap-2">
-                    <span class="font-medium uppercase text-noireText/60 tracking-widest text-[10px] hidden sm:inline-block mr-1">Status:</span>
-                    <div class="inline-flex rounded-xl border border-noireText/10 overflow-hidden bg-white p-0.5 h-[34px] shadow-sm">
-                        <button type="button" data-status="" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
-                            All
-                        </button>
-                        <button type="button" data-status="in-stock" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
-                            In Stock
-                        </button>
-                        <button type="button" data-status="low" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs bg-deepWine text-velvet">
-                            Low Stock (&lt;15)
-                        </button>
+            <div class="flex flex-col md:flex-row gap-3 md:items-center justify-between pt-2 border-t border-noireText/10">
+                <!-- Status Tabs & Display Limit -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium uppercase text-noireText/60 tracking-widest text-[10px] hidden sm:inline-block mr-1">Status:</span>
+                        <div class="inline-flex rounded-xl border border-noireText/10 overflow-hidden bg-white p-0.5 h-[34px] shadow-sm">
+                            <button type="button" data-status="" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
+                                All
+                            </button>
+                            <button type="button" data-status="in-stock" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
+                                In Stock
+                            </button>
+                            <button type="button" data-status="low" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs bg-deepWine text-velvet">
+                                Low Stock (&lt;15)
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-medium uppercase text-noireText/60 tracking-widest text-[10px] hidden sm:inline-block mr-1">Display:</span>
+                        <div class="inline-flex rounded-xl border border-noireText/10 overflow-hidden bg-white p-0.5 h-[34px] shadow-sm text-xs">
+                            <button type="button" id="invLimit10Btn" onclick="setInventoryLimit(10)" class="inv-limit-tab py-1 px-3 rounded-lg font-medium transition-all bg-deepWine text-velvet">
+                                Top 10 (Default)
+                            </button>
+                            <button type="button" id="invLimitAllBtn" onclick="setInventoryLimit('all')" class="inv-limit-tab py-1 px-3 rounded-lg font-medium transition-all hover:bg-velvet/50 text-noireText/75">
+                                Show All
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Compact Inline Sort Control -->
-                <div class="flex items-center gap-2 self-start sm:self-auto">
-                    <label for="table_sort" class="font-medium uppercase text-noireText/60 tracking-widest text-[10px] shrink-0">Sort By:</label>
-                    <select id="table_sort" class="px-3 py-1.5 rounded-xl bg-white border border-noireText/15 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-medium cursor-pointer shadow-sm">
-                        <option value="recent">Most Recent</option>
-                        <option value="stock-asc">Low Stock on Top</option>
-                        <option value="stock-desc">High Stock on Top</option>
-                        <option value="product-asc">Product (A-Z)</option>
-                        <option value="brand-asc">Brand (A-Z)</option>
-                        <option value="price-asc">Price (Low → High)</option>
-                        <option value="price-desc">Price (High → Low)</option>
-                    </select>
+                <!-- Compact Inline Sort Control & Match Count -->
+                <div class="flex items-center gap-3 self-start md:self-auto">
+                    <span id="inventoryMatchCount" class="text-[11px] text-noireText/60 font-medium hidden sm:inline">
+                        Showing 10 items
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <label for="table_sort" class="font-medium uppercase text-noireText/60 tracking-widest text-[10px] shrink-0">Sort By:</label>
+                        <select id="table_sort" class="px-3 py-1.5 rounded-xl bg-white border border-noireText/15 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-medium cursor-pointer shadow-sm">
+                            <option value="recent">Most Recent</option>
+                            <option value="stock-asc">Low Stock on Top</option>
+                            <option value="stock-desc">High Stock on Top</option>
+                            <option value="product-asc">Product (A-Z)</option>
+                            <option value="brand-asc">Brand (A-Z)</option>
+                            <option value="price-asc">Price (Low → High)</option>
+                            <option value="price-desc">Price (High → Low)</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -161,6 +180,15 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Show More Items Footer Control -->
+        <div id="inventoryShowMoreContainer" class="hidden p-3 bg-parchment/20 border-t border-noireText/10 text-center">
+            <button type="button" id="inventoryShowMoreBtn" onclick="setInventoryLimit('all')"
+                class="px-5 py-2 bg-white hover:bg-velvet border border-noireText/20 text-noireText rounded-xl font-medium text-xs shadow-sm transition-all inline-flex items-center gap-2 cursor-pointer">
+                <span id="inventoryShowMoreText">Show More Items</span>
+                <span class="text-dustyRose font-mono">↓</span>
+            </button>
+        </div>
     </div>
 
 </div>
@@ -214,15 +242,33 @@ document.addEventListener("DOMContentLoaded", () => {
     const tableRows = Array.from(tableBody.querySelectorAll('tr.inventory-row'));
     const emptyRow = document.getElementById('no_results_row');
     
+    let currentInventoryLimit = 10;
     let activeStatus = "low";
     sortSelect.value = "stock-asc";
-    
+
+    window.setInventoryLimit = function(limit) {
+        currentInventoryLimit = limit;
+        const tabs = document.querySelectorAll('.inv-limit-tab');
+        tabs.forEach(t => {
+            t.classList.remove('bg-deepWine', 'text-velvet');
+            t.classList.add('hover:bg-velvet/50', 'text-noireText/75');
+        });
+        if (limit === 10) {
+            document.getElementById('invLimit10Btn')?.classList.add('bg-deepWine', 'text-velvet');
+            document.getElementById('invLimit10Btn')?.classList.remove('hover:bg-velvet/50', 'text-noireText/75');
+        } else if (limit === 'all') {
+            document.getElementById('invLimitAllBtn')?.classList.add('bg-deepWine', 'text-velvet');
+            document.getElementById('invLimitAllBtn')?.classList.remove('hover:bg-velvet/50', 'text-noireText/75');
+        }
+        applySortAndFilters();
+    };
+
     const brandsSet = new Set();
     tableRows.forEach(row => {
         const brand = row.dataset.brand;
         if (brand) brandsSet.add(brand.trim());
     });
-    
+
     const sortedBrands = Array.from(brandsSet).sort();
     sortedBrands.forEach(brand => {
         const opt = document.createElement('option');
@@ -230,35 +276,30 @@ document.addEventListener("DOMContentLoaded", () => {
         opt.textContent = brand;
         brandSelect.appendChild(opt);
     });
-    
+
     function applySortAndFilters() {
         const query = searchInput.value.toLowerCase().trim();
         const selectedBrand = brandSelect.value;
         const sortBy = sortSelect.value;
-        let visibleCount = 0;
-        
-        // 1. Filter visibility (If user searches for a product or brand, search across all items; otherwise respect Low Stock tab default)
+
+        // 1. Filter matching items
+        let matchedRows = [];
         tableRows.forEach(row => {
             const brand = (row.dataset.brand || '').toLowerCase();
             const product = (row.dataset.product || '').toLowerCase();
             const status = row.dataset.status;
-            
+
             const matchesQuery = query === "" || brand.includes(query) || product.includes(query);
             const matchesBrand = selectedBrand === "" || row.dataset.brand === selectedBrand;
-            
-            // If user types a search query, show any matching product; otherwise filter by active tab status
             const matchesStatus = (query !== "" && activeStatus === "low") ? true : (activeStatus === "" || status === activeStatus);
-            
+
             if (matchesQuery && matchesBrand && matchesStatus) {
-                row.style.display = "";
-                visibleCount++;
-            } else {
-                row.style.display = "none";
+                matchedRows.push(row);
             }
         });
 
-        // 2. Sort rows
-        tableRows.sort((a, b) => {
+        // 2. Sort matching rows according to user's specification
+        matchedRows.sort((a, b) => {
             if (sortBy === 'recent') {
                 const dateA = a.dataset.updated || '';
                 const dateB = b.dataset.updated || '';
@@ -292,25 +333,51 @@ document.addEventListener("DOMContentLoaded", () => {
             return 0;
         });
 
-        // 3. Re-append in sorted order before emptyRow
+        // 3. Respect 10-item limit specification unless 'all' or user is searching
+        const limit = (query !== "" || currentInventoryLimit === 'all') ? matchedRows.length : parseInt(currentInventoryLimit, 10);
+
+        // 4. Update display visibility
         tableRows.forEach(row => {
+            row.style.display = "none";
+        });
+
+        matchedRows.slice(0, limit).forEach(row => {
+            row.style.display = "";
             tableBody.appendChild(row);
         });
+
         if (emptyRow) {
             tableBody.appendChild(emptyRow);
         }
-        
-        if (visibleCount === 0 && tableRows.length > 0) {
+
+        const displayed = Math.min(matchedRows.length, limit);
+        const remaining = matchedRows.length - displayed;
+
+        const showMoreContainer = document.getElementById('inventoryShowMoreContainer');
+        const showMoreText = document.getElementById('inventoryShowMoreText');
+        if (remaining > 0) {
+            if (showMoreContainer) showMoreContainer.classList.remove('hidden');
+            if (showMoreText) showMoreText.textContent = `Show ${remaining} More Item${remaining === 1 ? '' : 's'}`;
+        } else {
+            if (showMoreContainer) showMoreContainer.classList.add('hidden');
+        }
+
+        const matchCountEl = document.getElementById('inventoryMatchCount');
+        if (matchCountEl) {
+            matchCountEl.textContent = `Showing ${displayed} of ${matchedRows.length} items`;
+        }
+
+        if (matchedRows.length === 0 && tableRows.length > 0) {
             if (emptyRow) emptyRow.style.display = "";
         } else {
             if (emptyRow) emptyRow.style.display = "none";
         }
     }
-    
+
     searchInput.addEventListener('input', applySortAndFilters);
     brandSelect.addEventListener('change', applySortAndFilters);
     sortSelect.addEventListener('change', applySortAndFilters);
-    
+
     statusTabs.forEach(tab => {
         tab.addEventListener('click', () => {
             statusTabs.forEach(t => {
@@ -319,23 +386,25 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             tab.classList.add('bg-deepWine', 'text-velvet');
             tab.classList.remove('hover:bg-velvet/50', 'text-noireText/75');
-            
+
             activeStatus = tab.dataset.status;
 
             if (activeStatus === "") {
                 sortSelect.value = "recent";
+            } else if (activeStatus === "in-stock") {
+                sortSelect.value = "stock-desc";
             } else {
                 sortSelect.value = "stock-asc";
             }
 
-            applySortAndFilters();
+            setInventoryLimit(10);
         });
     });
-    
+
     clearFiltersBtn.addEventListener('click', () => {
         searchInput.value = "";
         brandSelect.value = "";
-        
+
         statusTabs.forEach(tab => {
             if (tab.dataset.status === "low") {
                 tab.classList.add('bg-deepWine', 'text-velvet');
@@ -345,10 +414,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 tab.classList.add('hover:bg-velvet/50', 'text-noireText/75');
             }
         });
-        
+
         activeStatus = "low";
         sortSelect.value = "stock-asc";
-        applySortAndFilters();
+        setInventoryLimit(10);
     });
 
     // Initial sort and filter application on page load (defaults to low stock)

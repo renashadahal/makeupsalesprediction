@@ -2,7 +2,7 @@
 import os
 import sys
 
-# Ensure project root directory is in sys.path for cross-platform imports (Windows / macOS / Linux)
+# add project root to path for imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -23,14 +23,14 @@ def run_etl_migration(db_path=DB_PATH):
     print("STARTING ETL MIGRATION: CSV FLAT-FILES TO SQLITE DATABASE")
     print("=" * 60)
 
-    # 1. Initialize SQLite DDL tables
+    # 1. initialize database schema
     init_db(db_path)
     print("[OK] SQLite database schemas & indexes initialized.")
 
     with get_db(db_path) as conn:
         cursor = conn.cursor()
 
-        # 2. Migrate users.csv
+        # 2. migrate users from csv
         users_csv = 'users.csv'
         if os.path.exists(users_csv):
             print("Migrating users.csv...")
@@ -48,7 +48,7 @@ def run_etl_migration(db_path=DB_PATH):
                         """, (u, p, r, b))
             print("[OK] Users migrated.")
 
-        # 3. Migrate inventory.csv & makeup_data.csv metadata into brands, categories, subcategories, products
+        # 3. migrate catalog and inventory metadata
         print("Migrating master catalog & inventory...")
         inv_csv = os.path.join('data', 'inventory.csv')
         makeup_csv = os.path.join('data', 'makeup_data.csv')
@@ -56,7 +56,7 @@ def run_etl_migration(db_path=DB_PATH):
         inv_df = pd.read_csv(inv_csv) if os.path.exists(inv_csv) else pd.DataFrame()
         makeup_df = pd.read_csv(makeup_csv) if os.path.exists(makeup_csv) else pd.DataFrame()
 
-        # Extract unique brands
+        # extract unique brand names
         brands_set = set()
         if not inv_df.empty and 'brand' in inv_df.columns:
             brands_set.update(inv_df['brand'].dropna().str.strip().unique())
@@ -68,10 +68,10 @@ def run_etl_migration(db_path=DB_PATH):
             [(b,) for b in sorted(list(brands_set))]
         )
 
-        # Load brand ID mapping
+        # load brand id map
         brand_map = {row['brand_name']: row['brand_id'] for row in cursor.execute("SELECT brand_id, brand_name FROM brands;").fetchall()}
 
-        # Extract unique categories and subcategories
+        # extract categories and subcategories
         cat_subcat_pairs = set()
         if not inv_df.empty:
             for _, r in inv_df.iterrows():
@@ -90,15 +90,15 @@ def run_etl_migration(db_path=DB_PATH):
             cat_id = cursor.execute("SELECT category_id FROM categories WHERE category_name = ?;", (cat_name,)).fetchone()['category_id']
             cursor.execute("INSERT OR IGNORE INTO subcategories (category_id, subcategory_name) VALUES (?, ?);", (cat_id, subcat_name))
 
-        # Load subcategory mapping: (category_name, subcategory_name) -> subcategory_id
+        # load subcategory map
         subcat_rows = cursor.execute("""
         SELECT s.subcategory_id, c.category_name, s.subcategory_name 
         FROM subcategories s JOIN categories c ON s.category_id = c.category_id;
         """).fetchall()
         subcat_map = {(r['category_name'], r['subcategory_name']): r['subcategory_id'] for r in subcat_rows}
 
-        # Extract & migrate products catalog
-        products_dict = {} # product_id -> (brand_id, subcategory_id, product_name, price)
+        # migrate master product catalog
+        products_dict = {} # product map
         
         if not makeup_df.empty:
             for _, r in makeup_df.iterrows():
@@ -133,7 +133,7 @@ def run_etl_migration(db_path=DB_PATH):
         """, prod_records)
         print(f"[OK] Master product catalog migrated: {len(prod_records)} products.")
 
-        # Populate branch inventory balances
+        # populate inventory stock balances
         if not inv_df.empty:
             inv_records = []
             for _, r in inv_df.iterrows():
@@ -149,7 +149,7 @@ def run_etl_migration(db_path=DB_PATH):
             """, inv_records)
             print(f"[OK] Inventory balances migrated: {len(inv_records)} stock ledger rows.")
 
-        # 4. Migrate sales_history.csv into transactions & transaction_items
+        # 4. migrate sales history into transactions
         sales_csv = os.path.join('data', 'sales_history.csv')
         if os.path.exists(sales_csv):
             sales_df = pd.read_csv(sales_csv)
@@ -158,7 +158,7 @@ def run_etl_migration(db_path=DB_PATH):
                 tx_headers = []
                 tx_items = []
                 
-                # Helper to lookup product_id by product_name
+                # helper to lookup product id by name
                 prod_name_map = {r['product_name']: r['product_id'] for r in cursor.execute("SELECT product_id, product_name FROM products;").fetchall()}
                 
                 for tx_id, group in tx_groups:
@@ -190,7 +190,7 @@ def run_etl_migration(db_path=DB_PATH):
                 """, tx_items)
                 print(f"[OK] Sales history migrated: {len(tx_headers)} transactions ({len(tx_items)} items).")
 
-        # 5. Bulk migrate historical_sales from makeup_data.csv (219,000+ rows)
+        # 5. bulk migrate baseline historical sales
         if not makeup_df.empty:
             print("Migrating 219,000+ historical sales baseline records into SQLite...")
             hist_records = []
@@ -204,7 +204,7 @@ def run_etl_migration(db_path=DB_PATH):
                 holiday = int(r['Holiday_Promotion'])
                 hist_records.append((dt, branch, pid, units, inv_lvl, price, holiday))
 
-            # Insert in chunked batches of 10,000 for high efficiency
+            # insert in 10k batch chunks
             chunk_size = 10000
             for i in range(0, len(hist_records), chunk_size):
                 chunk = hist_records[i:i + chunk_size]
@@ -215,7 +215,7 @@ def run_etl_migration(db_path=DB_PATH):
                 print(f"   Migrated batch {i // chunk_size + 1}/{(len(hist_records) // chunk_size) + 1} ({len(chunk)} rows)")
             print(f"[OK] Historical sales baseline fully migrated: {len(hist_records)} rows.")
 
-        # 6. Verification Audit Queries
+        # 6. run verification audit
         print("-" * 60)
         print("MIGRATION AUDIT VERIFICATION")
         print("-" * 60)

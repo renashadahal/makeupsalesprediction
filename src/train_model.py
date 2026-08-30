@@ -2,7 +2,7 @@
 import os
 import sys
 
-# Ensure project root directory is in sys.path for cross-platform imports (Windows / macOS / Linux)
+# add project root to path for imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -23,7 +23,7 @@ except ModuleNotFoundError:
 def load_training_data(db_path=DB_PATH):
     print("Step 1: Querying SQLite database tables...")
     with get_db(db_path) as conn:
-        # 1. Read historical sales baseline directly from SQLite
+        # 1. load historical baseline from sqlite
         query_hist = """
         SELECT 
             date as Date,
@@ -37,8 +37,7 @@ def load_training_data(db_path=DB_PATH):
         """
         hist_df = pd.read_sql_query(query_hist, conn)
 
-        # 2. Convert POS transaction lines into the same daily demand grain as
-        # the baseline: one row per date, branch, and product.
+        # 2. aggregate live transactions to daily grain
         query_live = """
         SELECT 
             t.transaction_date as Date,
@@ -87,29 +86,29 @@ def derive_event_type(date_series):
 
     event = pd.Series('none', index=date_series.index)
     
-    # 1. Valentine's Day (Feb 1 - 14)
+    # 1. valentine's day
     event[(month == 2) & (day.between(1, 14))] = 'valentines'
     
-    # 2. New Year periods (Jan 1-7 and Nepali New Year Apr 13-16)
+    # 2. new year periods
     event[(month == 1) & (day.between(1, 7))] = 'newyear'
     event[(month == 4) & (day.between(13, 16))] = 'newyear'
     
-    # 3. Summer Clearance / Mid-Year Flash Sales (July)
+    # 3. summer clearance
     event[month == 7] = 'clearance'
     
-    # 4. Teej Festival (late August / early September) - peak cosmetic demand for women
+    # 4. teej festival
     event[(month == 8) & (day.between(18, 31))] = 'teej'
     event[(month == 9) & (day.between(1, 7))] = 'teej'
     
-    # 5. Dashain Grand Festival (mid September to late October) - highest annual shopping volume
+    # 5. dashain grand festival
     event[(month == 9) & (day.between(20, 30))] = 'dashain'
     event[(month == 10) & (day.between(1, 20))] = 'dashain'
     
-    # 6. Tihar / Festival of Lights / Bhai Tika & Chhath (late October to mid November)
+    # 6. tihar festival
     event[(month == 10) & (day.between(21, 31))] = 'tihar'
     event[(month == 11) & (day.between(1, 15))] = 'tihar'
     
-    # 7. Winter Holiday / Festive Season (late December)
+    # 7. winter holidays
     event[(month == 12) & (day.between(20, 31))] = 'festive'
 
     return event
@@ -124,17 +123,17 @@ def build_predictive_pipeline(df):
     df['Date'] = pd.to_datetime(df['Date'])
     df = df.sort_values(by=['Store_ID', 'Product_ID', 'Date']).reset_index(drop=True)
 
-    # --- EVENT TYPE EXTRACTION & DEMAND CALIBRATION ---
+    # event extraction and demand calibration
     df['Event_Type'] = derive_event_type(df['Date'])
     
-    # Calibrate unit sales according to specific festival/occasion multipliers
+    # adjust sales with event multipliers
     event_mult_series = df['Event_Type'].map(EVENT_MULTIPLIERS).fillna(1.0)
     baseline_units = np.where(df['Holiday_Promotion'] == 1, df['Units_Sold'] / 2.0, df['Units_Sold'].astype(float))
     df['Baseline_Units'] = baseline_units
     df['Units_Sold'] = np.round(np.clip(baseline_units * event_mult_series, 1, 150)).astype(int)
 
     event_dummies = pd.get_dummies(df['Event_Type'], prefix='Event')
-    # Ensure all categories are present as columns even if one never occurs in slice
+    # make sure all event columns exist
     for cat in EVENT_CATEGORIES:
         col = f'Event_{cat}'
         if col not in event_dummies.columns:
@@ -143,7 +142,7 @@ def build_predictive_pipeline(df):
     event_feature_cols = [f'Event_{cat}' for cat in EVENT_CATEGORIES if cat != 'none']
     df = pd.concat([df, event_dummies[event_feature_cols]], axis=1)
 
-    # --- ADVANCED FEATURE ENGINEERING FOR R^2 OPTIMIZATION ---
+    # feature engineering
     global_sales_mean = float(df['Baseline_Units'].mean())
     df['Lag_7D_Mean'] = df.groupby(['Store_ID', 'Product_ID'])['Baseline_Units'].transform(
         lambda x: x.shift(1).rolling(window=7, min_periods=1).mean()
@@ -155,7 +154,7 @@ def build_predictive_pipeline(df):
 
     df['Price_Inventory_Ratio'] = df['Price'] / (df['Inventory_Level'] + 1)
 
-    # --- ENCODING CATEGORICAL VARIABLES WITH UNKNOWN HANDLING ---
+    # encode categoricals with unknown handling
     store_classes = list(df['Store_ID'].unique()) + ['UNKNOWN']
     prod_classes = list(df['Product_ID'].unique()) + ['UNKNOWN']
 
@@ -180,7 +179,7 @@ def build_predictive_pipeline(df):
     X = df[features]
     y = df[target]
 
-    # Chronological time-series split by Date (80% historical training -> 20% future testing)
+    # 80/20 chronological time-series split
     unique_dates = df['Date'].drop_duplicates().sort_values()
     cutoff_date = unique_dates.iloc[int(len(unique_dates) * 0.80)]
 
@@ -229,8 +228,7 @@ def build_predictive_pipeline(df):
             'Cutoff_Date': str(cutoff_date.strftime('%Y-%m-%d'))
         }
     }
-    # Write both assets to temporary files and replace only after both writes
-    # succeed.  The active forecast model is therefore never left half-written.
+    # atomic save so model isn't corrupted
     encoders_path = os.path.join(models_dir, 'encoders.pkl')
     demand_model_path = os.path.join(models_dir, 'demand_model.pkl')
     encoders_tmp = f'{encoders_path}.tmp'

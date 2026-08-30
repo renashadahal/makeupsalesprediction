@@ -1180,3 +1180,30 @@ def test_manage_branches_staff_forbidden(client):
         sess['branch'] = 'S002'
     resp = client.get('/manage_branches')
     assert resp.status_code == 403
+
+
+def test_switch_to_newly_created_branch(client):
+    """Admin can switch operating context to a newly created branch."""
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    import uuid
+    new_id = 'S' + '8' + uuid.uuid4().hex[:2].upper()
+
+    # Create new branch
+    client.post('/manage_branches/create', data={
+        'branch_id': new_id,
+        'branch_name': 'New Dynamic Branch',
+        'region': 'Bagmati',
+        'location_detail': 'Chitwan Outlet'
+    }, follow_redirects=True)
+
+    # Switch to the new branch
+    switch_resp = client.get(f'/switch_branch/{new_id}', follow_redirects=True)
+    assert switch_resp.status_code == 200
+
+    with client.session_transaction() as sess:
+        assert sess['branch'] == new_id
+

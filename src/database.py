@@ -7,9 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from contextlib import contextmanager
 
-# Resolve the production database relative to this project, not the directory
-# from which Flask happens to be launched.  This keeps the POS, training job,
-# and Forecast page on the same SQLite file.
+# locate database relative to project root
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 def get_db_path():
     return os.environ.get('TEST_DB_PATH', os.path.join(PROJECT_ROOT, 'data', 'noire_retail.db'))
@@ -18,7 +16,7 @@ DB_PATH = get_db_path()
 
 @contextmanager
 def get_db(db_path=None):
-    """Establishes thread-safe SQLite connection with WAL mode, Foreign Keys enabled, and automatic connection closure."""
+    """thread-safe sqlite connection helper"""
     if db_path is None:
         db_path = get_db_path()
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -36,13 +34,13 @@ def get_db(db_path=None):
         conn.close()
 
 def init_db(db_path=None):
-    """Initializes normalized relational SQLite schema tables and indexes."""
+    """set up initial database schema and tables"""
     if db_path is None:
         db_path = get_db_path()
     with get_db(db_path) as conn:
         cursor = conn.cursor()
         
-        # 1. Branches
+        # branch nodes
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS branches (
             branch_id TEXT PRIMARY KEY,
@@ -54,14 +52,14 @@ def init_db(db_path=None):
         );
         """)
 
-        # Migrate existing tables lacking branch_name / is_active columns
+        # add new branch columns if missing
         existing_cols = [r[1] for r in cursor.execute("PRAGMA table_info(branches);").fetchall()]
         if 'branch_name' not in existing_cols:
             cursor.execute("ALTER TABLE branches ADD COLUMN branch_name TEXT NOT NULL DEFAULT '';")
         if 'is_active' not in existing_cols:
             cursor.execute("ALTER TABLE branches ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;")
 
-        # Seed default branches S001 - S005
+        # seed default store branches
         branches_data = [
             ('S001', 'Kathmandu Store 1', 'Bagmati', 'Kathmandu Store 1'),
             ('S002', 'Kathmandu Store 2', 'Bagmati', 'Kathmandu Store 2'),
@@ -73,13 +71,13 @@ def init_db(db_path=None):
         INSERT OR IGNORE INTO branches (branch_id, branch_name, region, location_detail) VALUES (?, ?, ?, ?);
         """, branches_data)
 
-        # Back-fill branch_name for any rows that were seeded before this column existed
+        # back-fill branch names for older rows
         cursor.executemany("""
         UPDATE branches SET branch_name = ? WHERE branch_id = ? AND (branch_name IS NULL OR branch_name = '');
         """, [(name, bid) for bid, name, *_ in branches_data])
 
 
-        # 2. Users
+        # user accounts
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,7 +89,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 3. Categories & Subcategories
+        # product taxonomy
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS categories (
             category_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,7 +106,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 4. Brands
+        # brand names
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS brands (
             brand_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,7 +114,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 5. Products Catalog
+        # master product catalog
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS products (
             product_id TEXT PRIMARY KEY,
@@ -128,7 +126,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 6. Branch Inventory Stock
+        # branch inventory balances
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS inventory (
             inventory_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -140,7 +138,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 7. Transactions Header
+        # pos transactions header
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS transactions (
             transaction_id TEXT PRIMARY KEY,
@@ -154,7 +152,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 8. Transaction Items
+        # pos transaction line items
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS transaction_items (
             item_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -167,7 +165,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 9. Historical Baseline Sales (for ML feature engineering)
+        # historical baseline sales for training
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS historical_sales (
             history_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,7 +179,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 10. Inter-Branch Inventory Stock Transfers (3-step lifecycle: PENDING -> IN_TRANSIT -> COMPLETED)
+        # inter-branch transfers (pending -> in_transit -> completed)
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS inventory_transfers (
             transfer_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -199,7 +197,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 11. Branch notification inbox.  Transfer notifications are stored
+        # 11. branch notification inbox. transfer notifications are stored
         # separately from the stock ledger so they never affect stock movement.
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS branch_notifications (
@@ -213,7 +211,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 12. Weekly ML training audit.  This table contains metadata only; it
+        # 12. weekly ml training audit. this table contains metadata only; it
         # never changes transactions, inventory, or the historical baseline.
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS model_training_runs (
@@ -232,7 +230,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # 13. Promotional Discounts & Campaigns (Supports both Percentage and Fixed Cash Discounts)
+        # discounts and promos
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS discounts (
             discount_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -249,7 +247,7 @@ def init_db(db_path=None):
         );
         """)
 
-        # Migration: Ensure discount_type and discount_value columns exist for existing tables
+        # add discount columns if missing
         discount_cols = [row[1] for row in cursor.execute("PRAGMA table_info(discounts);").fetchall()]
         if 'discount_type' not in discount_cols:
             cursor.execute("ALTER TABLE discounts ADD COLUMN discount_type TEXT NOT NULL DEFAULT 'PERCENTAGE';")
@@ -257,7 +255,7 @@ def init_db(db_path=None):
             cursor.execute("ALTER TABLE discounts ADD COLUMN discount_value REAL NOT NULL DEFAULT 0.0;")
             cursor.execute("UPDATE discounts SET discount_value = COALESCE(discount_percent, 10.0) WHERE discount_value = 0.0 OR discount_value IS NULL;")
 
-        # Seed default discounts if not already present
+        # seed default promo codes
         cursor.execute("""
         INSERT OR IGNORE INTO discounts (code, discount_type, discount_value, discount_percent, valid_from, valid_to, is_active, description)
         VALUES 
@@ -266,7 +264,7 @@ def init_db(db_path=None):
             ('WELCOME5', 'FIXED', 5.0, 0.0, '2026-01-01 00:00:00', '2030-12-31 23:59:59', 1, 'Welcome Gift $5.00 Off Coupon');
         """)
 
-        # Ensure schema backward compatibility / column migrations for existing SQLite DB files
+        # schema migration check
         existing_cols = [row[1] for row in cursor.execute("PRAGMA table_info(inventory_transfers);").fetchall()]
         if 'approved_by' not in existing_cols:
             cursor.execute("ALTER TABLE inventory_transfers ADD COLUMN approved_by TEXT;")
@@ -281,7 +279,7 @@ def init_db(db_path=None):
         if 'completed_at' not in training_cols:
             cursor.execute("ALTER TABLE model_training_runs ADD COLUMN completed_at DATETIME;")
 
-        # 12. Create Indexes for High Performance Querying
+        # indexes for fast queries
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventory_branch_prod ON inventory(branch_id, product_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_transactions_branch_date ON transactions(branch_id, transaction_date);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_historical_sales_lookup ON historical_sales(branch_id, product_id, date);")
@@ -304,7 +302,7 @@ def db_claim_sunday_training_run(triggered_by, trigger_branch, today=None, db_pa
     duplicated.
     """
     today = today or date.today()
-    if today.weekday() != 6:  # Monday is 0; Sunday is 6.
+    if today.weekday() != 6:  # monday is 0, sunday is 6
         return False
 
     week_start = today.isoformat()
@@ -322,8 +320,8 @@ def db_claim_sunday_training_run(triggered_by, trigger_branch, today=None, db_pa
                 )
                 return True
             except sqlite3.IntegrityError:
-                # Another branch login claimed this Sunday between the read and
-                # insert. Its training job is the only one that should proceed.
+                # another branch login claimed this sunday between the read and
+                # insert. its training job is the only one that should proceed.
                 return False
         if existing['status'] == 'FAILED':
             result = conn.execute(
@@ -381,7 +379,7 @@ def db_get_latest_successful_training(db_path=None):
         ).fetchone()
     return dict(row) if row else None
 
-# --- DATABASE CRUD OPERATIONS ---
+# database helpers
 
 def db_load_users(db_path=None):
     """Loads all system users from SQLite."""
@@ -416,7 +414,7 @@ def db_verify_user(username, password, db_path=None):
             user = dict(row)
             if check_password_hash(user['password_hash'], password):
                 return user
-            # Fallback check for legacy sha256
+            # fallback for legacy sha256 hashes
             import hashlib
             if user['password_hash'] == hashlib.sha256(password.encode()).hexdigest():
                 return user
@@ -440,7 +438,7 @@ def db_update_user(username, password=None, role=None, branch=None, db_path=None
             params.append(hashed)
 
         if role and role in ['admin', 'staff']:
-            # Safety check: Prevent demoting the last remaining admin
+            # don't demote the last remaining admin
             if user_row['role'] == 'admin' and role != 'admin':
                 admin_count = cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'admin';").fetchone()[0]
                 if admin_count <= 1:
@@ -518,11 +516,11 @@ def db_update_inventory_stock(branch, brand_name, product_name, quantity_added, 
     with get_db(db_path) as conn:
         cursor = conn.cursor()
         
-        # 1. Ensure Brand exists
+        # ensure brand exists
         cursor.execute("INSERT OR IGNORE INTO brands (brand_name) VALUES (?);", (brand_name,))
         brand_id = cursor.execute("SELECT brand_id FROM brands WHERE brand_name = ?;", (brand_name,)).fetchone()['brand_id']
 
-        # 2. Ensure Category and Subcategory exist
+        # ensure category and subcategory exist
         cat_name = category_name or 'makeup'
         subcat_name = subcategory_name or 'general'
         cursor.execute("INSERT OR IGNORE INTO categories (category_name) VALUES (?);", (cat_name,))
@@ -531,7 +529,7 @@ def db_update_inventory_stock(branch, brand_name, product_name, quantity_added, 
         cursor.execute("INSERT OR IGNORE INTO subcategories (category_id, subcategory_name) VALUES (?, ?);", (cat_id, subcat_name))
         subcat_id = cursor.execute("SELECT subcategory_id FROM subcategories WHERE category_id = ? AND subcategory_name = ?;", (cat_id, subcat_name)).fetchone()['subcategory_id']
 
-        # 3. Ensure Product exists
+        # ensure product exists
         existing_p = cursor.execute("SELECT product_id FROM products WHERE product_name = ? AND brand_id = ?;", (product_name, brand_id)).fetchone()
         if existing_p:
             p_id = existing_p['product_id']
@@ -545,7 +543,7 @@ def db_update_inventory_stock(branch, brand_name, product_name, quantity_added, 
             VALUES (?, ?, ?, ?, ?);
             """, (p_id, brand_id, subcat_id, product_name, base_p))
 
-        # 4. Upsert Inventory Stock
+        # update inventory stock
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute("""
         INSERT INTO inventory (branch_id, product_id, stock, last_updated)
@@ -598,7 +596,7 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
     with get_db(db_path) as conn:
         cursor = conn.cursor()
 
-        # 1. Pre-validate stock availability for all items in cart before committing
+        # validate stock availability before checkout
         for item in cart:
             p_name = item['product_name'].strip()
             brand_name = item['brand'].strip()
@@ -635,7 +633,7 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
                 'raw_subtotal': raw_subtotal
             })
 
-        # Calculate discount totals (supports PERCENTAGE and FIXED cash discount)
+        # calculate discount total
         if disc_info:
             disc_type = disc_info.get('discount_type', 'PERCENTAGE')
             disc_val = float(disc_info.get('discount_value', disc_info.get('discount_percent', 0.0)))
@@ -652,7 +650,7 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
             discount_amount = 0.0
             grand_total = subtotal_before_discount
 
-        # Compute per-item unit price & subtotals based on effective rate
+        # compute item subtotals
         for item in processed_items:
             final_unit_price = round(item['orig_price'] * effective_rate, 2)
             final_subtotal = round(final_unit_price * item['quantity'], 2)
@@ -667,13 +665,13 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
                 'subtotal': final_subtotal
             })
 
-        # 2. Insert Transaction Header
+        # record transaction header
         cursor.execute("""
         INSERT INTO transactions (transaction_id, username, branch_id, promo_code, discount_rate, grand_total, transaction_date, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?);
         """, (tx_id, username, branch, promo_code, effective_rate, grand_total, today_date, now_str))
 
-        # 3. Insert Transaction Items & Deduct Stock
+        # insert items and deduct stock
         for r_item in receipt_items:
             cursor.execute("""
             INSERT INTO transaction_items (transaction_id, product_id, shade, quantity, unit_price, subtotal)
@@ -811,7 +809,7 @@ def db_load_transactions(branch=None, limit=None, db_path=None):
 
         return transactions
 
-# --- INTER-BRANCH INVENTORY TRANSFERS ---
+# inter-branch transfers
 
 def db_request_transfer(from_branch, to_branch, product_id, quantity, requested_by, notes='', db_path=None):
     """Creates a new inter-branch stock transfer request."""
@@ -829,12 +827,12 @@ def db_request_transfer(from_branch, to_branch, product_id, quantity, requested_
     with get_db(db_path) as conn:
         cursor = conn.cursor()
         
-        # Verify product exists
+        # check product exists
         prod_row = cursor.execute("SELECT product_name FROM products WHERE product_id = ?;", (product_id,)).fetchone()
         if not prod_row:
             return False, f"Product SKU '{product_id}' not found."
 
-        # Verify source branch stock
+        # check source stock
         row = cursor.execute(
             "SELECT stock FROM inventory WHERE branch_id = ? AND product_id = ?;",
             (from_branch, product_id)
@@ -885,7 +883,7 @@ def db_dispatch_transfer(transfer_id, approved_by, db_path=None):
         p_id   = t_row['product_id']
         qty    = int(t_row['quantity'])
 
-        # Re-verify source still has sufficient stock at dispatch time
+        # recheck source stock before dispatch
         src_row = cursor.execute(
             "SELECT stock FROM inventory WHERE branch_id = ? AND product_id = ?;",
             (from_b, p_id)
@@ -899,14 +897,14 @@ def db_dispatch_transfer(transfer_id, approved_by, db_path=None):
 
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        # Debit source branch stock immediately — those units are now "on the truck"
+        # debit source stock for in-transit shipment
         cursor.execute("""
         UPDATE inventory
         SET stock = stock - ?, last_updated = ?
         WHERE branch_id = ? AND product_id = ?;
         """, (qty, now_str, from_b, p_id))
 
-        # Mark transfer as IN_TRANSIT with local timestamp
+        # mark transfer in_transit
         cursor.execute("""
         UPDATE inventory_transfers
         SET status = 'IN_TRANSIT', approved_by = ?, dispatched_at = ?
@@ -954,7 +952,7 @@ def db_complete_transfer(transfer_id, db_path=None):
         qty  = int(t_row['quantity'])
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        # Credit destination branch stock (upsert in case this is first time stocking this SKU)
+        # credit destination stock on arrival
         cursor.execute("""
         INSERT INTO inventory (branch_id, product_id, stock, last_updated)
         VALUES (?, ?, ?, ?)
@@ -963,7 +961,7 @@ def db_complete_transfer(transfer_id, db_path=None):
             last_updated = ?;
         """, (to_b, p_id, qty, now_str, now_str))
 
-        # Mark transfer COMPLETED with local timestamp
+        # mark transfer completed
         cursor.execute("""
         UPDATE inventory_transfers
         SET status = 'COMPLETED', completed_at = ?
@@ -1003,7 +1001,7 @@ def db_cancel_transfer(transfer_id, db_path=None):
 
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        # If already dispatched, the source stock was debited — restore it
+        # restore debited stock if cancelled in_transit
         if t_row['status'] == 'IN_TRANSIT':
             cursor.execute("""
             UPDATE inventory
@@ -1058,7 +1056,7 @@ def db_load_transfers(branch=None, status=None, db_path=None):
         rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
-# --- DISCOUNT CODES & PROMOTIONS SYSTEM ---
+# discount management
 
 def _normalize_datetime_str(dt_input, is_end=False):
     """Normalizes various date/time input formats into ISO standard 'YYYY-MM-DD HH:MM:SS'."""
@@ -1072,14 +1070,14 @@ def _normalize_datetime_str(dt_input, is_end=False):
         return f"{dt_input.strftime('%Y-%m-%d')} {suffix}"
     
     val_str = str(dt_input).strip().replace('T', ' ')
-    if len(val_str) == 10:  # YYYY-MM-DD
+    if len(val_str) == 10:  # date format check
         suffix = '23:59:59' if is_end else '00:00:00'
         val_str = f"{val_str} {suffix}"
-    elif len(val_str) == 16:  # YYYY-MM-DD HH:MM
+    elif len(val_str) == 16:  # date format check hh:mm
         suffix = ':59' if is_end else ':00'
         val_str = f"{val_str}{suffix}"
     
-    # Validate timestamp format
+    # validate timestamp format
     try:
         parsed = datetime.strptime(val_str[:19], '%Y-%m-%d %H:%M:%S')
         return parsed.strftime('%Y-%m-%d %H:%M:%S')
@@ -1094,7 +1092,7 @@ def _format_discount_row(row, check_dt=None):
     d = dict(row)
     now_dt = check_dt or datetime.now()
     
-    # Parse validity timestamps
+    # parse valid dates
     try:
         from_dt = datetime.strptime(str(d['valid_from'])[:19], '%Y-%m-%d %H:%M:%S')
     except Exception:
@@ -1228,7 +1226,7 @@ def db_validate_discount_code(code, check_time=None, db_path=None):
 
 def db_create_discount(code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=None):
     """Creates a new discount promotional campaign in SQLite with day and time limits (Percentage or Fixed Cash)."""
-    # Backward compatibility if positional args passed as (code, 20.0, valid_from, valid_to, is_active, description)
+    # positional args backward compatibility
     if isinstance(discount_type, (int, float)) or (isinstance(discount_type, str) and discount_type.replace('.', '', 1).isdigit()):
         val = float(discount_type)
         disc_type = 'PERCENTAGE'
@@ -1297,7 +1295,7 @@ def db_create_discount(code, discount_type='PERCENTAGE', discount_value=None, va
 
 def db_update_discount(discount_id, code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=None):
     """Updates an existing discount code campaign in SQLite."""
-    # Backward compatibility if positional args passed as (discount_id, code, 20.0, valid_from, valid_to, is_active, description)
+    # backward compatibility if positional args passed as (discount_id, code, 20.0, valid_from, valid_to, is_active, description)
     if isinstance(discount_type, (int, float)) or (isinstance(discount_type, str) and discount_type.replace('.', '', 1).isdigit()):
         val = float(discount_type)
         disc_type = 'PERCENTAGE'
@@ -1392,7 +1390,7 @@ def db_toggle_discount_status(discount_id, db_path=None):
         return True, "Discount status updated successfully."
 
 
-# Convenience Aliases
+# convenience aliases
 request_transfer = db_request_transfer
 dispatch_transfer = db_dispatch_transfer
 approve_transfer = db_dispatch_transfer
@@ -1408,7 +1406,7 @@ validate_discount_code = db_validate_discount_code
 
 
 # ---------------------------------------------------------------------------
-# Branch Management
+# branch management
 # ---------------------------------------------------------------------------
 
 def db_load_branches(db_path=None):

@@ -64,9 +64,9 @@
                 <a href="{{ url_for('sales_history', branch='ALL') }}" class="px-3 py-1 rounded-lg font-medium text-[11px] transition-all {% if selected_branch == 'ALL' %}bg-deepWine text-velvet font-bold shadow-sm{% else %}bg-white/80 hover:bg-white text-noireText border border-noireText/10{% endif %}">
                     All Branches
                 </a>
-                {% for b_code in ['S001', 'S002', 'S003', 'S004', 'S005'] %}
-                <a href="{{ url_for('sales_history', branch=b_code) }}" class="px-3 py-1 rounded-lg font-mono text-[11px] transition-all {% if selected_branch == b_code %}bg-deepWine text-velvet font-bold shadow-sm{% else %}bg-white/80 hover:bg-white text-noireText border border-noireText/10{% endif %}">
-                    {{ b_code }}
+                {% for b in active_branches %}
+                <a href="{{ url_for('sales_history', branch=b.branch_id) }}" class="px-3 py-1 rounded-lg font-mono text-[11px] transition-all {% if selected_branch == b.branch_id %}bg-deepWine text-velvet font-bold shadow-sm{% else %}bg-white/80 hover:bg-white text-noireText border border-noireText/10{% endif %}">
+                    {{ b.branch_id }}
                 </a>
                 {% endfor %}
                 {% else %}

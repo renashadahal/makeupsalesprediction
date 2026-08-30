@@ -176,7 +176,7 @@
                            class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
                 </div>
 
-                <div class="pt-2 border-t border-noireText/5 flex justify-end">
+                <div class="pt-2 border-t border-noireText/5 flex justify-center">
                     <button id="submit_transfer_btn" type="submit" class="w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md">
                         Submit Transfer Request
                     </button>
@@ -225,6 +225,8 @@
 
     <!-- Transfer Records Audit Table -->
     <div class="bg-white rounded-2xl border border-noireText/10 shadow-md overflow-hidden">
+        
+        <!-- Header Row -->
         <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
                 <h3 class="text-xl font-serif text-noireText">Transfer Ledger</h3>
@@ -242,6 +244,25 @@
                 </button>
             </div>
         </div>
+
+        {% if session.get('role') == 'admin' %}
+        <!-- Admin Branch Scope Control Bar -->
+        <div class="px-5 py-3 border-b border-noireText/10 bg-parchment/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[10px] text-noireText/60 font-bold uppercase tracking-widest mr-1">Branch Scope:</span>
+                <button type="button" onclick="setAdminBranchScope('current')" id="scopeCurrentBtn" class="admin-scope-tab px-3 py-1 rounded-lg font-medium text-[11px] transition-all bg-deepWine text-velvet font-bold shadow-sm cursor-pointer">
+                    Branch {{ current_branch }} (Default)
+                </button>
+                <button type="button" onclick="setAdminBranchScope('other')" id="scopeOtherBtn" class="admin-scope-tab px-3 py-1 rounded-lg font-medium text-[11px] transition-all bg-white/80 hover:bg-white text-noireText border border-noireText/10 cursor-pointer">
+                    Other Branches
+                </button>
+                <button type="button" onclick="setAdminBranchScope('all')" id="scopeAllBtn" class="admin-scope-tab px-3 py-1 rounded-lg font-medium text-[11px] transition-all bg-white/80 hover:bg-white text-noireText border border-noireText/10 cursor-pointer">
+                    All Branches
+                </button>
+            </div>
+            <span class="text-[10px] text-noireText/50 italic font-medium">Defaulting to active branch (Branch {{ current_branch }})</span>
+        </div>
+        {% endif %}
 
         <!-- Comprehensive Filter Controls -->
         <div class="p-5 border-b border-noireText/10 bg-parchment/10 space-y-4 text-xs tracking-wide">
@@ -327,8 +348,8 @@
             </div>
         </div>
 
-        <div class="w-full overflow-hidden">
-            <table class="w-full table-fixed text-left text-xs tracking-wide border-collapse" id="transfersTable">
+        <div class="w-full overflow-x-auto">
+            <table class="w-full text-left text-xs tracking-wide border-collapse min-w-[850px]" id="transfersTable">
                 <colgroup>
                     <col class="w-[6%]">
                     <col class="w-[12%]">
@@ -385,11 +406,11 @@
                                     </span>
                                 {% elif t.status == 'COMPLETED' %}
                                     <span class="text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-emerald-200">
-                                        ✓ Completed
+                                        Completed
                                     </span>
                                 {% else %}
                                     <span class="text-rose-800 bg-rose-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-rose-200">
-                                        ✕ Cancelled
+                                        Cancelled
                                     </span>
                                 {% endif %}
                             </td>
@@ -469,6 +490,15 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Show More Records Footer Control -->
+        <div id="transferShowMoreContainer" class="hidden p-3 bg-parchment/20 border-t border-noireText/10 text-center">
+            <button type="button" id="transferShowMoreBtn" onclick="setTransferLimit('all')"
+                class="px-5 py-2 bg-white hover:bg-velvet border border-noireText/20 text-noireText rounded-xl font-medium text-xs shadow-sm transition-all inline-flex items-center gap-2 cursor-pointer">
+                <span id="transferShowMoreText">Show More Records</span>
+                <span class="text-dustyRose font-mono">↓</span>
+            </button>
+        </div>
     </div>
 
 </div>
@@ -519,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.className = 'w-full sm:w-auto px-8 py-3 bg-red-700/85 hover:bg-red-800 text-white font-bold uppercase tracking-widest text-xs rounded-xl cursor-not-allowed opacity-90 transition-all shadow-md';
-                submitBtn.innerText = '❌ Exceeds Source Stock';
+                submitBtn.innerText = ' Exceeds Source Stock';
             }
         } else if (requested === availableStock && availableStock > 0) {
             // Mini Yellow Warning: Stock Requested == Available Stock
@@ -646,16 +676,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     loadInitialBrands();
 
+    const toBranchSel = document.getElementById('to_branch');
+
     if (fromBranchSel) {
         fromBranchSel.addEventListener('change', () => {
             if (prodSel && prodSel.value) {
                 updateSourceStockDisplay();
             }
+            if (transferFilterFrom) {
+                transferFilterFrom.value = fromBranchSel.value;
+            }
+            filterTransfers();
+        });
+    }
+
+    if (toBranchSel) {
+        toBranchSel.addEventListener('change', () => {
+            if (transferFilterTo) {
+                transferFilterTo.value = toBranchSel.value;
+            }
+            filterTransfers();
         });
     }
 
     if (brandSel) {
         brandSel.addEventListener('change', async () => {
+            if (transferFilterBrand && brandSel.value) {
+                transferFilterBrand.value = brandSel.value.toLowerCase();
+                filterTransfers();
+            }
             const brand = brandSel.value;
             if (!brand) return;
 
@@ -728,6 +777,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!prodName) return;
 
             updateSourceStockDisplay();
+            if (transferSearchInput) {
+                transferSearchInput.value = prodName;
+                filterTransfers();
+            }
 
             if (shadeSel) {
                 shadeSel.innerHTML = '<option value="" disabled selected>-- Loading Shades... --</option>';
@@ -759,6 +812,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Transfer Ledger Filtering & Default Last 5 Display Logic
     let currentTransferLimit = 5;
+    const currentBranchVal = "{{ current_branch }}";
+    const isAdminUser = {{ 'true' if session.get('role') == 'admin' else 'false' }};
+    let adminBranchScope = isAdminUser ? 'current' : 'all';
+
     const transferSearchInput = document.getElementById('transferSearchInput');
     const transferFilterBrand = document.getElementById('transferFilterBrand');
     const transferFilterFrom = document.getElementById('transferFilterFrom');
@@ -770,16 +827,52 @@ document.addEventListener('DOMContentLoaded', () => {
     const transferMatchCount = document.getElementById('transferMatchCount');
     const transferRows = Array.from(document.querySelectorAll('#transfersTable tbody tr.transfer-row'));
 
+    window.setAdminBranchScope = function(scope) {
+        adminBranchScope = scope;
+        document.querySelectorAll('.admin-scope-tab').forEach(btn => {
+            btn.classList.remove('bg-deepWine', 'text-velvet', 'font-bold', 'shadow-sm');
+            btn.classList.add('bg-white/80', 'hover:bg-white', 'text-noireText', 'border', 'border-noireText/10');
+        });
+        if (scope === 'current') {
+            const btn = document.getElementById('scopeCurrentBtn');
+            if (btn) {
+                btn.classList.add('bg-deepWine', 'text-velvet', 'font-bold', 'shadow-sm');
+                btn.classList.remove('bg-white/80', 'hover:bg-white', 'text-noireText', 'border', 'border-noireText/10');
+            }
+        } else if (scope === 'other') {
+            const btn = document.getElementById('scopeOtherBtn');
+            if (btn) {
+                btn.classList.add('bg-deepWine', 'text-velvet', 'font-bold', 'shadow-sm');
+                btn.classList.remove('bg-white/80', 'hover:bg-white', 'text-noireText', 'border', 'border-noireText/10');
+            }
+        } else if (scope === 'all') {
+            const btn = document.getElementById('scopeAllBtn');
+            if (btn) {
+                btn.classList.add('bg-deepWine', 'text-velvet', 'font-bold', 'shadow-sm');
+                btn.classList.remove('bg-white/80', 'hover:bg-white', 'text-noireText', 'border', 'border-noireText/10');
+            }
+        }
+        filterTransfers();
+    };
+
     function filterTransfers() {
         const query = (transferSearchInput?.value || '').toLowerCase().trim();
         const selBrand = (transferFilterBrand?.value || '').toLowerCase().trim();
-        const selFrom = transferFilterFrom?.value || '';
-        const selTo = transferFilterTo?.value || '';
+        const selFrom = (transferFilterFrom?.value || '').trim();
+        const selTo = (transferFilterTo?.value || '').trim();
         const selStatus = transferFilterStatus?.value || '';
         const fromDate = transferFromDate?.value || '';
-        const toDate = transferToDate?.value || '';
+        let toDate = transferToDate?.value || '';
 
-        const hasCustomFilter = query !== '' || selBrand !== '' || selFrom !== '' || selTo !== '' || selStatus !== '' || fromDate !== '' || toDate !== '';
+        // If starting date is picked and toDate is empty, default toDate to today
+        if (fromDate && !toDate) {
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            toDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        }
+
+        const hasExplicitBranchFilter = selFrom !== '' || selTo !== '';
+        const hasCustomFilter = query !== '' || selBrand !== '' || selFrom !== '' || selTo !== '' || selStatus !== '' || fromDate !== '' || (isAdminUser && adminBranchScope !== 'current');
 
         let matchedRows = [];
 
@@ -795,8 +888,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const notes = row.dataset.notes || '';
             const fullText = (row.innerText || '').toLowerCase();
 
+            // Admin Scope Filter: 'current' (default) shows only transfers involving active branch unless an explicit branch filter is chosen
+            let matchesScope = true;
+            if (isAdminUser && !hasExplicitBranchFilter) {
+                if (adminBranchScope === 'current') {
+                    matchesScope = (from === currentBranchVal || to === currentBranchVal);
+                } else if (adminBranchScope === 'other') {
+                    matchesScope = (from !== currentBranchVal && to !== currentBranchVal);
+                } else if (adminBranchScope === 'all') {
+                    matchesScope = true;
+                }
+            }
+
             const matchesQuery = query === '' || fullText.includes(query) || id.includes(query) || user.includes(query) || notes.includes(query) || product.includes(query) || brand.includes(query);
-            const matchesBrand = selBrand === '' || brand.includes(selBrand);
+            const matchesBrand = selBrand === '' || brand.includes(selBrand) || product.includes(selBrand);
             const matchesFrom = selFrom === '' || from === selFrom;
             const matchesTo = selTo === '' || to === selTo;
             const matchesStatus = selStatus === '' || status === selStatus;
@@ -805,13 +910,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (fromDate && date < fromDate) matchesDate = false;
             if (toDate && date > toDate) matchesDate = false;
 
-            if (matchesQuery && matchesBrand && matchesFrom && matchesTo && matchesStatus && matchesDate) {
+            if (matchesScope && matchesQuery && matchesBrand && matchesFrom && matchesTo && matchesStatus && matchesDate) {
                 matchedRows.push(row);
             }
         });
 
-        // If no filter is applied and limit is numeric, display only top N rows (last N transfers)
-        const limit = (hasCustomFilter || currentTransferLimit === 'all') ? matchedRows.length : parseInt(currentTransferLimit, 10);
+        // Respect limit (default 5 recent/matching ones, unless limit == 'all')
+        const limit = currentTransferLimit === 'all' ? matchedRows.length : parseInt(currentTransferLimit, 10);
 
         transferRows.forEach(row => {
             row.style.display = 'none';
@@ -821,9 +926,37 @@ document.addEventListener('DOMContentLoaded', () => {
             row.style.display = '';
         });
 
+        const displayed = Math.min(matchedRows.length, limit);
+        const remaining = matchedRows.length - displayed;
+
+        const showMoreContainer = document.getElementById('transferShowMoreContainer');
+        const showMoreText = document.getElementById('transferShowMoreText');
+        if (remaining > 0) {
+            if (showMoreContainer) showMoreContainer.classList.remove('hidden');
+            if (showMoreText) showMoreText.textContent = `Show ${remaining} More Record${remaining === 1 ? '' : 's'}`;
+        } else {
+            if (showMoreContainer) showMoreContainer.classList.add('hidden');
+        }
+
         if (transferMatchCount) {
-            const displayed = Math.min(matchedRows.length, limit);
-            transferMatchCount.textContent = `Showing ${displayed} of ${transferRows.length} transfers${hasCustomFilter ? ' (Filtered)' : ''}`;
+            let filterDesc = '';
+            if (selBrand) {
+                filterDesc += ` [Brand: ${selBrand}]`;
+            }
+            if (selStatus) {
+                filterDesc += ` [Status: ${selStatus}]`;
+            }
+            if (selFrom && selTo) {
+                filterDesc += ` [${selFrom} → ${selTo}]`;
+            } else if (selFrom) {
+                filterDesc += ` [From ${selFrom}]`;
+            } else if (selTo) {
+                filterDesc += ` [To ${selTo}]`;
+            } else if (isAdminUser && !hasExplicitBranchFilter) {
+                filterDesc += (adminBranchScope === 'current' ? ` [Branch ${currentBranchVal}]` : adminBranchScope === 'other' ? ' [Other Branches]' : ' [All Branches]');
+            }
+
+            transferMatchCount.textContent = `Showing ${displayed} of ${matchedRows.length} matching transfers${filterDesc}${hasCustomFilter ? ' (Filtered)' : ''}`;
         }
     }
 
@@ -889,6 +1022,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (transferFilterStatus) transferFilterStatus.value = '';
             if (transferFromDate) transferFromDate.value = '';
             if (transferToDate) transferToDate.value = '';
+            if (isAdminUser) setAdminBranchScope('current');
             setTransferLimit(5);
         });
     }

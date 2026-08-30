@@ -150,7 +150,7 @@
                 </div>
                 <p id="promoMessage" class="text-[11px] font-mono font-medium hidden"></p>
                 <div class="text-[10px] text-noireText/50 space-y-0.5" id="activePromoContainer">
-                    <p id="activePromoList">💡 Loading active promotions...</p>
+                    <p id="activePromoList"> Loading active promotions...</p>
                 </div>
             </div>
 
@@ -253,7 +253,8 @@
                 <p style="font-family: serif; font-style: italic; margin: 0;">Thank you for shopping at Noire Beauty!</p>
                 <p style="font-family: monospace; font-size: 0.65rem; margin: 0.25rem 0 0 0;">Please retain this receipt for returns or exchanges.</p>
             </div>
-        </div>        <!-- Modal Action Footer (Always pinned at bottom, hidden on print) -->
+        </div>
+        <!-- Modal Action Footer (Always pinned at bottom, hidden on print) -->
         <div class="no-print" style="background-color: #f9fafb; padding: 1rem 1.5rem; border-top: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-shrink: 0;">
             <button type="button" id="closeReceiptBtn" style="padding: 0.6rem 1.2rem; border-radius: 0.75rem; border: 1px solid rgba(0,0,0,0.2); background: transparent; cursor: pointer; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
                 Close & Next Sale
@@ -579,7 +580,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 if (datalist) datalist.innerHTML = '';
                 
                 if (activeList.length > 0) {
-                    let html = '💡 Active Codes: ';
+                    let html = ' Active Codes: ';
                     activeList.forEach((d, idx) => {
                         if (datalist) {
                             const opt = document.createElement('option');
@@ -591,7 +592,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     });
                     if (container) container.innerHTML = html;
                 } else {
-                    if (container) container.innerHTML = '💡 No active promotions currently scheduled.';
+                    if (container) container.innerHTML = ' No active promotions currently scheduled.';
                 }
             }
         } catch (e) {
@@ -621,12 +622,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (data.valid) {
                 currentDiscountRate = data.discount_rate;
                 promoMsg.className = "text-[11px] font-mono font-medium text-emerald-700 flex items-center gap-1";
-                promoMsg.innerHTML = `✓ ${data.code} applied! (${data.discount_percent}% Discount)`;
+                promoMsg.innerHTML = `${data.code} applied! (${data.discount_percent}% Discount)`;
                 promoMsg.classList.remove('hidden');
             } else {
                 currentDiscountRate = 1.0;
                 promoMsg.className = "text-[11px] font-mono font-medium text-rose-600 flex items-center gap-1";
-                promoMsg.innerHTML = `✖ ${data.message || 'Invalid or expired promo code.'}`;
+                promoMsg.innerHTML = ` ${data.message || 'Invalid or expired promo code.'}`;
                 promoMsg.classList.remove('hidden');
             }
         } catch (err) {
@@ -634,17 +635,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (promoVal === "FESTIVE10") {
                 currentDiscountRate = 0.90;
                 promoMsg.className = "text-[11px] font-mono font-medium text-emerald-700 flex items-center gap-1";
-                promoMsg.innerHTML = "✓ FESTIVE10 applied! (10% Discount)";
+                promoMsg.innerHTML = "FESTIVE10 applied! (10% Discount)";
                 promoMsg.classList.remove('hidden');
             } else if (promoVal === "VALENTINE15") {
                 currentDiscountRate = 0.85;
                 promoMsg.className = "text-[11px] font-mono font-medium text-emerald-700 flex items-center gap-1";
-                promoMsg.innerHTML = "✓ VALENTINE15 applied! (15% Discount)";
+                promoMsg.innerHTML = "VALENTINE15 applied! (15% Discount)";
                 promoMsg.classList.remove('hidden');
             } else {
                 currentDiscountRate = 1.0;
                 promoMsg.className = "text-[11px] font-mono font-medium text-rose-600 flex items-center gap-1";
-                promoMsg.innerHTML = "✖ Invalid promo code.";
+                promoMsg.innerHTML = " Invalid promo code.";
                 promoMsg.classList.remove('hidden');
             }
         }
@@ -684,7 +685,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <td class="py-3 px-2 font-mono">${item.quantity}</td>
                 <td class="py-3 px-2 text-right font-mono font-medium text-noireText">$${(item.price * item.quantity).toFixed(2)}</td>
                 <td class="py-3 px-2 text-center">
-                    <button onclick="removeItemFromCart(${item.id})" class="text-rose-600 hover:text-rose-800 font-bold px-2 py-1 text-xs">✖</button>
+                    <button onclick="removeItemFromCart(${item.id})" class="text-rose-600 hover:text-rose-800 font-bold px-2 py-1 text-xs"></button>
                 </td>
             `;
             tbody.appendChild(tr);

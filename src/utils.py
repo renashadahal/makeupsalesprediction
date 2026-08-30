@@ -2,7 +2,7 @@
 import os
 import sys
 
-# Ensure project root directory is in sys.path for cross-platform imports (Windows / macOS / Linux)
+# cross-environment import fix
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -36,7 +36,7 @@ INVENTORY_CSV = os.path.join('data', 'inventory.csv')
 SALES_CSV = os.path.join('data', 'sales_history.csv')
 MAKEUP_DATA_CSV = os.path.join('data', 'makeup_data.csv')
 
-# --- USER MANAGEMENT UTILITIES ---
+# user management wrappers
 
 def load_users(db_path=None):
     return db_load_users(db_path=db_path)
@@ -53,12 +53,12 @@ def delete_user(username, current_admin_user=None, db_path=None):
 def verify_user(username, password, db_path=None):
     return db_verify_user(username, password, db_path=db_path)
 
-# --- SALES TRANSACTIONS UTILITIES ---
+# transaction wrappers
 
 def load_transactions(branch=None, limit=None, db_path=None):
     return db_load_transactions(branch=branch, limit=limit, db_path=db_path)
 
-# --- INVENTORY MANAGEMENT UTILITIES ---
+# inventory wrappers
 
 def load_inventory(branch=None, db_path=None):
     return db_load_inventory(branch=branch, db_path=db_path)
@@ -74,18 +74,14 @@ def update_inventory_stock(branch, brand, product_name, quantity_added, product_
 def deduct_inventory_stock(branch, product_name, quantity_sold, db_path=None):
     return db_deduct_inventory_stock(branch=branch, product_name=product_name, quantity_sold=quantity_sold, db_path=db_path)
 
-# --- CATALOG & SHADES UTILITIES ---
+# catalog and shade helpers
 
 def get_catalog_shades(product_name, db_path=None):
-    """Extracts available shades tailored to the specific product catalog item.
-    
-    Returns an empty list for non-shaded categories (e.g. sunscreens, moisturizers, perfumes),
-    and exact product shades for cosmetics (lipsticks, foundations, concealers, blushes, eyeliners, eyeshadows).
-    """
+    """get available shades for a given product"""
     if not product_name:
         return []
 
-    # 1. First check if custom shades exist in transaction_items table
+    # check custom shades from transaction history first
     with get_db(db_path) as conn:
         rows = conn.execute("""
         SELECT DISTINCT ti.shade FROM transaction_items ti
@@ -98,7 +94,7 @@ def get_catalog_shades(product_name, db_path=None):
         if custom_shades:
             return sorted(list(set(custom_shades)))
 
-        # 2. Lookup product metadata (category, subcategory, brand, product name)
+        # lookup product category and brand info
         p_info = conn.execute("""
         SELECT p.product_name, s.subcategory_name, c.category_name, b.brand_name
         FROM products p
@@ -132,12 +128,12 @@ def get_catalog_shades(product_name, db_path=None):
 
     pname_lower = pname.lower()
 
-    # Non-shaded categories: Sunscreens, Skincare/Moisturizers, Perfumes/Fragrances
+    # non-shaded categories like skincare or sunscreen get empty list
     non_shaded = ['sunscreen', 'moisturizer', 'perfume', 'skincare', 'body']
     if subcat in non_shaded or (cat in ['skincare', 'body'] and subcat not in ['blush', 'foundation', 'lipstick', 'eyeshadow', 'eyeliner', 'mascara']):
         return []
 
-    # --- Product & Category Specific Shade Lookup ---
+    # shade lookup map
     if 'lipstick' in subcat or 'lip' in cat or 'lipstick' in pname_lower:
         if '696 burgundy blush' in pname_lower:
             return ['696 Burgundy Blush', '690 Siren in Scarlet', '695 Divine Wine', '507 Almond Pink']
@@ -237,12 +233,12 @@ def get_catalog_shades(product_name, db_path=None):
 
     return []
 
-# --- ROLLING LAG FEATURE CALCULATION ---
+# rolling lag feature calculation
 
 def calculate_rolling_lags(product_id, store_id, default_mean=15.0, db_path=None):
     return db_calculate_rolling_lags(product_id=product_id, branch_id=store_id, default_mean=default_mean, db_path=db_path)
 
-# --- STOCK TRANSFER UTILITIES ---
+# stock transfer helpers
 
 def request_transfer(from_branch, to_branch, product_id, quantity, requested_by, notes='', db_path=None):
     return db_request_transfer(from_branch=from_branch, to_branch=to_branch, product_id=product_id, quantity=quantity, requested_by=requested_by, notes=notes, db_path=db_path)
@@ -265,7 +261,7 @@ def cancel_transfer(transfer_id, db_path=None):
 def load_transfers(branch=None, status=None, db_path=None):
     return db_load_transfers(branch=branch, status=status, db_path=db_path)
 
-# --- DISCOUNT CODES & PROMOTIONS UTILITIES ---
+# discount and promo helpers
 
 def load_discounts(db_path=None):
     return db_load_discounts(db_path=db_path)

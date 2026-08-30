@@ -24,13 +24,13 @@ from src.utils import get_catalog_shades
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'noire_intelligence_matrix_secure_key_2026')
 
-# Initialize SQLite database schema on startup
+# spin up sqlite db schema on startup
 init_db(DB_PATH)
 
 
 @app.context_processor
 def inject_active_branches():
-    """Inject active branch list into every template for nav branch selector."""
+    """pass active branches to all templates for nav dropdown"""
     try:
         with get_db() as conn:
             rows = conn.execute(
@@ -38,12 +38,12 @@ def inject_active_branches():
             ).fetchall()
         return {'active_branches': [{'branch_id': r['branch_id']} for r in rows]}
     except Exception:
-        # Fallback to defaults if DB not yet ready
+        # fallback if db isn't ready yet
         return {'active_branches': [{'branch_id': b} for b in ['S001', 'S002', 'S003', 'S004', 'S005']]}
 
 
 def _run_sunday_training(run_date):
-    """Background worker for the weekly model refresh."""
+    """background worker for weekly model retraining"""
     try:
         from src.train_model import load_training_data, build_predictive_pipeline
 
@@ -53,16 +53,12 @@ def _run_sunday_training(run_date):
             raise RuntimeError('No usable sales records were available for model training.')
         db_finish_sunday_training_run(True, metrics=metrics, today=run_date)
     except Exception as exc:
-        # Keep the currently saved model available if retraining fails.
+        # keep existing model if retraining fails
         db_finish_sunday_training_run(False, error_message=str(exc)[:500], today=run_date)
 
 
 def start_sunday_training_if_due(username, branch, today=None):
-    """Start Sunday training in the background after the first successful login.
-
-    The training job reads sales data only.  Its run status is stored separately
-    so it cannot alter POS transactions, inventory, or baseline history.
-    """
+    """kick off sunday retraining in background after first login"""
     run_date = today or datetime.now().date()
     if not db_claim_sunday_training_run(username, branch, today=run_date):
         return False
@@ -70,7 +66,7 @@ def start_sunday_training_if_due(username, branch, today=None):
     Thread(target=_run_sunday_training, args=(run_date,), daemon=True).start()
     return True
 
-# --- AUTHENTICATION & AUTHORIZATION DECORATORS ---
+# auth decorators
 
 def login_required(f):
     @wraps(f)
@@ -91,7 +87,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# --- AUTHENTICATION ROUTES ---
+# auth routes
 
 @app.route('/')
 def home():
@@ -134,11 +130,16 @@ def switch_branch(branch_id):
         flash("Access Denied: Branch selection is locked to assigned location for staff members.")
         return redirect(url_for('dashboard')), 403
 
-    allowed_branches = ['S001', 'S002', 'S003', 'S004', 'S005']
-    if branch_id in allowed_branches:
-        session['branch'] = branch_id
-        flash(f"Active operating node switched to Branch {branch_id}.")
+    target_id = branch_id.strip().upper()
+    with get_db() as conn:
+        b_row = conn.execute("SELECT branch_id FROM branches WHERE branch_id = ? AND is_active = 1;", (target_id,)).fetchone()
+    if b_row:
+        session['branch'] = b_row['branch_id']
+        flash(f"Active operating node switched to Branch {b_row['branch_id']}.")
+    else:
+        flash(f"Branch '{target_id}' does not exist or is inactive.", "error")
     return redirect(request.referrer or url_for('dashboard'))
+
 
 @app.route('/logout')
 def logout():
@@ -146,7 +147,7 @@ def logout():
     flash('Logged out successfully.')
     return redirect(url_for('login'))
 
-# --- ANALYTICS DASHBOARD ---
+# --- analytics dashboard ---
 
 @app.route('/dashboard')
 @login_required
@@ -154,17 +155,19 @@ def dashboard():
     user_branch = session.get('branch', 'S001')
     is_admin = session.get('role') == 'admin'
     
-    # Admins can view a specific branch or 'ALL' consolidated
+    # admins can view a specific branch or 'all' consolidated
     if is_admin:
         selected_branch = request.args.get('branch', user_branch)
     else:
         selected_branch = user_branch
 
     today_str = datetime.now().strftime('%Y-%m-%d')
-    all_branches = ['S001', 'S002', 'S003', 'S004', 'S005']
 
     with get_db() as conn:
-        # 1. Today's POS sales KPIs (only real transactions recorded today)
+        b_rows = conn.execute("SELECT branch_id FROM branches WHERE is_active = 1 ORDER BY branch_id;").fetchall()
+        all_branches = [r['branch_id'] for r in b_rows]
+
+        # 1. today's POS sales kpis (only real transactions recorded today)
         t_row = conn.execute("""
         SELECT COUNT(DISTINCT t.transaction_id) as tx_count,
                COALESCE(SUM(ti.quantity), 0) as total_qty,
@@ -178,7 +181,7 @@ def dashboard():
         today_sales_units = int(t_row['total_qty']) if t_row and t_row['total_qty'] else 0
         today_sales_revenue = float(t_row['total_revenue']) if t_row and t_row['total_revenue'] else 0.0
 
-        # 2. Real Store Shelf Stock on Hand (25-40 units per SKU)
+        # 2. real store shelf stock on hand (25-40 units per sku)
         inv_row = conn.execute("""
         SELECT COALESCE(SUM(i.stock), 0) as total_stock,
                COUNT(i.inventory_id) as total_skus,
@@ -194,7 +197,7 @@ def dashboard():
         low_stock_count = int(inv_row['low_stock_count']) if inv_row and inv_row['low_stock_count'] else 0
         inventory_value = float(inv_row['inventory_value']) if inv_row and inv_row['inventory_value'] else 0.0
 
-        # 3. Total Real POS Sales to Date (actual sales made in store POS)
+        # 3. total real POS sales to date (actual sales made in store pos)
         pos_total_row = conn.execute("""
         SELECT COUNT(DISTINCT t.transaction_id) as total_checkouts,
                COALESCE(SUM(ti.quantity), 0) as total_units_sold,
@@ -208,7 +211,7 @@ def dashboard():
         total_pos_units_sold = int(pos_total_row['total_units_sold']) if pos_total_row and pos_total_row['total_units_sold'] else 0
         total_pos_revenue = float(pos_total_row['total_revenue']) if pos_total_row and pos_total_row['total_revenue'] else 0.0
 
-        # 4. Active / Pending Transfers Count
+        # 4. active / pending transfers count
         tr_row = conn.execute("""
         SELECT COUNT(*) as pending_count
         FROM inventory_transfers
@@ -216,7 +219,7 @@ def dashboard():
         """, (selected_branch, selected_branch, selected_branch)).fetchone()
         pending_transfers_count = int(tr_row['pending_count']) if tr_row and tr_row['pending_count'] else 0
 
-        # 5. Real Daily POS Sales Timeline (Last 14 Days)
+        # 5. real daily POS sales timeline (last 14 days)
         sales_by_date = {}
         fourteen_days_ago = (datetime.now() - timedelta(days=13)).strftime('%Y-%m-%d')
         daily_rows = conn.execute("""
@@ -238,7 +241,7 @@ def dashboard():
             date_labels.append(lbl_str)
             daily_sales_data.append(sales_by_date.get(dt_str, 0))
 
-        # 6. Real Brand Inventory Stock Distribution
+        # 6. real brand inventory stock distribution
         brand_rows = conn.execute("""
         SELECT b.brand_name, SUM(i.stock) as stock_units
         FROM inventory i
@@ -252,7 +255,7 @@ def dashboard():
         brand_labels = [r['brand_name'] for r in brand_rows]
         brand_stock_data = [int(r['stock_units']) for r in brand_rows]
 
-        # 7. Real Category Stock Allocation
+        # 7. real category stock allocation
         subcat_rows = conn.execute("""
         SELECT s.subcategory_name, SUM(i.stock) as stock_units
         FROM inventory i
@@ -266,7 +269,7 @@ def dashboard():
         subcategory_labels = [r['subcategory_name'].title() for r in subcat_rows]
         subcategory_stock_data = [int(r['stock_units']) for r in subcat_rows]
 
-        # 8. Real Product Catalog & Stock Table
+        # 8. real product catalog & stock table
         inventory_products = conn.execute("""
         SELECT p.product_id, p.product_name, b.brand_name, s.subcategory_name,
                p.base_price,
@@ -289,7 +292,7 @@ def dashboard():
         LIMIT 10;
         """, (selected_branch, selected_branch, selected_branch, selected_branch)).fetchall()
 
-        # 9. Low stock items detail list (< 15 units) for quick inspection
+        # 9. low stock items detail list (< 15 units) for quick inspection
         low_stock_rows = conn.execute("""
         SELECT i.branch_id, i.product_id, p.product_name, b.brand_name, s.subcategory_name,
                i.stock, p.base_price
@@ -302,7 +305,7 @@ def dashboard():
         """, (selected_branch, selected_branch)).fetchall()
         low_stock_items = [dict(r) for r in low_stock_rows]
 
-        # Recent transfer updates for the current dashboard scope.  These are
+        # recent transfer updates for the current dashboard scope. these are
         # operational messages only and do not modify the inventory ledger.
         notification_rows = conn.execute("""
         SELECT notification_id, recipient_branch, transfer_id, event_type, title, message, created_at
@@ -340,7 +343,7 @@ def dashboard():
         current_branch=user_branch
     )
 
-# --- CASCADING CATALOG API ENDPOINTS ---
+# catalog api endpoints
 
 @app.route('/api/catalog/brands')
 @login_required
@@ -420,7 +423,7 @@ def get_shades():
     shades = get_catalog_shades(prod_name)
     return jsonify(shades)
 
-# --- POS TRANSACTIONS SYSTEM ---
+# pos checkout system
 
 @app.route('/record_sale', methods=['GET', 'POST'])
 @login_required
@@ -447,7 +450,7 @@ def record_sale():
         current_branch = session.get('branch', 'S001')
         current_user = session.get('username', 'staff')
 
-        # Execute atomic POS transaction in SQLite with pre-checkout stock validation
+        # atomic pos transaction with pre-checkout stock check
         success, result = db_record_transaction(tx_id, current_user, current_branch, cart, promo_code=promo)
         if not success:
             return jsonify({'status': 'error', 'message': result}), 400
@@ -456,7 +459,7 @@ def record_sale():
         
     return render_template('record_sale.html')
 
-# --- SALES AUDIT & TRANSACTION HISTORY ---
+# sales history and audit ledger
 
 @app.route('/sales_history')
 @login_required
@@ -471,7 +474,7 @@ def sales_history():
         else:
             transactions = db_load_transactions(branch=branch_param)
     else:
-        # Staff is strictly locked to their assigned branch
+        # staff only sees their assigned branch
         branch_param = current_branch
         transactions = db_load_transactions(branch=current_branch)
 
@@ -482,7 +485,7 @@ def sales_history():
         selected_branch=branch_param
     )
 
-# --- STOCK LEDGER / RESTOCK CONTROLLER ---
+# inventory ledger and restock control
 
 @app.route('/inventory', methods=['GET', 'POST'])
 @login_required
@@ -501,7 +504,7 @@ def inventory_view():
 
     inventory_items = db_load_inventory(branch=current_branch)
 
-    # Build brand catalog map for dropdown cascading
+    # brand catalog map for dropdowns
     catalog_map = {}
     all_subcategories = set()
     
@@ -524,7 +527,7 @@ def inventory_view():
         current_branch=current_branch
     )
 
-# --- AI FORECASTING ENGINE ---
+# ai demand forecasting engine
 
 @app.route('/forecast')
 @login_required
@@ -606,10 +609,10 @@ def predict():
     event_title = event_labels.get(holiday_ctx, "Special Event")
     is_surge = holiday_ctx != 'none'
 
-    # Color logic:
-    # 1. Predicted stock < stock at hand -> Green (Sufficient)
-    # 2. Predicted stock == stock at hand -> Yellow (Exact Match / Just Enough)
-    # 3. Stock at hand < predicted stock -> Red (Shortage / Restock Needed)
+    # color logic:
+    # 1. predicted stock < stock at hand -> green (sufficient)
+    # 2. predicted stock == stock at hand -> yellow (exact match / just enough)
+    # 3. stock at hand < predicted stock -> red (shortage / restock needed)
     if predicted_units < stock_val:
         status = 'sufficient'
         status_color = 'green'
@@ -640,7 +643,7 @@ def predict():
         'recommendation': rec
     })
 
-# --- ADMIN USER & CATALOG MANAGEMENT ---
+# admin user and catalog management
 
 @app.route('/admin/manage_users', methods=['GET', 'POST'])
 @admin_required
@@ -676,7 +679,7 @@ def edit_user():
     success, msg = db_update_user(user, password=pwd if pwd else None, role=role if role else None, branch=branch if branch else None)
     if success:
         flash(f"User account '{user}' updated successfully.")
-        # If the logged in user modified their own profile, sync session
+        # sync session if editing current profile
         if session.get('username') == user:
             if role: session['role'] = role
             if branch: session['branch'] = branch
@@ -712,14 +715,14 @@ def update_catalog():
         flash(f"Master product catalog expanded. Added '{p_name}' (ID: {p_id}) under brand '{brand}'.")
         return redirect(url_for('update_catalog'))
 
-    # Fetch existing brands and subcategories for dropdowns
+    # fetch brands and subcategories for dropdowns
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT brand_name FROM brands ORDER BY brand_name")
         existing_brands = [r[0] for r in cursor.fetchall()]
         cursor.execute("SELECT DISTINCT subcategory_name FROM subcategories ORDER BY subcategory_name")
         existing_subcategories = [r[0] for r in cursor.fetchall()]
-        # Determine next product ID in P#### format
+        # generate next product id like p0061
         cursor.execute("SELECT product_id FROM products WHERE product_id GLOB 'P[0-9][0-9][0-9][0-9]' ORDER BY product_id DESC LIMIT 1")
         row = cursor.fetchone()
         if row:
@@ -736,7 +739,7 @@ def update_catalog():
         next_product_id=next_product_id
     )
 
-# --- DISCOUNT CODES & PROMOTIONS MANAGEMENT (ADMIN ONLY) ---
+# discount and promo management
 
 @app.route('/admin/discounts', methods=['GET', 'POST'])
 @app.route('/discounts', methods=['GET', 'POST'])
@@ -861,7 +864,7 @@ def toggle_discount_direct(discount_id):
     return redirect(url_for('manage_discounts'))
 
 
-# --- REALTIME PROMO VALIDATION API ---
+# promo validation api
 
 @app.route('/api/discounts/validate', methods=['GET', 'POST'])
 @app.route('/api/validate_promo', methods=['GET', 'POST'])
@@ -922,7 +925,7 @@ def api_active_discounts():
     return jsonify(active)
 
 
-# --- INTER-BRANCH STOCK TRANSFERS ---
+# inter-branch stock transfers
 
 @app.route('/transfers', methods=['GET', 'POST'])
 @login_required
@@ -933,7 +936,7 @@ def stock_transfers():
 
     if request.method == 'POST':
         from_b = request.form.get('from_branch', '').strip()
-        # Admins can explicitly specify to_branch, or default to current_branch. Staff is locked to current_branch.
+        # admin can pick target branch, staff locked to theirs
         to_b = request.form.get('to_branch', current_branch).strip() if is_admin else current_branch
         if not to_b:
             to_b = current_branch
@@ -947,14 +950,14 @@ def stock_transfers():
             flash("Source and destination branch cannot be the same.", 'error')
             return redirect(url_for('stock_transfers'))
 
-        # Fallback resolution of product_id by product_name if needed
+        # fallback product id lookup by name
         if not product_id and product_name:
             with get_db() as conn:
                 p_row = conn.execute("SELECT product_id FROM products WHERE product_name = ?;", (product_name,)).fetchone()
                 if p_row:
                     product_id = p_row['product_id']
 
-        # Include shade details in transfer notes if specified
+        # attach shade details to notes if present
         if shade and shade.lower() not in ('default', 'standard shade', 'none', ''):
             if notes:
                 notes = f"[Shade: {shade}] {notes}"
@@ -965,11 +968,11 @@ def stock_transfers():
         flash(msg, 'error' if not success else 'success')
         return redirect(url_for('stock_transfers'))
 
-    # Load transfers based on role scope
+    # load transfers for user scope
     branch_filter = None if is_admin else current_branch
     transfers = db_load_transfers(branch=branch_filter)
 
-    # Load available brands and master catalog for cascading dropdowns
+    # load brands and catalog for cascading dropdowns
     with get_db() as conn:
         brands_rows = conn.execute("SELECT brand_name FROM brands ORDER BY brand_name;").fetchall()
         all_brands_list = [r['brand_name'] for r in brands_rows]
@@ -1001,12 +1004,12 @@ def stock_transfers():
 @app.route('/transfers/approve/<int:transfer_id>', methods=['POST'])
 @login_required
 def dispatch_transfer_route(transfer_id):
-    """Step 2: Source branch or Administrator approves and dispatches the stock (marks IN_TRANSIT)."""
+    """step 2: approve and dispatch stock (marks in_transit)"""
     current_branch = session.get('branch', 'S001')
     is_admin = session.get('role') == 'admin'
     current_user = session.get('username', 'staff')
 
-    # Security check: Only the SOURCE branch operator (from_branch) or an Administrator can dispatch stock
+    # security check: source branch or admin only
     with get_db() as conn:
         t_row = conn.execute("SELECT from_branch, to_branch FROM inventory_transfers WHERE transfer_id = ?;", (transfer_id,)).fetchone()
         if not t_row:
@@ -1024,11 +1027,11 @@ def dispatch_transfer_route(transfer_id):
 @app.route('/transfers/receive/<int:transfer_id>', methods=['POST'])
 @login_required
 def complete_transfer_route(transfer_id):
-    """Step 3: Destination branch or Administrator confirms receipt and restocks inventory (marks COMPLETED)."""
+    """step 3: confirm receipt and credit stock (marks completed)"""
     current_branch = session.get('branch', 'S001')
     is_admin = session.get('role') == 'admin'
 
-    # Security check: Only the DESTINATION branch operator (to_branch) or an Administrator can confirm receipt
+    # security check: destination branch or admin only
     with get_db() as conn:
         t_row = conn.execute("SELECT from_branch, to_branch FROM inventory_transfers WHERE transfer_id = ?;", (transfer_id,)).fetchone()
         if not t_row:
@@ -1064,14 +1067,12 @@ def cancel_transfer_route(transfer_id):
 
 
 
-# ---------------------------------------------------------------------------
-# Branch Management Routes (Admin Only)
-# ---------------------------------------------------------------------------
+# branch management routes
 
 @app.route('/manage_branches')
 @admin_required
 def manage_branches():
-    """Admin page: view all branches with stats and create new ones."""
+    """admin branch manager"""
     branches = db_load_branches()
     return render_template('manage_branches.html', branches=branches)
 

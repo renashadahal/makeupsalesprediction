@@ -31,9 +31,16 @@
                 </div>
 
                 <div>
+                    <label for="subcategory" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Subcategory</label>
+                    <select id="subcategory" name="subcategory" disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        <option value="" disabled selected>-- Select Brand First --</option>
+                    </select>
+                </div>
+
+                <div class="sm:col-span-2">
                     <label for="product_name" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Product Item</label>
                     <select id="product_name" name="product_name" required disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                        <option value="" disabled selected>-- Select Brand First --</option>
+                        <option value="" disabled selected>-- Select Subcategory First --</option>
                     </select>
                 </div>
 
@@ -105,49 +112,76 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
-    const brandSel = document.getElementById('brand');
-    const prodSel = document.getElementById('product_name');
-    const priceInput = document.getElementById('price');
-    const stockInput = document.getElementById('stock');
+    const brandSel    = document.getElementById('brand');
+    const subcatSel   = document.getElementById('subcategory');
+    const prodSel     = document.getElementById('product_name');
+    const priceInput  = document.getElementById('price');
+    const stockInput  = document.getElementById('stock');
     const holidayContext = document.getElementById('holiday_context');
-    const forecastForm = document.getElementById('forecastForm');
-    const resultCard = document.getElementById('forecastResult');
-    let activeProductId = "";
+    const forecastForm   = document.getElementById('forecastForm');
+    const resultCard     = document.getElementById('forecastResult');
+    let activeProductId  = "";
 
-    // 1. Ingest brands
+    function resetSubcat() {
+        subcatSel.innerHTML = '<option value="" disabled selected>-- Select Brand First --</option>';
+        subcatSel.disabled = true;
+        resetProd();
+    }
+    function resetProd() {
+        prodSel.innerHTML = '<option value="" disabled selected>-- Select Subcategory First --</option>';
+        prodSel.disabled = true;
+        priceInput.value = '';
+        stockInput.value = '';
+        activeProductId = '';
+    }
+
+    // 1. Load brands
     try {
         const res = await fetch('/api/catalog/brands');
         const brands = await res.json();
-        brandSel.innerHTML = '<option value="" disabled selected>-- Choose Brand --</option>' + 
+        brandSel.innerHTML = '<option value="" disabled selected>-- Choose Brand --</option>' +
             brands.map(b => `<option value="${b}">${b}</option>`).join('');
     } catch(e) {
         brandSel.innerHTML = '<option value="" disabled>Error loading brands</option>';
     }
 
-    // 2. Cascade products
+    // 2. Brand → Subcategory cascade
     brandSel.addEventListener('change', async () => {
-        prodSel.innerHTML = '<option value="" disabled selected>-- Loading items --</option>';
-        prodSel.disabled = false;
-        priceInput.value = '';
-        stockInput.value = '';
-
+        resetSubcat();
         try {
-            const res = await fetch(`/api/catalog/products?brand=${encodeURIComponent(brandSel.value)}`);
-            const products = await res.json();
-            
-            if (products.length === 0) {
-                prodSel.innerHTML = '<option value="" disabled>No items tracked here</option>';
-                prodSel.disabled = true;
+            const res = await fetch(`/api/catalog/subcategories?brand=${encodeURIComponent(brandSel.value)}`);
+            const subcats = await res.json();
+            if (subcats.length === 0) {
+                subcatSel.innerHTML = '<option value="" disabled>No subcategories found</option>';
             } else {
-                prodSel.innerHTML = '<option value="" disabled selected>-- Choose Product --</option>' + 
-                    products.map(p => `<option value="${p}">${p}</option>`).join('');
+                subcatSel.innerHTML = '<option value="" disabled selected>-- Choose Subcategory --</option>' +
+                    subcats.map(s => `<option value="${s}">${s}</option>`).join('');
+                subcatSel.disabled = false;
             }
-        } catch (err) {
+        } catch(e) {
+            subcatSel.innerHTML = '<option value="" disabled>Error loading subcategories</option>';
+        }
+    });
+
+    // 3. Subcategory → Product cascade
+    subcatSel.addEventListener('change', async () => {
+        resetProd();
+        try {
+            const res = await fetch(`/api/catalog/products?brand=${encodeURIComponent(brandSel.value)}&subcategory=${encodeURIComponent(subcatSel.value)}`);
+            const products = await res.json();
+            if (products.length === 0) {
+                prodSel.innerHTML = '<option value="" disabled>No products in this subcategory</option>';
+            } else {
+                prodSel.innerHTML = '<option value="" disabled selected>-- Choose Product --</option>' +
+                    products.map(p => `<option value="${p}">${p}</option>`).join('');
+                prodSel.disabled = false;
+            }
+        } catch(e) {
             prodSel.innerHTML = '<option value="" disabled>Error loading products</option>';
         }
     });
 
-    // 3. Auto-populate Base Price and REAL Branch Stock on-hand
+    // 4. Product → auto-fill price & stock
     prodSel.addEventListener('change', async () => {
         priceInput.value = '...';
         stockInput.value = '...';
@@ -215,21 +249,21 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (predUnits < stockUnits) {
                 // GREEN - Sufficient Stock
                 resultCard.className = "max-w-2xl mx-auto p-6 rounded-2xl border shadow-lg transition-all duration-300 bg-emerald-50/90 border-emerald-300";
-                statusBadge.innerText = "✓ Stock is Sufficient";
+                statusBadge.innerText = "Stock is Sufficient";
                 statusBadge.className = "text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300";
                 unitsEl.className = "text-4xl font-mono font-bold text-emerald-700";
                 adviceBox.className = "mt-4 p-4 rounded-xl text-center text-sm font-medium leading-relaxed bg-white/90 text-emerald-900 border border-emerald-200 shadow-sm";
             } else if (predUnits === stockUnits) {
                 // YELLOW - Just Enough
                 resultCard.className = "max-w-2xl mx-auto p-6 rounded-2xl border shadow-lg transition-all duration-300 bg-amber-50/90 border-amber-300";
-                statusBadge.innerText = "⚠ Stock is Just Enough";
+                statusBadge.innerText = "Stock is Just Enough";
                 statusBadge.className = "text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300";
                 unitsEl.className = "text-4xl font-mono font-bold text-amber-700";
                 adviceBox.className = "mt-4 p-4 rounded-xl text-center text-sm font-medium leading-relaxed bg-white/90 text-amber-900 border border-amber-200 shadow-sm";
             } else {
                 // RED - Stock Shortage
                 resultCard.className = "max-w-2xl mx-auto p-6 rounded-2xl border shadow-lg transition-all duration-300 bg-rose-50/90 border-rose-300";
-                statusBadge.innerText = "✕ Restock Needed";
+                statusBadge.innerText = "Restock Needed";
                 statusBadge.className = "text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300";
                 unitsEl.className = "text-4xl font-mono font-bold text-rose-700";
                 adviceBox.className = "mt-4 p-4 rounded-xl text-center text-sm font-medium leading-relaxed bg-white/90 text-rose-900 border border-rose-200 shadow-sm";
