@@ -387,7 +387,7 @@ def test_sales_history_authenticated_access(client):
     response = client.get('/sales_history')
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert 'Sales Transaction History' in html
+    assert 'Sales History' in html
     assert 'salesTable' in html
     assert 'searchInput' in html
 
@@ -849,8 +849,8 @@ def test_transfers_route_authorization_and_view(client):
     resp = client.get('/transfers')
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    assert 'Inter-Branch Stock Transfers' in html
-    assert 'Transfer Audit Ledger' in html
+    assert 'Stock Transfers' in html
+    assert 'Transfer Ledger' in html
 
 def test_transfers_role_based_permissions_and_lifecycle(client):
     unique_prod = f"EyeShadow_{uuid.uuid4().hex[:4]}"
@@ -955,8 +955,8 @@ def test_dashboard_real_data_and_admin_scope(client):
     resp_s001 = client.get('/dashboard?branch=S001')
     assert resp_s001.status_code == 200
     html_s001 = resp_s001.get_data(as_text=True)
-    assert 'Executive Store Control Panel' in html_s001
-    assert 'Store Inventory & Sales Tracker' in html_s001
+    assert 'Executive Dashboard' in html_s001
+    assert 'Recent POS Sales Activity' in html_s001
     # 2. Test consolidated ALL view
     resp_all = client.get('/dashboard?branch=ALL')
     assert resp_all.status_code == 200
@@ -1070,7 +1070,7 @@ def test_discount_routes_authorization_and_pos(client):
 
     admin_resp = client.get('/discounts')
     assert admin_resp.status_code == 200
-    assert 'Promotions &amp; Discount Codes' in admin_resp.get_data(as_text=True)
+    assert 'Discounts &amp; Promotions' in admin_resp.get_data(as_text=True)
 
     # 3. Admin creates a new discount code via POST
     promo_code = f"SALE{uuid.uuid4().hex[:4].upper()}"
@@ -1126,3 +1126,57 @@ def test_discount_routes_authorization_and_pos(client):
     assert receipt['promo_code'] == promo_code
     assert receipt['discount_percent'] == 20
     assert receipt['grand_total'] == 48.00  # (30 * 2) * 0.80 = 48.00
+
+
+# --- Branch Management Tests ---
+
+def test_manage_branches_page_admin(client):
+    """Admin can load the branch management page."""
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+    resp = client.get('/manage_branches')
+    assert resp.status_code == 200
+    assert b'Branch Management' in resp.data
+
+
+def test_create_branch_and_duplicate_rejection(client):
+    """Admin can create a new branch; duplicate IDs are rejected."""
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    import uuid
+    new_id = 'T' + uuid.uuid4().hex[:3].upper()  # e.g. T4AF
+    # Use a proper S-format ID for the test
+    new_id = 'S' + '9' + uuid.uuid4().hex[:2].upper()  # won't collide with real branches
+
+    resp = client.post('/manage_branches/create', data={
+        'branch_id': new_id,
+        'branch_name': 'Test Branch',
+        'region': 'Bagmati',
+        'location_detail': 'Test Location'
+    }, follow_redirects=True)
+    assert resp.status_code == 200
+
+    # Duplicate should be rejected
+    resp2 = client.post('/manage_branches/create', data={
+        'branch_id': new_id,
+        'branch_name': 'Duplicate Branch',
+        'region': 'Gandaki',
+        'location_detail': 'Somewhere'
+    }, follow_redirects=True)
+    assert resp2.status_code == 200
+    assert b'already exists' in resp2.data
+
+
+def test_manage_branches_staff_forbidden(client):
+    """Staff cannot access the branch management page."""
+    with client.session_transaction() as sess:
+        sess['username'] = 'staffuser'
+        sess['role'] = 'staff'
+        sess['branch'] = 'S002'
+    resp = client.get('/manage_branches')
+    assert resp.status_code == 403

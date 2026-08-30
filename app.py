@@ -16,6 +16,7 @@ from src.database import (
     db_get_latest_successful_training,
     db_load_discounts, db_get_discount_by_id, db_get_discount_by_code, db_validate_discount_code,
     db_create_discount, db_update_discount, db_delete_discount, db_toggle_discount_status,
+    db_load_branches, db_create_branch, db_toggle_branch_active,
     DB_PATH
 )
 from src.utils import get_catalog_shades
@@ -25,6 +26,20 @@ app.secret_key = os.environ.get('SECRET_KEY', 'noire_intelligence_matrix_secure_
 
 # Initialize SQLite database schema on startup
 init_db(DB_PATH)
+
+
+@app.context_processor
+def inject_active_branches():
+    """Inject active branch list into every template for nav branch selector."""
+    try:
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT branch_id FROM branches WHERE is_active = 1 ORDER BY branch_id;"
+            ).fetchall()
+        return {'active_branches': [{'branch_id': r['branch_id']} for r in rows]}
+    except Exception:
+        # Fallback to defaults if DB not yet ready
+        return {'active_branches': [{'branch_id': b} for b in ['S001', 'S002', 'S003', 'S004', 'S005']]}
 
 
 def _run_sunday_training(run_date):
@@ -732,7 +747,8 @@ def manage_discounts():
 
         if action == 'create':
             code = request.form.get('code', '').strip()
-            percent = request.form.get('discount_percent', '').strip()
+            discount_type = request.form.get('discount_type', 'PERCENTAGE').strip()
+            discount_value = request.form.get('discount_value', request.form.get('discount_percent', '')).strip()
             valid_from = request.form.get('valid_from', '').strip()
             valid_to = request.form.get('valid_to', '').strip()
             is_active = 1 if request.form.get('is_active') in ('1', 'on', 'true', True) else 0
@@ -740,7 +756,8 @@ def manage_discounts():
 
             success, msg, _ = db_create_discount(
                 code=code,
-                discount_percent=percent,
+                discount_type=discount_type,
+                discount_value=discount_value,
                 valid_from=valid_from,
                 valid_to=valid_to,
                 is_active=is_active,
@@ -752,7 +769,8 @@ def manage_discounts():
         elif action == 'edit':
             discount_id = request.form.get('discount_id', '').strip()
             code = request.form.get('code', '').strip()
-            percent = request.form.get('discount_percent', '').strip()
+            discount_type = request.form.get('discount_type', 'PERCENTAGE').strip()
+            discount_value = request.form.get('discount_value', request.form.get('discount_percent', '')).strip()
             valid_from = request.form.get('valid_from', '').strip()
             valid_to = request.form.get('valid_to', '').strip()
             is_active = 1 if request.form.get('is_active') in ('1', 'on', 'true', True) else 0
@@ -761,7 +779,8 @@ def manage_discounts():
             success, msg = db_update_discount(
                 discount_id=discount_id,
                 code=code,
-                discount_percent=percent,
+                discount_type=discount_type,
+                discount_value=discount_value,
                 valid_from=valid_from,
                 valid_to=valid_to,
                 is_active=is_active,
@@ -805,7 +824,8 @@ def manage_discounts():
 def edit_discount_direct():
     discount_id = request.form.get('discount_id', '').strip()
     code = request.form.get('code', '').strip()
-    percent = request.form.get('discount_percent', '').strip()
+    discount_type = request.form.get('discount_type', 'PERCENTAGE').strip()
+    discount_value = request.form.get('discount_value', request.form.get('discount_percent', '')).strip()
     valid_from = request.form.get('valid_from', '').strip()
     valid_to = request.form.get('valid_to', '').strip()
     is_active = 1 if request.form.get('is_active') in ('1', 'on', 'true', True) else 0
@@ -814,7 +834,8 @@ def edit_discount_direct():
     success, msg = db_update_discount(
         discount_id=discount_id,
         code=code,
-        discount_percent=percent,
+        discount_type=discount_type,
+        discount_value=discount_value,
         valid_from=valid_from,
         valid_to=valid_to,
         is_active=is_active,
@@ -868,6 +889,9 @@ def api_validate_promo():
     return jsonify({
         'valid': True,
         'code': disc['code'],
+        'discount_type': disc['discount_type'],
+        'discount_value': disc['discount_value'],
+        'discount_label': disc['discount_label'],
         'discount_percent': disc['discount_percent'],
         'discount_rate': disc['discount_rate'],
         'valid_from': disc['valid_from_display'],
@@ -886,6 +910,9 @@ def api_active_discounts():
     active = [
         {
             'code': d['code'],
+            'discount_type': d['discount_type'],
+            'discount_value': d['discount_value'],
+            'discount_label': d['discount_label'],
             'discount_percent': d['discount_percent'],
             'description': d.get('description', ''),
             'valid_to': d['valid_to_display']
@@ -955,14 +982,20 @@ def stock_transfers():
         ORDER BY b.brand_name, s.subcategory_name, p.product_name;
         """).fetchall()
 
+        branch_rows = conn.execute(
+            "SELECT branch_id FROM branches WHERE is_active = 1 ORDER BY branch_id;"
+        ).fetchall()
+        all_branches_list = [r['branch_id'] for r in branch_rows]
+
     return render_template(
         'transfers.html',
         transfers=transfers,
         catalog_brands=all_brands_list,
         all_products=[dict(p) for p in all_products],
         current_branch=current_branch,
-        all_branches=['S001', 'S002', 'S003', 'S004', 'S005']
+        all_branches=all_branches_list
     )
+
 
 @app.route('/transfers/dispatch/<int:transfer_id>', methods=['POST'])
 @app.route('/transfers/approve/<int:transfer_id>', methods=['POST'])
@@ -1023,10 +1056,54 @@ def cancel_transfer_route(transfer_id):
         if not is_admin and t_row['from_branch'] != current_branch and t_row['to_branch'] != current_branch:
             flash("Unauthorized to cancel this transfer.", 'error')
             return redirect(url_for('stock_transfers')), 403
+            return redirect(url_for('stock_transfers')), 403
 
     success, msg = db_cancel_transfer(transfer_id)
     flash(msg, 'error' if not success else 'success')
     return redirect(url_for('stock_transfers'))
+
+
+
+# ---------------------------------------------------------------------------
+# Branch Management Routes (Admin Only)
+# ---------------------------------------------------------------------------
+
+@app.route('/manage_branches')
+@admin_required
+def manage_branches():
+    """Admin page: view all branches with stats and create new ones."""
+    branches = db_load_branches()
+    return render_template('manage_branches.html', branches=branches)
+
+
+@app.route('/manage_branches/create', methods=['POST'])
+@admin_required
+def create_branch_route():
+    branch_id     = request.form.get('branch_id', '').strip().upper()
+    branch_name   = request.form.get('branch_name', '').strip()
+    region        = request.form.get('region', 'Bagmati').strip()
+    location      = request.form.get('location_detail', '').strip()
+
+    if not branch_id or not branch_name or not location:
+        flash("Branch ID, Branch Name, and Location are all required.", 'error')
+        return redirect(url_for('manage_branches'))
+
+    try:
+        _, msg = db_create_branch(branch_id, branch_name, region, location)
+        flash(msg, 'success')
+    except ValueError as e:
+        flash(str(e), 'error')
+
+    return redirect(url_for('manage_branches'))
+
+
+@app.route('/manage_branches/toggle/<branch_id>', methods=['POST'])
+@admin_required
+def toggle_branch_route(branch_id):
+    success, msg = db_toggle_branch_active(branch_id)
+    flash(msg, 'success' if success else 'error')
+    return redirect(url_for('manage_branches'))
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

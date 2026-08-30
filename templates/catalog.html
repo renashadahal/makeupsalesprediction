@@ -5,7 +5,6 @@
     <div class="border-b border-noireText/10 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <h2 class="text-3xl text-noireText font-serif">Master Catalog</h2>
-            <p class="text-xs text-noireText/50 mt-1">Add a new product to the catalog and initial stock for the selected branch.</p>
         </div>
         <a href="{{ url_for('inventory_view') }}" class="w-full sm:w-auto px-4 py-2 bg-white text-noireText border border-noireText/10 hover:bg-velvet/50 text-center font-medium rounded-xl text-xs uppercase tracking-wider transition-all h-fit">
             Back to Inventory Ledger
@@ -39,7 +38,7 @@
                     <p class="text-[10px] text-noireText/40 mt-0.5">Auto-generated as the next available ID. You can edit this if needed.</p>
                 </div>
 
-                <!-- Brand: toggle between existing dropdown or new text input -->
+                <!-- 1. Brand: toggle between existing dropdown or new text input -->
                 <div class="flex flex-col gap-1 md:col-span-2" id="brandField">
                     <div class="flex items-center justify-between mb-1.5">
                         <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Brand</label>
@@ -78,15 +77,8 @@
                     <input type="hidden" id="brand" name="brand">
                 </div>
 
-                <!-- Product Name -->
+                <!-- 2. Subcategory: toggle between existing dropdown or new text input -->
                 <div class="flex flex-col gap-1 md:col-span-2">
-                    <label for="product_name" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Product Name</label>
-                    <input type="text" id="product_name" name="product_name" placeholder="e.g. Fit Me Foundation" required
-                        class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
-                </div>
-
-                <!-- Subcategory: toggle between existing dropdown or new text input -->
-                <div class="flex flex-col gap-1">
                     <div class="flex items-center justify-between mb-1.5">
                         <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Subcategory</label>
                         <div class="flex items-center gap-2">
@@ -98,7 +90,7 @@
                             <button type="button" id="subcatToggleNew"
                                 onclick="setSubcatMode('new')"
                                 class="px-2.5 py-1 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all bg-white text-noireText border border-noireText/20 hover:border-dustyRose">
-                                + New
+                                + New Subcategory
                             </button>
                         </div>
                     </div>
@@ -124,8 +116,15 @@
                     <input type="hidden" id="subcategory" name="subcategory">
                 </div>
 
-                <!-- Base Price -->
-                <div class="flex flex-col gap-1">
+                <!-- 3. Product Name -->
+                <div class="flex flex-col gap-1 md:col-span-2">
+                    <label for="product_name" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Product Name</label>
+                    <input type="text" id="product_name" name="product_name" placeholder="e.g. Fit Me Foundation" required
+                        class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                </div>
+
+                <!-- 4. Base Price -->
+                <div class="flex flex-col gap-1 md:col-span-2">
                     <label for="price" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Base Price ($)</label>
                     <input type="number" step="0.01" id="price" name="price" placeholder="0.00" required
                         class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">

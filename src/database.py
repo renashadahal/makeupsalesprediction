@@ -11,11 +11,16 @@ from contextlib import contextmanager
 # from which Flask happens to be launched.  This keeps the POS, training job,
 # and Forecast page on the same SQLite file.
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-DB_PATH = os.environ.get('TEST_DB_PATH', os.path.join(PROJECT_ROOT, 'data', 'noire_retail.db'))
+def get_db_path():
+    return os.environ.get('TEST_DB_PATH', os.path.join(PROJECT_ROOT, 'data', 'noire_retail.db'))
+
+DB_PATH = get_db_path()
 
 @contextmanager
-def get_db(db_path=DB_PATH):
+def get_db(db_path=None):
     """Establishes thread-safe SQLite connection with WAL mode, Foreign Keys enabled, and automatic connection closure."""
+    if db_path is None:
+        db_path = get_db_path()
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path, timeout=30.0)
     conn.row_factory = sqlite3.Row
@@ -30,8 +35,10 @@ def get_db(db_path=DB_PATH):
     finally:
         conn.close()
 
-def init_db(db_path=DB_PATH):
+def init_db(db_path=None):
     """Initializes normalized relational SQLite schema tables and indexes."""
+    if db_path is None:
+        db_path = get_db_path()
     with get_db(db_path) as conn:
         cursor = conn.cursor()
         
@@ -39,23 +46,38 @@ def init_db(db_path=DB_PATH):
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS branches (
             branch_id TEXT PRIMARY KEY,
+            branch_name TEXT NOT NULL DEFAULT '',
             region TEXT NOT NULL DEFAULT 'Bagmati',
             location_detail TEXT NOT NULL DEFAULT 'Kathmandu',
+            is_active INTEGER NOT NULL DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
         """)
-        
+
+        # Migrate existing tables lacking branch_name / is_active columns
+        existing_cols = [r[1] for r in cursor.execute("PRAGMA table_info(branches);").fetchall()]
+        if 'branch_name' not in existing_cols:
+            cursor.execute("ALTER TABLE branches ADD COLUMN branch_name TEXT NOT NULL DEFAULT '';")
+        if 'is_active' not in existing_cols:
+            cursor.execute("ALTER TABLE branches ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;")
+
         # Seed default branches S001 - S005
         branches_data = [
-            ('S001', 'Bagmati', 'Kathmandu Store 1'),
-            ('S002', 'Bagmati', 'Kathmandu Store 2'),
-            ('S003', 'Bagmati', 'Lalitpur Branch'),
-            ('S004', 'Gandaki', 'Pokhara Mall Branch'),
-            ('S005', 'Bagmati', 'Bhaktapur Outlet')
+            ('S001', 'Kathmandu Store 1', 'Bagmati', 'Kathmandu Store 1'),
+            ('S002', 'Kathmandu Store 2', 'Bagmati', 'Kathmandu Store 2'),
+            ('S003', 'Lalitpur Branch',   'Bagmati', 'Lalitpur Branch'),
+            ('S004', 'Pokhara Mall',      'Gandaki', 'Pokhara Mall Branch'),
+            ('S005', 'Bhaktapur Outlet',  'Bagmati', 'Bhaktapur Outlet'),
         ]
         cursor.executemany("""
-        INSERT OR IGNORE INTO branches (branch_id, region, location_detail) VALUES (?, ?, ?);
+        INSERT OR IGNORE INTO branches (branch_id, branch_name, region, location_detail) VALUES (?, ?, ?, ?);
         """, branches_data)
+
+        # Back-fill branch_name for any rows that were seeded before this column existed
+        cursor.executemany("""
+        UPDATE branches SET branch_name = ? WHERE branch_id = ? AND (branch_name IS NULL OR branch_name = '');
+        """, [(name, bid) for bid, name, *_ in branches_data])
+
 
         # 2. Users
         cursor.execute("""
@@ -274,7 +296,7 @@ def init_db(db_path=DB_PATH):
         conn.commit()
 
 
-def db_claim_sunday_training_run(triggered_by, trigger_branch, today=None, db_path=DB_PATH):
+def db_claim_sunday_training_run(triggered_by, trigger_branch, today=None, db_path=None):
     """Atomically claim this Sunday's weekly training run.
 
     Returns ``True`` only to the first Sunday login.  A previous failed run may
@@ -316,7 +338,7 @@ def db_claim_sunday_training_run(triggered_by, trigger_branch, today=None, db_pa
     return False
 
 
-def db_finish_sunday_training_run(success, metrics=None, error_message=None, today=None, db_path=DB_PATH):
+def db_finish_sunday_training_run(success, metrics=None, error_message=None, today=None, db_path=None):
     """Record the result of the currently claimed Sunday training run."""
     today = today or date.today()
     week_start = today.isoformat()
@@ -334,7 +356,7 @@ def db_finish_sunday_training_run(success, metrics=None, error_message=None, tod
         )
 
 
-def db_get_sunday_training_status(today=None, db_path=DB_PATH):
+def db_get_sunday_training_status(today=None, db_path=None):
     """Return the current Sunday's training audit record, if one exists."""
     today = today or date.today()
     with get_db(db_path) as conn:
@@ -346,7 +368,7 @@ def db_get_sunday_training_status(today=None, db_path=DB_PATH):
     return dict(row) if row else None
 
 
-def db_get_latest_successful_training(db_path=DB_PATH):
+def db_get_latest_successful_training(db_path=None):
     """Return the latest completed model refresh for the Forecast page."""
     with get_db(db_path) as conn:
         row = conn.execute(
@@ -361,13 +383,13 @@ def db_get_latest_successful_training(db_path=DB_PATH):
 
 # --- DATABASE CRUD OPERATIONS ---
 
-def db_load_users(db_path=DB_PATH):
+def db_load_users(db_path=None):
     """Loads all system users from SQLite."""
     with get_db(db_path) as conn:
         rows = conn.execute("SELECT username, password_hash, role, branch_id as branch FROM users ORDER BY user_id;").fetchall()
         return [dict(r) for r in rows]
 
-def db_save_user(username, password, role='staff', branch='S001', db_path=DB_PATH):
+def db_save_user(username, password, role='staff', branch='S001', db_path=None):
     """Saves a new user with salted Werkzeug hashing."""
     username = username.strip()
     if not username or not password:
@@ -385,7 +407,7 @@ def db_save_user(username, password, role='staff', branch='S001', db_path=DB_PAT
         except sqlite3.IntegrityError:
             return False, f"Username '{username}' already exists."
 
-def db_verify_user(username, password, db_path=DB_PATH):
+def db_verify_user(username, password, db_path=None):
     """Verifies credentials against SQLite users table."""
     username = username.strip()
     with get_db(db_path) as conn:
@@ -400,7 +422,7 @@ def db_verify_user(username, password, db_path=DB_PATH):
                 return user
     return None
 
-def db_update_user(username, password=None, role=None, branch=None, db_path=DB_PATH):
+def db_update_user(username, password=None, role=None, branch=None, db_path=None):
     """Updates user security credentials, role tier, or branch assignment."""
     username = username.strip()
     with get_db(db_path) as conn:
@@ -439,7 +461,7 @@ def db_update_user(username, password=None, role=None, branch=None, db_path=DB_P
         conn.commit()
         return True, f"User account '{username}' updated successfully."
 
-def db_delete_user(username, current_admin_user=None, db_path=DB_PATH):
+def db_delete_user(username, current_admin_user=None, db_path=None):
     """Deletes a user account with safety guards against self-lockout or deleting the last admin."""
     username = username.strip()
     if current_admin_user and username.lower() == str(current_admin_user).strip().lower():
@@ -461,7 +483,7 @@ def db_delete_user(username, current_admin_user=None, db_path=DB_PATH):
         return True, f"User account '{username}' removed successfully."
 
 
-def db_load_inventory(branch=None, db_path=DB_PATH):
+def db_load_inventory(branch=None, db_path=None):
     """Loads inventory stock joined with master product, brand, and subcategory tables."""
     with get_db(db_path) as conn:
         query = """
@@ -491,7 +513,7 @@ def db_load_inventory(branch=None, db_path=DB_PATH):
         rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
-def db_update_inventory_stock(branch, brand_name, product_name, quantity_added, product_id=None, subcategory_name=None, category_name='makeup', price=None, db_path=DB_PATH):
+def db_update_inventory_stock(branch, brand_name, product_name, quantity_added, product_id=None, subcategory_name=None, category_name='makeup', price=None, db_path=None):
     """Increments inventory stock and inserts missing brands/products into catalog automatically."""
     with get_db(db_path) as conn:
         cursor = conn.cursor()
@@ -536,7 +558,7 @@ def db_update_inventory_stock(branch, brand_name, product_name, quantity_added, 
         conn.commit()
         return True
 
-def db_deduct_inventory_stock(branch, product_name, quantity_sold, db_path=DB_PATH):
+def db_deduct_inventory_stock(branch, product_name, quantity_sold, db_path=None):
     """Decrements inventory stock for a product in a branch."""
     with get_db(db_path) as conn:
         cursor = conn.cursor()
@@ -558,7 +580,7 @@ def db_deduct_inventory_stock(branch, product_name, quantity_sold, db_path=DB_PA
             return True
     return False
 
-def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=DB_PATH):
+def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=None):
     """Executes atomic POS checkout transaction (pre-validation + header + items + stock deduction) and returns (success, receipt/error)."""
     promo_code = (promo_code or '').strip().upper()
     disc_info = None
@@ -681,7 +703,7 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
             'items': receipt_items
         }
 
-def db_calculate_rolling_lags(product_id, branch_id, default_mean=15.0, db_path=DB_PATH):
+def db_calculate_rolling_lags(product_id, branch_id, default_mean=15.0, db_path=None):
     """Fast SQL aggregation for 7-day and 14-day rolling mean sales."""
     with get_db(db_path) as conn:
         rows = conn.execute("""
@@ -703,7 +725,7 @@ def db_calculate_rolling_lags(product_id, branch_id, default_mean=15.0, db_path=
         lag_14d = float(sum(units) / len(units))
         return lag_7d, lag_14d
 
-def db_load_transactions(branch=None, limit=None, db_path=DB_PATH):
+def db_load_transactions(branch=None, limit=None, db_path=None):
     """Loads transactions along with their nested line items for sales history auditing."""
     with get_db(db_path) as conn:
         query = """
@@ -791,7 +813,7 @@ def db_load_transactions(branch=None, limit=None, db_path=DB_PATH):
 
 # --- INTER-BRANCH INVENTORY TRANSFERS ---
 
-def db_request_transfer(from_branch, to_branch, product_id, quantity, requested_by, notes='', db_path=DB_PATH):
+def db_request_transfer(from_branch, to_branch, product_id, quantity, requested_by, notes='', db_path=None):
     """Creates a new inter-branch stock transfer request."""
     if from_branch == to_branch:
         return False, "Source and destination branch cannot be the same."
@@ -841,7 +863,7 @@ def db_request_transfer(from_branch, to_branch, product_id, quantity, requested_
         conn.commit()
         return True, f"Transfer request for {qty} units of '{prod_row['product_name']}' created successfully."
 
-def db_dispatch_transfer(transfer_id, approved_by, db_path=DB_PATH):
+def db_dispatch_transfer(transfer_id, approved_by, db_path=None):
     """Step 2: Source branch approves the request, debits their stock, and marks the shipment IN_TRANSIT.
     
     The destination branch's stock is NOT credited yet because items are physically in transit.
@@ -909,7 +931,7 @@ def db_dispatch_transfer(transfer_id, approved_by, db_path=DB_PATH):
             f"and are now in transit to Branch {t_row['to_branch']}."
         )
 
-def db_complete_transfer(transfer_id, db_path=DB_PATH):
+def db_complete_transfer(transfer_id, db_path=None):
     """Step 3: Destination branch confirms physical receipt — credits their stock.
     
     Source stock was already debited at dispatch (Step 2). This step finalizes
@@ -965,7 +987,7 @@ def db_complete_transfer(transfer_id, db_path=DB_PATH):
             f"Transfer #{transfer_id} completed: {qty} units received and credited to Branch {to_b}."
         )
 
-def db_cancel_transfer(transfer_id, db_path=DB_PATH):
+def db_cancel_transfer(transfer_id, db_path=None):
     """Cancels a PENDING transfer request, or reverses an IN_TRANSIT shipment and restores source stock."""
     with get_db(db_path) as conn:
         cursor = conn.cursor()
@@ -1000,7 +1022,7 @@ def db_cancel_transfer(transfer_id, db_path=DB_PATH):
             return True, f"Transfer #{transfer_id} cancelled and {t_row['quantity']} units restored to Branch {t_row['from_branch']}."
         return True, f"Transfer #{transfer_id} cancelled."
 
-def db_load_transfers(branch=None, status=None, db_path=DB_PATH):
+def db_load_transfers(branch=None, status=None, db_path=None):
     """Loads inter-branch transfer logs joined with master product and brand names."""
     with get_db(db_path) as conn:
         query = """
@@ -1141,7 +1163,7 @@ def _format_discount_row(row, check_dt=None):
     return d
 
 
-def db_load_discounts(db_path=DB_PATH):
+def db_load_discounts(db_path=None):
     """Loads all discount promotional codes ordered by activity and expiration."""
     with get_db(db_path) as conn:
         rows = conn.execute("""
@@ -1152,7 +1174,7 @@ def db_load_discounts(db_path=DB_PATH):
         return [_format_discount_row(r, check_dt=now_dt) for r in rows]
 
 
-def db_get_discount_by_id(discount_id, db_path=DB_PATH):
+def db_get_discount_by_id(discount_id, db_path=None):
     """Fetches a specific discount code by ID with enriched metadata."""
     with get_db(db_path) as conn:
         row = conn.execute("SELECT * FROM discounts WHERE discount_id = ?;", (int(discount_id),)).fetchone()
@@ -1161,7 +1183,7 @@ def db_get_discount_by_id(discount_id, db_path=DB_PATH):
         return _format_discount_row(row)
 
 
-def db_get_discount_by_code(code, db_path=DB_PATH):
+def db_get_discount_by_code(code, db_path=None):
     """Fetches a discount code record by exact code name."""
     if not code:
         return None
@@ -1172,7 +1194,7 @@ def db_get_discount_by_code(code, db_path=DB_PATH):
         return _format_discount_row(row)
 
 
-def db_validate_discount_code(code, check_time=None, db_path=DB_PATH):
+def db_validate_discount_code(code, check_time=None, db_path=None):
     """Validates if a discount code exists, is enabled, and is within its valid date and time window."""
     code_clean = (code or '').strip().upper()
     if not code_clean:
@@ -1204,7 +1226,7 @@ def db_validate_discount_code(code, check_time=None, db_path=DB_PATH):
         return True, disc, f"Discount code '{code_clean}' applied ({disc['discount_label']})."
 
 
-def db_create_discount(code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=DB_PATH):
+def db_create_discount(code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=None):
     """Creates a new discount promotional campaign in SQLite with day and time limits (Percentage or Fixed Cash)."""
     # Backward compatibility if positional args passed as (code, 20.0, valid_from, valid_to, is_active, description)
     if isinstance(discount_type, (int, float)) or (isinstance(discount_type, str) and discount_type.replace('.', '', 1).isdigit()):
@@ -1216,7 +1238,10 @@ def db_create_discount(code, discount_type='PERCENTAGE', discount_value=None, va
         desc = description if is_active == 1 else is_active
     else:
         disc_type = 'FIXED' if str(discount_type).upper() in ('FIXED', 'CASH', 'AMOUNT', 'DOLLAR', '$') else 'PERCENTAGE'
-        val = float(discount_value if discount_value is not None else 0.0)
+        try:
+            val = float(discount_value if discount_value is not None else 0.0)
+        except (TypeError, ValueError):
+            return False, "Discount value must be a valid number.", None
         v_from = valid_from
         v_to = valid_to
         act = is_active
@@ -1270,7 +1295,7 @@ def db_create_discount(code, discount_type='PERCENTAGE', discount_value=None, va
         return True, f"Discount code '{code_clean}' ({val_label} off) successfully created.", new_id
 
 
-def db_update_discount(discount_id, code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=DB_PATH):
+def db_update_discount(discount_id, code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=None):
     """Updates an existing discount code campaign in SQLite."""
     # Backward compatibility if positional args passed as (discount_id, code, 20.0, valid_from, valid_to, is_active, description)
     if isinstance(discount_type, (int, float)) or (isinstance(discount_type, str) and discount_type.replace('.', '', 1).isdigit()):
@@ -1282,7 +1307,10 @@ def db_update_discount(discount_id, code, discount_type='PERCENTAGE', discount_v
         desc = description if is_active == 1 else is_active
     else:
         disc_type = 'FIXED' if str(discount_type).upper() in ('FIXED', 'CASH', 'AMOUNT', 'DOLLAR', '$') else 'PERCENTAGE'
-        val = float(discount_value if discount_value is not None else 0.0)
+        try:
+            val = float(discount_value if discount_value is not None else 0.0)
+        except (TypeError, ValueError):
+            return False, "Discount value must be a valid number."
         v_from = valid_from
         v_to = valid_to
         act = is_active
@@ -1338,7 +1366,7 @@ def db_update_discount(discount_id, code, discount_type='PERCENTAGE', discount_v
         return True, f"Discount code '{code_clean}' updated successfully."
 
 
-def db_delete_discount(discount_id, db_path=DB_PATH):
+def db_delete_discount(discount_id, db_path=None):
     """Deletes a discount record from the database."""
     with get_db(db_path) as conn:
         cursor = conn.cursor()
@@ -1349,7 +1377,7 @@ def db_delete_discount(discount_id, db_path=DB_PATH):
         return True, f"Discount code #{discount_id} permanently deleted."
 
 
-def db_toggle_discount_status(discount_id, db_path=DB_PATH):
+def db_toggle_discount_status(discount_id, db_path=None):
     """Toggles active state (1 -> 0 or 0 -> 1) of a discount."""
     with get_db(db_path) as conn:
         cursor = conn.cursor()
@@ -1377,4 +1405,74 @@ create_discount = db_create_discount
 update_discount = db_update_discount
 delete_discount = db_delete_discount
 validate_discount_code = db_validate_discount_code
+
+
+# ---------------------------------------------------------------------------
+# Branch Management
+# ---------------------------------------------------------------------------
+
+def db_load_branches(db_path=None):
+    """Returns all branches with basic operational stats."""
+    with get_db(db_path) as conn:
+        rows = conn.execute("""
+        SELECT
+            b.branch_id,
+            b.branch_name,
+            b.region,
+            b.location_detail,
+            b.is_active,
+            b.created_at,
+            COUNT(DISTINCT u.user_id)          AS user_count,
+            COUNT(DISTINCT i.inventory_id)     AS sku_count,
+            COALESCE(SUM(i.stock), 0)          AS total_stock,
+            COUNT(DISTINCT t.transaction_id)   AS total_sales
+        FROM branches b
+        LEFT JOIN users      u ON u.branch_id = b.branch_id
+        LEFT JOIN inventory  i ON i.branch_id = b.branch_id
+        LEFT JOIN transactions t ON t.branch_id = b.branch_id
+        GROUP BY b.branch_id
+        ORDER BY b.branch_id;
+        """).fetchall()
+        return [dict(r) for r in rows]
+
+
+def db_create_branch(branch_id, branch_name, region, location_detail, db_path=None):
+    """Creates a new branch. Raises ValueError if branch_id already exists."""
+    branch_id = branch_id.strip().upper()
+    branch_name = branch_name.strip()
+    region = region.strip()
+    location_detail = location_detail.strip()
+
+    if not branch_id or not branch_name:
+        raise ValueError("Branch ID and Branch Name are required.")
+
+    with get_db(db_path) as conn:
+        existing = conn.execute(
+            "SELECT 1 FROM branches WHERE branch_id = ?;", (branch_id,)
+        ).fetchone()
+        if existing:
+            raise ValueError(f"Branch ID '{branch_id}' already exists.")
+        conn.execute("""
+        INSERT INTO branches (branch_id, branch_name, region, location_detail, is_active)
+        VALUES (?, ?, ?, ?, 1);
+        """, (branch_id, branch_name, region, location_detail))
+    return True, f"Branch '{branch_id} — {branch_name}' created successfully."
+
+
+def db_toggle_branch_active(branch_id, db_path=None):
+    """Toggles the is_active flag for a branch (1 → 0 or 0 → 1)."""
+    with get_db(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        UPDATE branches SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END
+        WHERE branch_id = ?;
+        """, (branch_id,))
+        if cursor.rowcount == 0:
+            return False, f"Branch '{branch_id}' not found."
+        new_state = conn.execute(
+            "SELECT is_active FROM branches WHERE branch_id = ?;", (branch_id,)
+        ).fetchone()['is_active']
+        status = "activated" if new_state == 1 else "deactivated"
+        return True, f"Branch '{branch_id}' {status}."
+
 

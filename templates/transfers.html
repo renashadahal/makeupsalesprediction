@@ -6,8 +6,7 @@
     <!-- Top Header -->
     <div class="border-b border-noireText/10 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-            <h2 class="text-3xl sm:text-4xl text-noireText font-serif">Inter-Branch Stock Transfers</h2>
-            <p class="text-xs text-noireText/60 font-light mt-1">Request, authorize, and track physical inventory shipments across branch nodes.</p>
+            <h2 class="text-3xl sm:text-4xl text-noireText font-serif">Stock Transfers</h2>
         </div>
         <div class="flex items-center gap-2">
             <span class="text-xs bg-white/80 border border-noireText/10 px-3 py-1.5 rounded-xl font-mono text-noireText">
@@ -22,8 +21,7 @@
         <!-- Left: Create Transfer Form (Spans 2 columns) -->
         <div class="lg:col-span-2 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
             <div class="border-b border-noireText/10 pb-3 mb-5">
-                <h3 class="text-2xl text-noireText font-serif">Initiate Transfer Request</h3>
-                <p class="text-xs text-noireText/60 font-light">Transfer physical inventory units from a source branch to a destination branch.</p>
+                <h3 class="text-2xl text-noireText font-serif">Initiate Transfer</h3>
             </div>
 
             <form action="{{ url_for('stock_transfers') }}" method="POST" class="space-y-5 text-xs tracking-wide">
@@ -227,15 +225,110 @@
 
     <!-- Transfer Records Audit Table -->
     <div class="bg-white rounded-2xl border border-noireText/10 shadow-md overflow-hidden">
-        <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex items-center justify-between">
+        <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-                <h3 class="text-xl font-serif text-noireText">Transfer Audit Ledger</h3>
-                <p class="text-xs text-noireText/60 font-light">Real-time log of inter-branch shipments across the lifecycle.</p>
+                <h3 class="text-xl font-serif text-noireText">Transfer Ledger</h3>
+            </div>
+            <!-- View Limit Tabs -->
+            <div class="inline-flex rounded-xl border border-noireText/10 overflow-hidden bg-white p-0.5 shadow-sm text-xs">
+                <button type="button" id="limit5Btn" onclick="setTransferLimit(5)" class="limit-tab py-1 px-3 rounded-lg font-medium transition-all bg-deepWine text-velvet">
+                    Last 5 (Default)
+                </button>
+                <button type="button" id="limit10Btn" onclick="setTransferLimit(10)" class="limit-tab py-1 px-3 rounded-lg font-medium transition-all hover:bg-velvet/50 text-noireText/75">
+                    Last 10
+                </button>
+                <button type="button" id="limitAllBtn" onclick="setTransferLimit('all')" class="limit-tab py-1 px-3 rounded-lg font-medium transition-all hover:bg-velvet/50 text-noireText/75">
+                    All Transfers
+                </button>
+            </div>
+        </div>
+
+        <!-- Comprehensive Filter Controls -->
+        <div class="p-5 border-b border-noireText/10 bg-parchment/10 space-y-4 text-xs tracking-wide">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <!-- Search Input -->
+                <div class="md:col-span-3 flex flex-col gap-1">
+                    <label for="transferSearchInput" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">Search Transfers</label>
+                    <input type="text" id="transferSearchInput" placeholder="Search ID, Product, User, Notes..." class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
+                </div>
+
+                <!-- Brand Filter -->
+                <div class="md:col-span-2 flex flex-col gap-1">
+                    <label for="transferFilterBrand" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">Brand</label>
+                    <select id="transferFilterBrand" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs cursor-pointer">
+                        <option value="">All Brands</option>
+                        {% for b in catalog_brands %}
+                        <option value="{{ b|lower }}">{{ b }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Source Branch Filter -->
+                <div class="md:col-span-2 flex flex-col gap-1">
+                    <label for="transferFilterFrom" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">From Branch</label>
+                    <select id="transferFilterFrom" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-mono cursor-pointer">
+                        <option value="">All Sources</option>
+                        {% for b in all_branches %}
+                        <option value="{{ b }}">{{ b }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Destination Branch Filter -->
+                <div class="md:col-span-2 flex flex-col gap-1">
+                    <label for="transferFilterTo" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">To Branch</label>
+                    <select id="transferFilterTo" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-mono cursor-pointer">
+                        <option value="">All Destinations</option>
+                        {% for b in all_branches %}
+                        <option value="{{ b }}">{{ b }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Status Filter -->
+                <div class="md:col-span-2 flex flex-col gap-1">
+                    <label for="transferFilterStatus" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">Status</label>
+                    <select id="transferFilterStatus" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs cursor-pointer">
+                        <option value="">All Statuses</option>
+                        <option value="PENDING">Pending Approval</option>
+                        <option value="IN_TRANSIT">In Transit</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="CANCELLED">Cancelled</option>
+                    </select>
+                </div>
+
+                <!-- Reset Button -->
+                <div class="md:col-span-1 flex items-end">
+                    <button type="button" id="resetTransferFilters" class="w-full py-2 bg-white hover:bg-velvet border border-noireText/20 rounded-xl text-noireText font-medium text-xs transition-all shadow-sm h-[34px] flex items-center justify-center">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Date Range Row -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-noireText/10">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[10px] text-noireText/60 font-semibold uppercase tracking-wider">From:</span>
+                        <input type="date" id="transferFromDate" class="px-2.5 py-1 rounded-lg bg-white border border-noireText/10 text-noireText text-xs font-mono focus:outline-none focus:border-dustyRose">
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[10px] text-noireText/60 font-semibold uppercase tracking-wider">To:</span>
+                        <input type="date" id="transferToDate" class="px-2.5 py-1 rounded-lg bg-white border border-noireText/10 text-noireText text-xs font-mono focus:outline-none focus:border-dustyRose">
+                    </div>
+                    <button type="button" onclick="setTransferQuickDate('today')" class="px-2 py-0.5 bg-white hover:bg-velvet border border-noireText/10 rounded text-[10px] font-mono">Today</button>
+                    <button type="button" onclick="setTransferQuickDate('7d')" class="px-2 py-0.5 bg-white hover:bg-velvet border border-noireText/10 rounded text-[10px] font-mono">7 Days</button>
+                    <button type="button" onclick="setTransferQuickDate('30d')" class="px-2 py-0.5 bg-white hover:bg-velvet border border-noireText/10 rounded text-[10px] font-mono">30 Days</button>
+                    <button type="button" onclick="setTransferQuickDate('all')" class="px-2 py-0.5 bg-white hover:bg-velvet border border-noireText/10 rounded text-[10px] font-mono">All</button>
+                </div>
+                <span id="transferMatchCount" class="text-[11px] text-noireText/60 font-medium self-end sm:self-auto">
+                    Showing {{ [5, transfers|length]|min }} of {{ transfers|length }} transfers
+                </span>
             </div>
         </div>
 
         <div class="w-full overflow-hidden">
-            <table class="w-full table-fixed text-left text-xs tracking-wide border-collapse">
+            <table class="w-full table-fixed text-left text-xs tracking-wide border-collapse" id="transfersTable">
                 <colgroup>
                     <col class="w-[6%]">
                     <col class="w-[12%]">
@@ -261,7 +354,16 @@
                 <tbody class="divide-y divide-noireText/5 text-noireText">
                     {% if transfers %}
                         {% for t in transfers %}
-                        <tr class="hover:bg-velvet/20 transition-colors">
+                        <tr class="transfer-row hover:bg-velvet/20 transition-colors"
+                            data-id="{{ t.transfer_id }}"
+                            data-date="{{ (t.created_at or '')[:10] }}"
+                            data-from="{{ t.from_branch }}"
+                            data-to="{{ t.to_branch }}"
+                            data-brand="{{ (t.brand_name or '')|lower }}"
+                            data-product="{{ (t.product_name or '')|lower }}"
+                            data-status="{{ t.status }}"
+                            data-user="{{ (t.requested_by or '')|lower }}"
+                            data-notes="{{ (t.notes or '')|lower }}">
                             <td class="py-3 px-3 font-mono font-bold text-noireText truncate">#{{ t.transfer_id }}</td>
                             <td class="py-3 px-3 font-mono text-[10px] text-noireText/70 truncate" title="{{ t.created_at }}">{{ t.created_at[:16] if t.created_at else '' }}</td>
                             <td class="py-3 px-3 font-mono font-semibold truncate" title="{{ t.from_branch }} to {{ t.to_branch }}">
@@ -654,6 +756,145 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Transfer Ledger Filtering & Default Last 5 Display Logic
+    let currentTransferLimit = 5;
+    const transferSearchInput = document.getElementById('transferSearchInput');
+    const transferFilterBrand = document.getElementById('transferFilterBrand');
+    const transferFilterFrom = document.getElementById('transferFilterFrom');
+    const transferFilterTo = document.getElementById('transferFilterTo');
+    const transferFilterStatus = document.getElementById('transferFilterStatus');
+    const transferFromDate = document.getElementById('transferFromDate');
+    const transferToDate = document.getElementById('transferToDate');
+    const resetTransferBtn = document.getElementById('resetTransferFilters');
+    const transferMatchCount = document.getElementById('transferMatchCount');
+    const transferRows = Array.from(document.querySelectorAll('#transfersTable tbody tr.transfer-row'));
+
+    function filterTransfers() {
+        const query = (transferSearchInput?.value || '').toLowerCase().trim();
+        const selBrand = (transferFilterBrand?.value || '').toLowerCase().trim();
+        const selFrom = transferFilterFrom?.value || '';
+        const selTo = transferFilterTo?.value || '';
+        const selStatus = transferFilterStatus?.value || '';
+        const fromDate = transferFromDate?.value || '';
+        const toDate = transferToDate?.value || '';
+
+        const hasCustomFilter = query !== '' || selBrand !== '' || selFrom !== '' || selTo !== '' || selStatus !== '' || fromDate !== '' || toDate !== '';
+
+        let matchedRows = [];
+
+        transferRows.forEach(row => {
+            const id = (row.dataset.id || '').toLowerCase();
+            const date = row.dataset.date || '';
+            const from = row.dataset.from || '';
+            const to = row.dataset.to || '';
+            const brand = row.dataset.brand || '';
+            const product = row.dataset.product || '';
+            const status = row.dataset.status || '';
+            const user = row.dataset.user || '';
+            const notes = row.dataset.notes || '';
+            const fullText = (row.innerText || '').toLowerCase();
+
+            const matchesQuery = query === '' || fullText.includes(query) || id.includes(query) || user.includes(query) || notes.includes(query) || product.includes(query) || brand.includes(query);
+            const matchesBrand = selBrand === '' || brand.includes(selBrand);
+            const matchesFrom = selFrom === '' || from === selFrom;
+            const matchesTo = selTo === '' || to === selTo;
+            const matchesStatus = selStatus === '' || status === selStatus;
+
+            let matchesDate = true;
+            if (fromDate && date < fromDate) matchesDate = false;
+            if (toDate && date > toDate) matchesDate = false;
+
+            if (matchesQuery && matchesBrand && matchesFrom && matchesTo && matchesStatus && matchesDate) {
+                matchedRows.push(row);
+            }
+        });
+
+        // If no filter is applied and limit is numeric, display only top N rows (last N transfers)
+        const limit = (hasCustomFilter || currentTransferLimit === 'all') ? matchedRows.length : parseInt(currentTransferLimit, 10);
+
+        transferRows.forEach(row => {
+            row.style.display = 'none';
+        });
+
+        matchedRows.slice(0, limit).forEach(row => {
+            row.style.display = '';
+        });
+
+        if (transferMatchCount) {
+            const displayed = Math.min(matchedRows.length, limit);
+            transferMatchCount.textContent = `Showing ${displayed} of ${transferRows.length} transfers${hasCustomFilter ? ' (Filtered)' : ''}`;
+        }
+    }
+
+    window.setTransferLimit = function(limit) {
+        currentTransferLimit = limit;
+        const tabs = document.querySelectorAll('.limit-tab');
+        tabs.forEach(t => {
+            t.classList.remove('bg-deepWine', 'text-velvet');
+            t.classList.add('hover:bg-velvet/50', 'text-noireText/75');
+        });
+        if (limit === 5) {
+            document.getElementById('limit5Btn')?.classList.add('bg-deepWine', 'text-velvet');
+            document.getElementById('limit5Btn')?.classList.remove('hover:bg-velvet/50', 'text-noireText/75');
+        } else if (limit === 10) {
+            document.getElementById('limit10Btn')?.classList.add('bg-deepWine', 'text-velvet');
+            document.getElementById('limit10Btn')?.classList.remove('hover:bg-velvet/50', 'text-noireText/75');
+        } else if (limit === 'all') {
+            document.getElementById('limitAllBtn')?.classList.add('bg-deepWine', 'text-velvet');
+            document.getElementById('limitAllBtn')?.classList.remove('hover:bg-velvet/50', 'text-noireText/75');
+        }
+        filterTransfers();
+    };
+
+    window.setTransferQuickDate = function(preset) {
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const formatYmd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+        if (preset === 'today') {
+            if (transferFromDate) transferFromDate.value = formatYmd(now);
+            if (transferToDate) transferToDate.value = formatYmd(now);
+        } else if (preset === '7d') {
+            const past = new Date();
+            past.setDate(past.getDate() - 7);
+            if (transferFromDate) transferFromDate.value = formatYmd(past);
+            if (transferToDate) transferToDate.value = formatYmd(now);
+        } else if (preset === '30d') {
+            const past = new Date();
+            past.setDate(past.getDate() - 30);
+            if (transferFromDate) transferFromDate.value = formatYmd(past);
+            if (transferToDate) transferToDate.value = formatYmd(now);
+        } else if (preset === 'all') {
+            if (transferFromDate) transferFromDate.value = '';
+            if (transferToDate) transferToDate.value = '';
+        }
+        filterTransfers();
+    };
+
+    if (transferSearchInput) transferSearchInput.addEventListener('input', filterTransfers);
+    if (transferFilterBrand) transferFilterBrand.addEventListener('change', filterTransfers);
+    if (transferFilterFrom) transferFilterFrom.addEventListener('change', filterTransfers);
+    if (transferFilterTo) transferFilterTo.addEventListener('change', filterTransfers);
+    if (transferFilterStatus) transferFilterStatus.addEventListener('change', filterTransfers);
+    if (transferFromDate) transferFromDate.addEventListener('change', filterTransfers);
+    if (transferToDate) transferToDate.addEventListener('change', filterTransfers);
+
+    if (resetTransferBtn) {
+        resetTransferBtn.addEventListener('click', () => {
+            if (transferSearchInput) transferSearchInput.value = '';
+            if (transferFilterBrand) transferFilterBrand.value = '';
+            if (transferFilterFrom) transferFilterFrom.value = '';
+            if (transferFilterTo) transferFilterTo.value = '';
+            if (transferFilterStatus) transferFilterStatus.value = '';
+            if (transferFromDate) transferFromDate.value = '';
+            if (transferToDate) transferToDate.value = '';
+            setTransferLimit(5);
+        });
+    }
+
+    // Initial default filter on page load (shows last 5 transfers)
+    filterTransfers();
 });
 </script>
 {% endblock %}

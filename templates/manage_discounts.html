@@ -5,8 +5,7 @@
     <!-- Top Header -->
     <div class="border-b border-noireText/10 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h2 class="text-3xl sm:text-4xl text-noireText font-serif">Promotions &amp; Discount Codes</h2>
-            <p class="text-xs text-noireText/60 font-light mt-1">Configure time-bounded promotional discounts, seasonal sales, and register checkout coupons.</p>
+            <h2 class="text-3xl sm:text-4xl text-noireText font-serif">Discounts &amp; Promotions</h2>
         </div>
         <div class="flex items-center gap-2">
             <a href="{{ url_for('record_sale') }}" class="px-3.5 py-2 bg-white text-noireText border border-noireText/15 hover:bg-velvet/50 text-center font-medium rounded-xl text-xs uppercase tracking-wider transition-all shadow-sm">
@@ -76,16 +75,21 @@
                     <p class="text-[10px] text-noireText/40 mt-1 font-mono">Alphanumeric, uppercase coupon code.</p>
                 </div>
 
-                <!-- Discount Percentage -->
+                <!-- Discount Value -->
                 <div>
                     <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">
-                        Discount Rate (%) <span class="text-rose-600">*</span>
+                        Discount Type <span class="text-rose-600">*</span>
                     </label>
-                    <div class="relative">
-                        <input type="number" name="discount_percent" min="0.1" max="100" step="0.5" required placeholder="e.g. 15"
-                               class="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono font-bold focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
-                        <span class="absolute right-4 top-2.5 text-noireText/50 font-bold">%</span>
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <label class="cursor-pointer"><input type="radio" name="discount_type" value="PERCENTAGE" checked class="sr-only peer" onchange="updateDiscountValueField('create')"><span class="block rounded-xl border border-noireText/10 bg-white px-3 py-2 text-center font-semibold peer-checked:bg-deepWine peer-checked:text-velvet peer-checked:border-deepWine">Percentage</span></label>
+                        <label class="cursor-pointer"><input type="radio" name="discount_type" value="FIXED" class="sr-only peer" onchange="updateDiscountValueField('create')"><span class="block rounded-xl border border-noireText/10 bg-white px-3 py-2 text-center font-semibold peer-checked:bg-deepWine peer-checked:text-velvet peer-checked:border-deepWine">Cash amount</span></label>
                     </div>
+                    <div class="relative">
+                        <input type="number" name="discount_value" id="create_discount_value" min="0.01" max="100" step="0.01" required placeholder="e.g. 15"
+                               class="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono font-bold focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                        <span id="create_discount_suffix" class="absolute right-4 top-2.5 text-noireText/50 font-bold">%</span>
+                    </div>
+                    <p id="create_discount_help" class="text-[10px] text-noireText/40 mt-1">Enter any percentage from 0.01% to 100% (for example, 15%).</p>
                 </div>
 
                 <!-- Valid From (Date & Time Limit) -->
@@ -179,7 +183,7 @@
                                         <div class="flex items-center gap-1.5">
                                             <span class="font-mono font-bold text-sm text-deepWine tracking-wide">{{ d.code }}</span>
                                         </div>
-                                        <span class="font-mono text-emerald-700 font-semibold text-xs">{{ d.discount_percent|round|int if d.discount_percent == d.discount_percent|round else d.discount_percent }}% OFF</span>
+                                        <span class="font-mono text-emerald-700 font-semibold text-xs">{{ d.discount_badge }}</span>
                                     </div>
                                 </td>
 
@@ -270,9 +274,9 @@
 </div>
 
 <!-- EDIT DISCOUNT MODAL POPUP -->
-<div id="editModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-    <div class="bg-parchment w-full max-w-lg rounded-2xl border border-noireText/10 shadow-2xl p-6 relative">
-        <div class="flex items-center justify-between border-b border-noireText/10 pb-3 mb-4">
+<div id="editModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4 overflow-y-auto">
+    <div class="bg-parchment w-full max-w-lg rounded-2xl border border-noireText/10 shadow-2xl p-6 relative my-auto max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-noireText/10 pb-3 mb-4 sticky top-0 bg-parchment z-10">
             <h3 class="text-2xl text-noireText font-serif">Modify Discount Campaign</h3>
             <button onclick="closeEditModal()" class="text-noireText/50 hover:text-noireText text-lg font-bold">✕</button>
         </div>
@@ -287,14 +291,19 @@
                        class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono font-bold uppercase focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
             </div>
 
-            <!-- Discount Percent -->
+            <!-- Discount Value -->
             <div>
-                <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Discount Rate (%)</label>
-                <div class="relative">
-                    <input type="number" name="discount_percent" id="edit_discount_percent" min="0.1" max="100" step="0.5" required
-                           class="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono font-bold focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
-                    <span class="absolute right-4 top-2.5 text-noireText/50 font-bold">%</span>
+                <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Discount Type</label>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <label class="cursor-pointer"><input type="radio" name="discount_type" value="PERCENTAGE" id="edit_type_percentage" class="sr-only peer" onchange="updateDiscountValueField('edit')"><span class="block rounded-xl border border-noireText/10 bg-white px-3 py-2 text-center font-semibold peer-checked:bg-deepWine peer-checked:text-velvet peer-checked:border-deepWine">Percentage</span></label>
+                    <label class="cursor-pointer"><input type="radio" name="discount_type" value="FIXED" id="edit_type_fixed" class="sr-only peer" onchange="updateDiscountValueField('edit')"><span class="block rounded-xl border border-noireText/10 bg-white px-3 py-2 text-center font-semibold peer-checked:bg-deepWine peer-checked:text-velvet peer-checked:border-deepWine">Cash amount</span></label>
                 </div>
+                <div class="relative">
+                    <input type="number" name="discount_value" id="edit_discount_value" min="0.01" max="100" step="0.01" required
+                           class="w-full pl-4 pr-10 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono font-bold focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
+                    <span id="edit_discount_suffix" class="absolute right-4 top-2.5 text-noireText/50 font-bold">%</span>
+                </div>
+                <p id="edit_discount_help" class="text-[10px] text-noireText/40 mt-1"></p>
             </div>
 
             <!-- Valid From -->
@@ -405,7 +414,9 @@
     function openEditModal(d) {
         document.getElementById('edit_discount_id').value = d.discount_id;
         document.getElementById('edit_code').value = d.code;
-        document.getElementById('edit_discount_percent').value = d.discount_percent;
+        document.getElementById(d.discount_type === 'FIXED' ? 'edit_type_fixed' : 'edit_type_percentage').checked = true;
+        document.getElementById('edit_discount_value').value = d.discount_value;
+        updateDiscountValueField('edit');
         document.getElementById('edit_valid_from').value = d.valid_from_input;
         document.getElementById('edit_valid_to').value = d.valid_to_input;
         document.getElementById('edit_description').value = d.description || '';
@@ -414,6 +425,16 @@
         const modal = document.getElementById('editModal');
         modal.classList.remove('hidden');
         modal.classList.add('flex');
+    }
+
+    function updateDiscountValueField(prefix) {
+        const isFixed = document.querySelector(`input[name="discount_type"]${prefix === 'edit' ? '#edit_type_fixed' : '[value="FIXED"]'}`).checked;
+        const input = document.getElementById(`${prefix}_discount_value`);
+        const suffix = document.getElementById(`${prefix}_discount_suffix`);
+        const help = document.getElementById(`${prefix}_discount_help`);
+        input.max = isFixed ? '' : '100';
+        suffix.textContent = isFixed ? '$' : '%';
+        help.textContent = isFixed ? 'Enter the cash amount to take off, e.g. $5.00.' : 'Enter any percentage from 0.01% to 100% (for example, 15%).';
     }
 
     function closeEditModal() {

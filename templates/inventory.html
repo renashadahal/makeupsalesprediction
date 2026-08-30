@@ -4,7 +4,6 @@
 
     <div class="border-b border-noireText/10 pb-4">
         <h2 class="text-4xl text-noireText font-serif">Inventory Ledger (Branch {{ current_branch }})</h2>
-        <p class="text-xs text-noireText/60 font-light mt-1">Log shipments and monitor stock balances for operating node {{ current_branch }}.</p>
     </div>
 
     <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
@@ -84,14 +83,14 @@
                 <div class="flex items-center gap-2">
                     <span class="font-medium uppercase text-noireText/60 tracking-widest text-[10px] hidden sm:inline-block mr-1">Status:</span>
                     <div class="inline-flex rounded-xl border border-noireText/10 overflow-hidden bg-white p-0.5 h-[34px] shadow-sm">
-                        <button type="button" data-status="" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs bg-deepWine text-velvet">
+                        <button type="button" data-status="" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
                             All
                         </button>
                         <button type="button" data-status="in-stock" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
                             In Stock
                         </button>
-                        <button type="button" data-status="low" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs hover:bg-velvet/50 text-noireText/75">
-                            Low Stock
+                        <button type="button" data-status="low" class="status-tab py-1 px-3.5 rounded-lg text-center transition-all font-medium text-xs bg-deepWine text-velvet">
+                            Low Stock (&lt;15)
                         </button>
                     </div>
                 </div>
@@ -126,7 +125,7 @@
                 </thead>
                 <tbody id="inventory_table_body">
                     {% for item in inventory_items %}
-                    {% set item_status = 'low' if item.stock|int < 10 else 'in-stock' %}
+                    {% set item_status = 'low' if item.stock|int < 15 else 'in-stock' %}
                     <tr class="inventory-row border-b border-noireText/5 hover:bg-velvet/20 transition-colors" 
                         data-brand="{{ item.brand }}" 
                         data-product="{{ item.product_name }}" 
@@ -140,10 +139,10 @@
                         <td class="py-4 px-6 text-noireText/80">{{ item.product_name }}</td>
                         <td class="py-4 px-6 font-mono font-medium text-noireText">{{ item.stock }} units</td>
                         <td class="py-4 px-6">
-                            {% if item.stock|int < 10 %}
-                                <span class="text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-block border border-rose-200/50">⚠️ Low Stock</span>
+                            {% if item.stock|int < 15 %}
+                                <span class="text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-block border border-rose-200/50">Low Stock</span>
                             {% else %}
-                                <span class="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-block border border-emerald-200/50">✓ In Stock</span>
+                                <span class="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-block border border-emerald-200/50">In Stock</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -215,7 +214,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const tableRows = Array.from(tableBody.querySelectorAll('tr.inventory-row'));
     const emptyRow = document.getElementById('no_results_row');
     
-    let activeStatus = "";
+    let activeStatus = "low";
+    sortSelect.value = "stock-asc";
     
     const brandsSet = new Set();
     tableRows.forEach(row => {
@@ -237,7 +237,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const sortBy = sortSelect.value;
         let visibleCount = 0;
         
-        // 1. Filter visibility
+        // 1. Filter visibility (If user searches for a product or brand, search across all items; otherwise respect Low Stock tab default)
         tableRows.forEach(row => {
             const brand = (row.dataset.brand || '').toLowerCase();
             const product = (row.dataset.product || '').toLowerCase();
@@ -245,7 +245,9 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const matchesQuery = query === "" || brand.includes(query) || product.includes(query);
             const matchesBrand = selectedBrand === "" || row.dataset.brand === selectedBrand;
-            const matchesStatus = activeStatus === "" || status === activeStatus;
+            
+            // If user types a search query, show any matching product; otherwise filter by active tab status
+            const matchesStatus = (query !== "" && activeStatus === "low") ? true : (activeStatus === "" || status === activeStatus);
             
             if (matchesQuery && matchesBrand && matchesStatus) {
                 row.style.display = "";
@@ -320,9 +322,6 @@ document.addEventListener("DOMContentLoaded", () => {
             
             activeStatus = tab.dataset.status;
 
-            // Default sorting per tab:
-            // 'All' -> recent
-            // 'In Stock' / 'Low Stock' -> stock-asc (low stock on top)
             if (activeStatus === "") {
                 sortSelect.value = "recent";
             } else {
@@ -338,7 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
         brandSelect.value = "";
         
         statusTabs.forEach(tab => {
-            if (tab.dataset.status === "") {
+            if (tab.dataset.status === "low") {
                 tab.classList.add('bg-deepWine', 'text-velvet');
                 tab.classList.remove('hover:bg-velvet/50', 'text-noireText/75');
             } else {
@@ -347,12 +346,12 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
         
-        activeStatus = "";
-        sortSelect.value = "recent";
+        activeStatus = "low";
+        sortSelect.value = "stock-asc";
         applySortAndFilters();
     });
 
-    // Initial sort and filter application on page load
+    // Initial sort and filter application on page load (defaults to low stock)
     applySortAndFilters();
 });
 </script>

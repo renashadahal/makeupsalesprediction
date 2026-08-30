@@ -7,7 +7,7 @@
     <!-- Premium Editorial Typography Stack -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
     <!-- Tailwind CSS CDN Engine -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -15,27 +15,28 @@
             theme: {
                 extend: {
                     colors: {
-                        velvet: '#f3e9e9',       /* Muted Rose-Tinted Cream Backdrop */
-                        parchment: '#eae0e0',    /* Darker, richer element plates */
-                        noireText: '#2e2528',    /* Vintage Charcoal Wine Accent */
-                        dustyRose: '#a88189',    /* Muted Rose Accent Tone */
-                        deepWine: '#423338'      /* True Navbar Palette Dark */
+                        velvet: '#f3e9e9',
+                        parchment: '#eae0e0',
+                        noireText: '#2e2528',
+                        dustyRose: '#a88189',
+                        deepWine: '#423338'
                     },
                     fontFamily: {
                         serif: ['Cormorant Garamond', 'serif'],
-                        sans: ['Space Grotesk', 'sans-serif']
+                        sans: ['Plus Jakarta Sans', 'Space Grotesk', 'sans-serif'],
+                        display: ['Cormorant Garamond', 'serif']
                     }
                 }
             }
         }
     </script>
     <style>
-        body { font-family: 'Space Grotesk', sans-serif; background-color: #f3e9e9; color: #2e2528; }
+        body { font-family: 'Plus Jakarta Sans', 'Space Grotesk', sans-serif; background-color: #f3e9e9; color: #2e2528; }
         h1, h2, h3, .brand-font { font-family: 'Cormorant Garamond', serif; font-weight: 600; }
     </style>
     {% block head %}{% endblock %}
 </head>
-<body class="min-h-screen flex flex-col bg-velvet">
+<body class="min-h-screen flex flex-col bg-velvet text-noireText antialiased">
 
     <!-- Fully Responsive Global Header -->
     <header class="bg-deepWine text-velvet shadow-md w-full border-b border-noireText/10">
@@ -55,9 +56,9 @@
                     <span class="text-[10px] text-dustyRose uppercase font-bold tracking-widest">Branch:</span>
                     {% if session.get('role') == 'admin' %}
                     <select onchange="window.location.href='/switch_branch/' + this.value" class="bg-transparent text-velvet font-bold focus:outline-none cursor-pointer">
-                        {% for b_code in ['S001', 'S002', 'S003', 'S004', 'S005'] %}
-                            <option value="{{ b_code }}" class="bg-deepWine text-velvet" {% if session.get('branch') == b_code %}selected{% endif %}>
-                                {{ b_code }}
+                        {% for b in active_branches %}
+                            <option value="{{ b.branch_id }}" class="bg-deepWine text-velvet" {% if session.get('branch') == b.branch_id %}selected{% endif %}>
+                                {{ b.branch_id }}
                             </option>
                         {% endfor %}
                     </select>
@@ -74,9 +75,9 @@
                 </div>
             </div>
 
-            <!-- Fully Responsive Links Container -->
+            <!-- Primary navigation plus a compact admin tools menu -->
             <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 text-xs font-medium tracking-wide">
-                <nav class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 md:gap-2">
+                <nav aria-label="Primary navigation" class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 md:gap-2">
                     <a href="{{ url_for('dashboard') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">Dashboard</a>
                     <a href="{{ url_for('record_sale') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">Record Sale</a>
                     <a href="{{ url_for('sales_history') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">Sales History</a>
@@ -85,9 +86,17 @@
                     <a href="{{ url_for('forecast') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">AI Forecast</a>
                     
                     {% if session.get('role') == 'admin' %}
-                        <a href="{{ url_for('manage_discounts') }}" class="px-2.5 py-1.5 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20 whitespace-nowrap">Discounts</a>
-                        <a href="{{ url_for('manage_users') }}" class="px-2.5 py-1.5 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20 whitespace-nowrap">Users</a>
-                        <a href="{{ url_for('update_catalog') }}" class="px-2.5 py-1.5 rounded-lg bg-dustyRose/10 text-dustyRose hover:bg-dustyRose/20 transition-all text-center border border-dustyRose/20 whitespace-nowrap">Catalog</a>
+                        <details class="relative col-span-2 sm:col-span-1 group">
+                            <summary class="list-none cursor-pointer px-2.5 py-1.5 rounded-lg bg-dustyRose/15 text-dustyRose hover:bg-dustyRose/25 transition-all text-center border border-dustyRose/30 whitespace-nowrap flex items-center justify-center gap-1.5">
+                                <span>Admin tools</span><span class="text-[9px] transition-transform group-open:rotate-180">⌄</span>
+                            </summary>
+                            <div class="z-50 mt-1.5 w-48 rounded-xl border border-dustyRose/25 bg-deepWine p-1.5 shadow-xl sm:absolute sm:right-0 sm:mt-2">
+                                <a href="{{ url_for('manage_discounts') }}" class="block rounded-lg px-3 py-2 hover:bg-velvet/10 hover:text-dustyRose transition-colors">Discounts</a>
+                                <a href="{{ url_for('manage_users') }}" class="block rounded-lg px-3 py-2 hover:bg-velvet/10 hover:text-dustyRose transition-colors">Users</a>
+                                <a href="{{ url_for('update_catalog') }}" class="block rounded-lg px-3 py-2 hover:bg-velvet/10 hover:text-dustyRose transition-colors">Catalog</a>
+                                <a href="{{ url_for('manage_branches') }}" class="block rounded-lg px-3 py-2 hover:bg-velvet/10 hover:text-dustyRose transition-colors">Branches</a>
+                            </div>
+                        </details>
                     {% endif %}
                 </nav>
 
@@ -165,7 +174,7 @@
     </main>
 
     <!-- Footer System -->
-    <footer class="py-4 text-center text-[10px] text-red-900 uppercase tracking-widest border-t border-parchment/40 bg-parchment/10 mt-auto">
+    <footer class="py-4 text-center text-[10px] text-noireText/50 uppercase tracking-widest border-t border-noireText/10 bg-white/40 mt-auto">
         &copy; 2026 Noire Intelligence Module Matrix.
     </footer>
 

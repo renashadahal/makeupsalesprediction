@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- PDF Generation Library -->
+<!-- PDF Generation Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
@@ -36,15 +37,13 @@
     
     <!-- Top Meta Panel Header -->
     <div class="border-b border-noireText/10 pb-4">
-        <h2 class="text-4xl text-noireText font-serif">Sales Transactional Terminal</h2>
-        <p class="text-xs text-noireText/60 font-light mt-1">Process multi-item makeup checkouts logged under active branch node ({{ session.get('branch', 'S001') }}).</p>
+        <h2 class="text-4xl text-noireText font-serif">Record Sale</h2>
     </div>
     
     <!-- Catalog Item Selection Matrix Card -->
     <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
         <div class="border-b border-noireText/10 pb-3 mb-6">
-            <h3 class="text-2xl text-noireText font-serif">Catalog Item Selection Matrix</h3>
-            <p class="text-xs text-noireText/60 font-light">Filter attributes sequentially to stage items into current cart ledger.</p>
+            <h3 class="text-2xl text-noireText font-serif">Select Products</h3>
         </div>
 
         <div class="space-y-6">
@@ -254,32 +253,206 @@
                 <p style="font-family: serif; font-style: italic; margin: 0;">Thank you for shopping at Noire Beauty!</p>
                 <p style="font-family: monospace; font-size: 0.65rem; margin: 0.25rem 0 0 0;">Please retain this receipt for returns or exchanges.</p>
             </div>
-        </div>
-
-        <!-- Modal Action Footer (Always pinned at bottom, hidden on print) -->
-        <div class="no-print" style="background-color: #f9fafb; padding: 1rem 1.5rem; border-top: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-shrink: 0;">
+        </div>        <!-- Modal Action Footer (Always pinned at bottom, hidden on print) -->
+        <div class="no-print" style="background-color: #f9fafb; padding: 1rem 1.5rem; border-top: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-shrink: 0;">
             <button type="button" id="closeReceiptBtn" style="padding: 0.6rem 1.2rem; border-radius: 0.75rem; border: 1px solid rgba(0,0,0,0.2); background: transparent; cursor: pointer; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
                 Close & Next Sale
             </button>
-            <button type="button" id="printReceiptBtn" style="padding: 0.6rem 1.2rem; border-radius: 0.75rem; background-color: #4a1525; color: #ffffff; border: none; cursor: pointer; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
-                Print Receipt
-            </button>
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="button" id="downloadPdfBtn" style="padding: 0.6rem 1.2rem; border-radius: 0.75rem; background-color: #10b981; color: #ffffff; border: none; cursor: pointer; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
+                    Download PDF
+                </button>
+                <button type="button" id="printReceiptBtn" style="padding: 0.6rem 1.2rem; border-radius: 0.75rem; background-color: #4a1525; color: #ffffff; border: none; cursor: pointer; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
+                    Print Receipt
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-// Function to generate and download PDF automatically
-function autoSaveReceiptPDF(transactionId) {
+let lastReceiptData = null;
+
+// Pure Procedural Vector jsPDF Receipt Generator (100% Reliable, Zero Blank Pages)
+function autoSaveReceiptPDF(dataOrTxId) {
+    let r = lastReceiptData;
+    if (dataOrTxId && typeof dataOrTxId === 'object') {
+        r = dataOrTxId;
+    }
+
+    // Scrape data if not provided directly
+    if (!r) {
+        const items = [];
+        document.querySelectorAll('#r_items_body tr').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 4) {
+                const itemText = cells[0].innerText.trim();
+                const qty = parseInt(cells[1].innerText.trim(), 10) || 1;
+                const price = parseFloat(cells[2].innerText.replace('$', '').trim()) || 0;
+                const subtotal = parseFloat(cells[3].innerText.replace('$', '').trim()) || 0;
+                items.push({
+                    product_name: itemText,
+                    quantity: qty,
+                    final_unit_price: price,
+                    subtotal: subtotal
+                });
+            }
+        });
+
+        r = {
+            branch_id: document.getElementById('r_branch')?.textContent?.trim() || 'S001',
+            transaction_id: document.getElementById('r_tx_id')?.textContent?.trim() || 'TX-POS',
+            transaction_date: document.getElementById('r_date')?.textContent?.trim() || new Date().toISOString().slice(0, 10),
+            username: document.getElementById('r_operator')?.textContent?.trim() || 'staff',
+            items: items,
+            subtotal_before_discount: parseFloat(document.getElementById('r_subtotal')?.textContent?.replace('$', '')?.trim()) || 0,
+            discount_amount: parseFloat(document.getElementById('r_discount')?.textContent?.replace('-$', '')?.replace('$', '')?.trim()) || 0,
+            promo_code: document.getElementById('r_promo_code')?.textContent?.trim() || '',
+            grand_total: parseFloat(document.getElementById('r_grand_total')?.textContent?.replace('$', '')?.trim()) || 0
+        };
+    }
+
+    try {
+        const jsPDFClass = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : (window.jsPDF || (window.html2pdf && window.html2pdf.jsPDF));
+        if (jsPDFClass) {
+            const itemCount = (r.items && r.items.length) || 1;
+            const dynamicHeight = Math.max(160, 110 + (itemCount * 8));
+
+            const doc = new jsPDFClass({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: [80, dynamicHeight]
+            });
+
+            // Receipt Header
+            doc.setFont("courier", "bold");
+            doc.setFontSize(11);
+            doc.setTextColor(30, 20, 25);
+            doc.text("NOIRE BEAUTY STORE", 40, 10, { align: "center" });
+
+            doc.setFont("courier", "normal");
+            doc.setFontSize(6.5);
+            doc.setTextColor(90, 80, 85);
+            doc.text("Retail Intelligence POS Network", 40, 14, { align: "center" });
+            doc.text(`Branch Node: ${r.branch_id || 'S001'}`, 40, 17.5, { align: "center" });
+
+            // Dotted divider
+            doc.setLineDashPattern([1, 1], 0);
+            doc.setDrawColor(160, 160, 160);
+            doc.line(5, 20, 75, 20);
+
+            // Metadata block
+            let y = 24;
+            doc.setFontSize(6.5);
+            doc.setTextColor(40, 40, 40);
+            doc.text(`Tx ID:    ${r.transaction_id}`, 5, y);
+            y += 3.5;
+            doc.text(`Date:     ${r.transaction_date || ''}`, 5, y);
+            y += 3.5;
+            doc.text(`Operator: ${r.username || 'staff'}`, 5, y);
+            y += 3.5;
+            doc.text(`Payment:  PAID (Verified)`, 5, y);
+            y += 3.5;
+
+            // Line items header
+            doc.line(5, y, 75, y);
+            y += 4;
+
+            doc.setFont("courier", "bold");
+            doc.setFontSize(6.5);
+            doc.setTextColor(30, 20, 25);
+            doc.text("ITEM / DESCRIPTION", 5, y);
+            doc.text("QTY", 46, y, { align: "right" });
+            doc.text("PRICE", 58, y, { align: "right" });
+            doc.text("TOTAL", 75, y, { align: "right" });
+            y += 2;
+            doc.line(5, y, 75, y);
+            y += 3.5;
+
+            // Line items body
+            doc.setFont("courier", "normal");
+            doc.setFontSize(6);
+            if (r.items && r.items.length > 0) {
+                r.items.forEach(item => {
+                    const brandStr = item.brand ? `${item.brand} ` : '';
+                    const shadeStr = (item.shade && item.shade !== 'Default') ? ` (${item.shade})` : '';
+                    const fullDesc = (brandStr + (item.product_name || '') + shadeStr).substring(0, 22);
+
+                    doc.setTextColor(30, 20, 25);
+                    doc.text(fullDesc, 5, y);
+                    doc.text(String(item.quantity || 1), 46, y, { align: "right" });
+                    doc.text(`$${Number(item.final_unit_price || item.unit_price || 0).toFixed(2)}`, 58, y, { align: "right" });
+                    doc.setFont("courier", "bold");
+                    doc.text(`$${Number(item.subtotal || 0).toFixed(2)}`, 75, y, { align: "right" });
+                    doc.setFont("courier", "normal");
+                    y += 3.8;
+                });
+            }
+
+            // Financial breakdown
+            doc.line(5, y, 75, y);
+            y += 4;
+
+            doc.setFontSize(6.5);
+            doc.setTextColor(50, 50, 50);
+            doc.text("Subtotal:", 5, y);
+            doc.text(`$${Number(r.subtotal_before_discount || 0).toFixed(2)}`, 75, y, { align: "right" });
+            y += 3.5;
+
+            if (r.discount_amount && r.discount_amount > 0) {
+                doc.setTextColor(20, 120, 60);
+                const pCode = r.promo_code ? ` (${r.promo_code})` : '';
+                doc.text(`Discount${pCode}:`, 5, y);
+                doc.text(`-$${Number(r.discount_amount).toFixed(2)}`, 75, y, { align: "right" });
+                y += 3.5;
+            }
+
+            doc.setLineDashPattern([], 0);
+            doc.setDrawColor(60, 60, 60);
+            doc.line(5, y, 75, y);
+            y += 4.5;
+
+            doc.setFont("courier", "bold");
+            doc.setFontSize(8);
+            doc.setTextColor(15, 80, 50);
+            doc.text("TOTAL PAID:", 5, y);
+            doc.text(`$${Number(r.grand_total || 0).toFixed(2)}`, 75, y, { align: "right" });
+            y += 6;
+
+            // Receipt Footer
+            doc.setLineDashPattern([1, 1], 0);
+            doc.setDrawColor(160, 160, 160);
+            doc.line(5, y, 75, y);
+            y += 4;
+
+            doc.setFont("courier", "italic");
+            doc.setFontSize(6);
+            doc.setTextColor(100, 90, 95);
+            doc.text("Thank you for shopping at Noire Beauty!", 40, y, { align: "center" });
+            y += 3.5;
+            doc.setFont("courier", "normal");
+            doc.setFontSize(5.5);
+            doc.text("Please retain this receipt for returns/exchanges.", 40, y, { align: "center" });
+
+            doc.save(`Receipt_${r.transaction_id || 'Sale'}.pdf`);
+            return;
+        }
+    } catch (err) {
+        console.error("jsPDF generation error, attempting html2pdf fallback:", err);
+    }
+
+    // HTML2PDF fallback directly on the visible element
     const element = document.getElementById('printableReceipt');
-    const opt = {
-        margin:       0.3,
-        filename:     `Receipt_${transactionId}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2 },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    html2pdf().set(opt).from(element).save();
+    if (element) {
+        const opt = {
+            margin: [0.2, 0.2, 0.2, 0.2],
+            filename: `Receipt_${r.transaction_id || 'Sale'}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: 0, scrollX: 0 },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(element).save();
+    }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -583,13 +756,11 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
                 document.getElementById('r_grand_total').textContent = `$${r.grand_total.toFixed(2)}`;
 
+                // Retain data for PDF generation & printing
+                lastReceiptData = r;
+
                 // Display Modal via inline styling block
                 receiptModal.style.display = 'flex';
-
-                // Automatically generate PDF
-                setTimeout(() => {
-                    autoSaveReceiptPDF(r.transaction_id);
-                }, 300);
 
                 // Reset Interface
                 activeCart = [];
@@ -610,6 +781,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById('closeReceiptBtn').addEventListener('click', () => {
         receiptModal.style.display = 'none';
     });
+
+    const downloadBtn = document.getElementById('downloadPdfBtn');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', () => {
+            autoSaveReceiptPDF(lastReceiptData);
+        });
+    }
 
     document.getElementById('printReceiptBtn').addEventListener('click', () => {
         window.print();

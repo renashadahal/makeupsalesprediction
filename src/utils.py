@@ -38,32 +38,32 @@ MAKEUP_DATA_CSV = os.path.join('data', 'makeup_data.csv')
 
 # --- USER MANAGEMENT UTILITIES ---
 
-def load_users(db_path=DB_PATH):
+def load_users(db_path=None):
     return db_load_users(db_path=db_path)
 
-def save_user(username, password, role='staff', branch='S001', db_path=DB_PATH):
+def save_user(username, password, role='staff', branch='S001', db_path=None):
     return db_save_user(username, password, role=role, branch=branch, db_path=db_path)
 
-def update_user(username, password=None, role=None, branch=None, db_path=DB_PATH):
+def update_user(username, password=None, role=None, branch=None, db_path=None):
     return db_update_user(username, password=password, role=role, branch=branch, db_path=db_path)
 
-def delete_user(username, current_admin_user=None, db_path=DB_PATH):
+def delete_user(username, current_admin_user=None, db_path=None):
     return db_delete_user(username, current_admin_user=current_admin_user, db_path=db_path)
 
-def verify_user(username, password, db_path=DB_PATH):
+def verify_user(username, password, db_path=None):
     return db_verify_user(username, password, db_path=db_path)
 
 # --- SALES TRANSACTIONS UTILITIES ---
 
-def load_transactions(branch=None, limit=None, db_path=DB_PATH):
+def load_transactions(branch=None, limit=None, db_path=None):
     return db_load_transactions(branch=branch, limit=limit, db_path=db_path)
 
 # --- INVENTORY MANAGEMENT UTILITIES ---
 
-def load_inventory(branch=None, db_path=DB_PATH):
+def load_inventory(branch=None, db_path=None):
     return db_load_inventory(branch=branch, db_path=db_path)
 
-def update_inventory_stock(branch, brand, product_name, quantity_added, product_id=None, subcategory=None, category='makeup', price=None, db_path=DB_PATH):
+def update_inventory_stock(branch, brand, product_name, quantity_added, product_id=None, subcategory=None, category='makeup', price=None, db_path=None):
     return db_update_inventory_stock(
         branch=branch, brand_name=brand, product_name=product_name,
         quantity_added=quantity_added, product_id=product_id,
@@ -71,12 +71,12 @@ def update_inventory_stock(branch, brand, product_name, quantity_added, product_
         db_path=db_path
     )
 
-def deduct_inventory_stock(branch, product_name, quantity_sold, db_path=DB_PATH):
+def deduct_inventory_stock(branch, product_name, quantity_sold, db_path=None):
     return db_deduct_inventory_stock(branch=branch, product_name=product_name, quantity_sold=quantity_sold, db_path=db_path)
 
 # --- CATALOG & SHADES UTILITIES ---
 
-def get_catalog_shades(product_name, db_path=DB_PATH):
+def get_catalog_shades(product_name, db_path=None):
     """Extracts available shades tailored to the specific product catalog item.
     
     Returns an empty list for non-shaded categories (e.g. sunscreens, moisturizers, perfumes),
@@ -239,55 +239,54 @@ def get_catalog_shades(product_name, db_path=DB_PATH):
 
 # --- ROLLING LAG FEATURE CALCULATION ---
 
-def calculate_rolling_lags(product_id, store_id, default_mean=15.0, db_path=DB_PATH):
+def calculate_rolling_lags(product_id, store_id, default_mean=15.0, db_path=None):
     return db_calculate_rolling_lags(product_id=product_id, branch_id=store_id, default_mean=default_mean, db_path=db_path)
 
 # --- STOCK TRANSFER UTILITIES ---
 
-def request_transfer(from_branch, to_branch, product_id, quantity, requested_by, notes='', db_path=DB_PATH):
+def request_transfer(from_branch, to_branch, product_id, quantity, requested_by, notes='', db_path=None):
     return db_request_transfer(from_branch=from_branch, to_branch=to_branch, product_id=product_id, quantity=quantity, requested_by=requested_by, notes=notes, db_path=db_path)
 
-def dispatch_transfer(transfer_id, approved_by, db_path=DB_PATH):
+def dispatch_transfer(transfer_id, approved_by, db_path=None):
     return db_dispatch_transfer(transfer_id=transfer_id, approved_by=approved_by, db_path=db_path)
 
-def approve_transfer(transfer_id, approved_by, db_path=DB_PATH):
+def approve_transfer(transfer_id, approved_by, db_path=None):
     return db_dispatch_transfer(transfer_id=transfer_id, approved_by=approved_by, db_path=db_path)
 
-def complete_transfer(transfer_id, db_path=DB_PATH):
+def complete_transfer(transfer_id, db_path=None):
     return db_complete_transfer(transfer_id=transfer_id, db_path=db_path)
 
-def receive_transfer(transfer_id, db_path=DB_PATH):
+def receive_transfer(transfer_id, db_path=None):
     return db_complete_transfer(transfer_id=transfer_id, db_path=db_path)
 
-def cancel_transfer(transfer_id, db_path=DB_PATH):
+def cancel_transfer(transfer_id, db_path=None):
     return db_cancel_transfer(transfer_id=transfer_id, db_path=db_path)
 
-def load_transfers(branch=None, status=None, db_path=DB_PATH):
+def load_transfers(branch=None, status=None, db_path=None):
     return db_load_transfers(branch=branch, status=status, db_path=db_path)
 
 # --- DISCOUNT CODES & PROMOTIONS UTILITIES ---
 
-def load_discounts(db_path=DB_PATH):
+def load_discounts(db_path=None):
     return db_load_discounts(db_path=db_path)
 
-def get_discount_by_id(discount_id, db_path=DB_PATH):
+def get_discount_by_id(discount_id, db_path=None):
     return db_get_discount_by_id(discount_id, db_path=db_path)
 
-def get_discount_by_code(code, db_path=DB_PATH):
+def get_discount_by_code(code, db_path=None):
     return db_get_discount_by_code(code, db_path=db_path)
 
-def validate_discount_code(code, check_time=None, db_path=DB_PATH):
+def validate_discount_code(code, check_time=None, db_path=None):
     return db_validate_discount_code(code, check_time=check_time, db_path=db_path)
 
-def create_discount(code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=DB_PATH):
+def create_discount(code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=None):
     return db_create_discount(code, discount_type=discount_type, discount_value=discount_value, valid_from=valid_from, valid_to=valid_to, is_active=is_active, description=description, db_path=db_path)
 
-def update_discount(discount_id, code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=DB_PATH):
+def update_discount(discount_id, code, discount_type='PERCENTAGE', discount_value=None, valid_from=None, valid_to=None, is_active=1, description='', db_path=None):
     return db_update_discount(discount_id, code, discount_type=discount_type, discount_value=discount_value, valid_from=valid_from, valid_to=valid_to, is_active=is_active, description=description, db_path=db_path)
 
-def delete_discount(discount_id, db_path=DB_PATH):
+def delete_discount(discount_id, db_path=None):
     return db_delete_discount(discount_id, db_path=db_path)
 
-def toggle_discount_status(discount_id, db_path=DB_PATH):
+def toggle_discount_status(discount_id, db_path=None):
     return db_toggle_discount_status(discount_id, db_path=db_path)
-
