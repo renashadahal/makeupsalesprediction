@@ -264,6 +264,17 @@ def init_db(db_path=None):
             ('WELCOME5', 'FIXED', 5.0, 0.0, '2026-01-01 00:00:00', '2030-12-31 23:59:59', 1, 'Welcome Gift $5.00 Off Coupon');
         """)
 
+        # product shades table for catalog products
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS product_shades (
+            shade_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id TEXT NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+            shade_name TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(product_id, shade_name)
+        );
+        """)
+
         # schema migration check
         existing_cols = [row[1] for row in cursor.execute("PRAGMA table_info(inventory_transfers);").fetchall()]
         if 'approved_by' not in existing_cols:
@@ -607,7 +618,7 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
             FROM products p 
             JOIN brands b ON p.brand_id = b.brand_id
             LEFT JOIN inventory i ON p.product_id = i.product_id AND i.branch_id = ?
-            WHERE b.brand_name = ? AND p.product_name = ?;
+            WHERE LOWER(b.brand_name) = LOWER(?) AND LOWER(p.product_name) = LOWER(?);
             """, (branch, brand_name, p_name)).fetchone()
 
             if not p_row:
@@ -622,6 +633,11 @@ def db_record_transaction(tx_id, username, branch, cart, promo_code='', db_path=
             raw_subtotal = orig_price * qty
             subtotal_before_discount += raw_subtotal
             shade = item.get('shade', 'Default').strip() or 'Default'
+
+            # validate shade selection if product has registered shades
+            shades_in_db = cursor.execute("SELECT shade_name FROM product_shades WHERE product_id = ?;", (p_id,)).fetchall()
+            if shades_in_db and (shade == 'Default' or not shade or shade.lower() in ('none', 'n/a', 'standard shade')):
+                return False, f"Shade selection is required for product '{p_name}'."
 
             processed_items.append({
                 'product_id': p_id,
@@ -1467,10 +1483,26 @@ def db_toggle_branch_active(branch_id, db_path=None):
         """, (branch_id,))
         if cursor.rowcount == 0:
             return False, f"Branch '{branch_id}' not found."
-        new_state = conn.execute(
-            "SELECT is_active FROM branches WHERE branch_id = ?;", (branch_id,)
-        ).fetchone()['is_active']
-        status = "activated" if new_state == 1 else "deactivated"
-        return True, f"Branch '{branch_id}' {status}."
+        new_active = conn.execute("SELECT is_active FROM branches WHERE branch_id = ?;", (branch_id,)).fetchone()[0]
+        status_str = "activated" if new_active == 1 else "deactivated"
+        return True, f"Branch '{branch_id}' is now {status_str}."
 
 
+def db_save_product_shades(product_id, shades_list, db_path=None):
+    """saves multiple catalog shades for a product"""
+    if not product_id or not shades_list:
+        return
+    valid_shades = []
+    for s in shades_list:
+        if s and isinstance(s, str) and s.strip():
+            clean = s.strip()
+            if clean not in valid_shades:
+                valid_shades.append(clean)
+    if not valid_shades:
+        return
+    with get_db(db_path) as conn:
+        for shade in valid_shades:
+            conn.execute("""
+            INSERT OR IGNORE INTO product_shades (product_id, shade_name)
+            VALUES (?, ?);
+            """, (product_id, shade))

@@ -606,6 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const transferForm = document.querySelector('form[action*="transfers"]') || document.querySelector('form');
     if (transferForm) {
         transferForm.addEventListener('submit', (e) => {
+            // block if quantity exceeds source stock
             if (availableStock !== null && qtyInput) {
                 const requested = parseInt(qtyInput.value, 10) || 0;
                 if (requested > availableStock) {
@@ -613,7 +614,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     checkQuantityGuard();
                     overstockWarning.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     qtyInput.focus();
+                    return;
                 }
+            }
+            // block if shade is required but not selected
+            if (shadeSel && shadeSel.dataset.hasShades === "true" && (!shadeSel.value || shadeSel.value === "" || shadeSel.value === "Default")) {
+                e.preventDefault();
+                alert(`Shade selection is required for transfer of ${prodSel ? prodSel.value : 'this product'}. Please choose a valid shade.`);
+                if (shadeSel) shadeSel.focus();
             }
         });
     }
@@ -793,18 +801,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (shadeSel) {
                     if (shades && shades.length > 0) {
-                        shadeSel.innerHTML = '<option value="" disabled selected>-- Select Shade --</option>' + 
+                        shadeSel.innerHTML = '<option value="" disabled selected>-- Select Required Shade --</option>' + 
                             shades.map(sh => `<option value="${sh}">${sh}</option>`).join('');
                         shadeSel.disabled = false;
+                        shadeSel.required = true;
+                        shadeSel.dataset.hasShades = "true";
                     } else {
                         shadeSel.innerHTML = '<option value="Default" selected>N/A (Standard / Non-Shaded)</option>';
                         shadeSel.disabled = true;
+                        shadeSel.required = false;
+                        shadeSel.dataset.hasShades = "false";
                     }
                 }
             } catch (e) {
                 if (shadeSel) {
                     shadeSel.innerHTML = '<option value="Default" selected>N/A (Standard / Non-Shaded)</option>';
                     shadeSel.disabled = true;
+                    shadeSel.required = false;
+                    shadeSel.dataset.hasShades = "false";
                 }
             }
         });

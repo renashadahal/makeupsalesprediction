@@ -13,11 +13,11 @@
         
         <form action="{{ url_for('inventory_view') }}" method="POST" class="space-y-6">
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs tracking-wide">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs tracking-wide">
                 <div class="flex flex-col gap-1.5">
-                    <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Select Brand</label>
+                    <label class="block font-semibold uppercase text-noireText/70 tracking-widest">1. Select Brand</label>
                     <select id="brand_select" name="brand" onchange="handleBrandChange()" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
-                        <option value="">-- Choose Existing Brand --</option>
+                        <option value="" disabled selected>-- Choose Existing Brand --</option>
                         {% for brand in brands %}
                         <option value="{{ brand }}">{{ brand }}</option>
                         {% endfor %}
@@ -25,14 +25,27 @@
                 </div>
                 
                 <div class="flex flex-col gap-1.5">
-                    <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Select Product</label>
-                    <select id="product_select" name="product" onchange="handleProductChange()" required class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
-                        <option value="">-- Select Brand First --</option>
+                    <label class="block font-semibold uppercase text-noireText/70 tracking-widest">2. Select Subcategory</label>
+                    <select id="subcategory_select" name="subcategory" onchange="handleSubcategoryChange()" required disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm disabled:opacity-50 capitalize">
+                        <option value="" disabled selected>-- Select Brand First --</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="block font-semibold uppercase text-noireText/70 tracking-widest">3. Select Product</label>
+                    <select id="product_select" name="product" onchange="handleProductChange()" required disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm disabled:opacity-50">
+                        <option value="" disabled selected>-- Select Subcategory First --</option>
                     </select>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs tracking-wide items-end">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-5 text-xs tracking-wide items-end">
+                <div class="flex flex-col gap-1.5">
+                    <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Select Shade</label>
+                    <select id="shade_select" name="shade" disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm disabled:opacity-50">
+                        <option value="Default" selected>Standard Shade (N/A)</option>
+                    </select>
+                </div>
                 <div class="flex flex-col gap-1.5">
                     <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Unit Price ($)</label>
                     <div class="relative">
@@ -56,7 +69,7 @@
         <!-- Search, Filter & Sort Controls -->
         <div class="p-5 border-b border-noireText/10 bg-parchment/30 space-y-4 text-xs tracking-wide">
             
-            <!-- Upper Row: Search, Brand Filter, Reset -->
+            <!-- Upper Row: Search, Brand Filter, Subcategory Filter, Reset -->
             <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-end">
                 <div class="flex-grow flex flex-col gap-1">
                     <label for="table_search" class="font-medium uppercase text-noireText/70 tracking-widest text-[10px]">Search Ledger</label>
@@ -65,10 +78,17 @@
                     </div>
                 </div>
 
-                <div class="w-full md:w-56 flex flex-col gap-1">
+                <div class="w-full md:w-48 flex flex-col gap-1">
                     <label for="table_filter_brand" class="font-medium uppercase text-noireText/70 tracking-widest text-[10px]">Filter by Brand</label>
                     <select id="table_filter_brand" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm">
                         <option value="">All Brands</option>
+                    </select>
+                </div>
+
+                <div class="w-full md:w-48 flex flex-col gap-1">
+                    <label for="table_filter_subcat" class="font-medium uppercase text-noireText/70 tracking-widest text-[10px]">Filter by Subcategory</label>
+                    <select id="table_filter_subcat" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-sm capitalize">
+                        <option value="">All Subcategories</option>
                     </select>
                 </div>
 
@@ -147,6 +167,7 @@
                     {% set item_status = 'low' if item.stock|int < 15 else 'in-stock' %}
                     <tr class="inventory-row border-b border-noireText/5 hover:bg-velvet/20 transition-colors" 
                         data-brand="{{ item.brand }}" 
+                        data-subcategory="{{ (item.subcategory or '')|lower }}"
                         data-product="{{ item.product_name }}" 
                         data-status="{{ item_status }}"
                         data-stock="{{ item.stock }}"
@@ -155,7 +176,12 @@
                         data-id="{{ item.inventory_id or loop.index }}">
                         <td class="py-4 px-6 font-mono text-noireText/60">{{ item.product_id or 'P0000' }}</td>
                         <td class="py-4 px-6 font-bold text-noireText">{{ item.brand }}</td>
-                        <td class="py-4 px-6 text-noireText/80">{{ item.product_name }}</td>
+                        <td class="py-4 px-6 text-noireText/80">
+                            {{ item.product_name }}
+                            {% if item.subcategory %}
+                            <span class="block text-[10px] text-noireText/50 font-mono capitalize">{{ item.subcategory }}</span>
+                            {% endif %}
+                        </td>
                         <td class="py-4 px-6 font-mono font-medium text-noireText">{{ item.stock }} units</td>
                         <td class="py-4 px-6">
                             {% if item.stock|int < 15 %}
@@ -196,45 +222,121 @@
 <script>
 const catalogMap = {{ catalog_map | tojson | safe }};
 
-function handleBrandChange() {
+async function handleBrandChange() {
     const brandSelect = document.getElementById('brand_select');
+    const subcatSelect = document.getElementById('subcategory_select');
     const productSelect = document.getElementById('product_select');
+    const shadeSelect = document.getElementById('shade_select');
+    const priceInput = document.getElementById('price_input');
     const selectedBrand = brandSelect.value;
     
-    productSelect.innerHTML = '<option value="">-- Choose Existing Product --</option>';
-    document.getElementById('price_input').value = '';
-    
-    if (selectedBrand && catalogMap[selectedBrand]) {
-        catalogMap[selectedBrand].forEach(prod => {
-            const opt = document.createElement('option');
-            opt.value = prod.name;
-            opt.textContent = prod.name;
-            productSelect.appendChild(opt);
-        });
+    subcatSelect.innerHTML = '<option value="" disabled selected>-- Loading Subcategories... --</option>';
+    subcatSelect.disabled = false;
+    productSelect.innerHTML = '<option value="" disabled selected>-- Select Subcategory First --</option>';
+    productSelect.disabled = true;
+    if (shadeSelect) {
+        shadeSelect.innerHTML = '<option value="Default" selected>Standard Shade (N/A)</option>';
+        shadeSelect.disabled = true;
+    }
+    priceInput.value = '';
+
+    if (!selectedBrand) return;
+
+    try {
+        const res = await fetch(`/api/catalog/subcategories?brand=${encodeURIComponent(selectedBrand)}`);
+        const subcats = await res.json();
+        if (subcats && subcats.length > 0) {
+            subcatSelect.innerHTML = '<option value="" disabled selected>-- Choose Subcategory --</option>' + 
+                subcats.map(s => `<option value="${s}" class="capitalize">${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join('');
+        } else {
+            subcatSelect.innerHTML = '<option value="" disabled>No subcategories found</option>';
+        }
+    } catch (e) {
+        subcatSelect.innerHTML = '<option value="" disabled>Error loading subcategories</option>';
     }
 }
 
-function handleProductChange() {
+async function handleSubcategoryChange() {
     const brandSelect = document.getElementById('brand_select');
+    const subcatSelect = document.getElementById('subcategory_select');
     const productSelect = document.getElementById('product_select');
+    const shadeSelect = document.getElementById('shade_select');
     const priceInput = document.getElementById('price_input');
     
     const selectedBrand = brandSelect.value;
-    const selectedProduct = productSelect.value;
+    const selectedSubcat = subcatSelect.value;
     
-    if (selectedBrand && selectedProduct && catalogMap[selectedBrand]) {
-        const productMatch = catalogMap[selectedBrand].find(p => p.name === selectedProduct);
-        if (productMatch) {
-            priceInput.value = productMatch.price.toFixed(2);
+    productSelect.innerHTML = '<option value="" disabled selected>-- Loading Products... --</option>';
+    productSelect.disabled = false;
+    if (shadeSelect) {
+        shadeSelect.innerHTML = '<option value="Default" selected>Standard Shade (N/A)</option>';
+        shadeSelect.disabled = true;
+    }
+    priceInput.value = '';
+
+    if (!selectedBrand || !selectedSubcat) return;
+
+    try {
+        const res = await fetch(`/api/catalog/products?brand=${encodeURIComponent(selectedBrand)}&subcategory=${encodeURIComponent(selectedSubcat)}`);
+        const prods = await res.json();
+        if (prods && prods.length > 0) {
+            productSelect.innerHTML = '<option value="" disabled selected>-- Choose Product --</option>' + 
+                prods.map(p => `<option value="${p}">${p}</option>`).join('');
+        } else {
+            productSelect.innerHTML = '<option value="" disabled>No products found</option>';
         }
-    } else {
+    } catch (e) {
+        productSelect.innerHTML = '<option value="" disabled>Error loading products</option>';
+    }
+}
+
+async function handleProductChange() {
+    const productSelect = document.getElementById('product_select');
+    const priceInput = document.getElementById('price_input');
+    const shadeSelect = document.getElementById('shade_select');
+
+    const selectedProduct = productSelect.value;
+    if (!selectedProduct) return;
+
+    try {
+        const detailRes = await fetch(`/api/catalog/product_details?product_name=${encodeURIComponent(selectedProduct)}`);
+        const details = await detailRes.json();
+        if (details && details.price) {
+            priceInput.value = details.price.toFixed(2);
+        }
+    } catch (e) {
         priceInput.value = '';
+    }
+
+    if (shadeSelect) {
+        try {
+            const res = await fetch(`/api/catalog/shades?product_name=${encodeURIComponent(selectedProduct)}`);
+            const shades = await res.json();
+            if (shades && shades.length > 0) {
+                shadeSelect.innerHTML = '<option value="" disabled selected>-- Select Required Shade --</option>' + 
+                    shades.map(s => `<option value="${s}">${s}</option>`).join('');
+                shadeSelect.disabled = false;
+                shadeSelect.required = true;
+                shadeSelect.dataset.hasShades = "true";
+            } else {
+                shadeSelect.innerHTML = '<option value="Default" selected>Standard Shade (N/A)</option>';
+                shadeSelect.disabled = true;
+                shadeSelect.required = false;
+                shadeSelect.dataset.hasShades = "false";
+            }
+        } catch(e) {
+            shadeSelect.innerHTML = '<option value="Default" selected>Standard Shade (N/A)</option>';
+            shadeSelect.disabled = true;
+            shadeSelect.required = false;
+            shadeSelect.dataset.hasShades = "false";
+        }
     }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
     const searchInput = document.getElementById('table_search');
-    const brandSelect = document.getElementById('table_filter_brand');
+    const brandFilterSelect = document.getElementById('table_filter_brand');
+    const subcatFilterSelect = document.getElementById('table_filter_subcat');
     const sortSelect = document.getElementById('table_sort');
     const statusTabs = document.querySelectorAll('.status-tab');
     const clearFiltersBtn = document.getElementById('clear_filters');
@@ -263,10 +365,14 @@ document.addEventListener("DOMContentLoaded", () => {
         applySortAndFilters();
     };
 
+    // Populate Brand and Subcategory filter dropdowns dynamically
     const brandsSet = new Set();
+    const subcatsSet = new Set();
     tableRows.forEach(row => {
         const brand = row.dataset.brand;
+        const subcat = row.dataset.subcategory;
         if (brand) brandsSet.add(brand.trim());
+        if (subcat) subcatsSet.add(subcat.trim().toLowerCase());
     });
 
     const sortedBrands = Array.from(brandsSet).sort();
@@ -274,12 +380,21 @@ document.addEventListener("DOMContentLoaded", () => {
         const opt = document.createElement('option');
         opt.value = brand;
         opt.textContent = brand;
-        brandSelect.appendChild(opt);
+        brandFilterSelect.appendChild(opt);
+    });
+
+    const sortedSubcats = Array.from(subcatsSet).sort();
+    sortedSubcats.forEach(subcat => {
+        const opt = document.createElement('option');
+        opt.value = subcat;
+        opt.textContent = subcat.charAt(0).toUpperCase() + subcat.slice(1);
+        subcatFilterSelect.appendChild(opt);
     });
 
     function applySortAndFilters() {
         const query = searchInput.value.toLowerCase().trim();
-        const selectedBrand = brandSelect.value;
+        const selectedBrand = brandFilterSelect.value;
+        const selectedSubcat = (subcatFilterSelect?.value || '').toLowerCase().trim();
         const sortBy = sortSelect.value;
 
         // 1. Filter matching items
@@ -287,18 +402,20 @@ document.addEventListener("DOMContentLoaded", () => {
         tableRows.forEach(row => {
             const brand = (row.dataset.brand || '').toLowerCase();
             const product = (row.dataset.product || '').toLowerCase();
+            const subcat = (row.dataset.subcategory || '').toLowerCase();
             const status = row.dataset.status;
 
-            const matchesQuery = query === "" || brand.includes(query) || product.includes(query);
+            const matchesQuery = query === "" || brand.includes(query) || product.includes(query) || subcat.includes(query);
             const matchesBrand = selectedBrand === "" || row.dataset.brand === selectedBrand;
+            const matchesSubcat = selectedSubcat === "" || subcat === selectedSubcat;
             const matchesStatus = (query !== "" && activeStatus === "low") ? true : (activeStatus === "" || status === activeStatus);
 
-            if (matchesQuery && matchesBrand && matchesStatus) {
+            if (matchesQuery && matchesBrand && matchesSubcat && matchesStatus) {
                 matchedRows.push(row);
             }
         });
 
-        // 2. Sort matching rows according to user's specification
+        // 2. Sort matching rows
         matchedRows.sort((a, b) => {
             if (sortBy === 'recent') {
                 const dateA = a.dataset.updated || '';
@@ -333,7 +450,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return 0;
         });
 
-        // 3. Respect 10-item limit specification unless 'all' or user is searching
+        // 3. Respect 10-item limit specification unless 'all' or user is searching/filtering
         const limit = (query !== "" || currentInventoryLimit === 'all') ? matchedRows.length : parseInt(currentInventoryLimit, 10);
 
         // 4. Update display visibility
@@ -375,7 +492,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     searchInput.addEventListener('input', applySortAndFilters);
-    brandSelect.addEventListener('change', applySortAndFilters);
+    brandFilterSelect.addEventListener('change', applySortAndFilters);
+    if (subcatFilterSelect) subcatFilterSelect.addEventListener('change', applySortAndFilters);
     sortSelect.addEventListener('change', applySortAndFilters);
 
     statusTabs.forEach(tab => {
@@ -403,7 +521,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     clearFiltersBtn.addEventListener('click', () => {
         searchInput.value = "";
-        brandSelect.value = "";
+        brandFilterSelect.value = "";
+        if (subcatFilterSelect) subcatFilterSelect.value = "";
 
         statusTabs.forEach(tab => {
             if (tab.dataset.status === "low") {

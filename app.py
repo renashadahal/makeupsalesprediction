@@ -16,7 +16,7 @@ from src.database import (
     db_get_latest_successful_training,
     db_load_discounts, db_get_discount_by_id, db_get_discount_by_code, db_validate_discount_code,
     db_create_discount, db_update_discount, db_delete_discount, db_toggle_discount_status,
-    db_load_branches, db_create_branch, db_toggle_branch_active,
+    db_load_branches, db_create_branch, db_toggle_branch_active, db_save_product_shades,
     DB_PATH
 )
 from src.utils import get_catalog_shades
@@ -494,12 +494,24 @@ def inventory_view():
 
     if request.method == 'POST':
         brand = request.form.get('brand', '').strip()
+        subcategory = request.form.get('subcategory', '').strip()
         product_name = request.form.get('product', '').strip()
         quantity_added = request.form.get('quantity_received', '0').strip()
+        shade = request.form.get('shade', 'Default').strip()
+
+        if not subcategory:
+            flash("Subcategory selection is required.", 'error')
+            return redirect(url_for('inventory_view'))
 
         if brand and product_name and quantity_added.isdigit():
-            db_update_inventory_stock(current_branch, brand, product_name, int(quantity_added))
-            flash(f"Stock ledger updated for Branch {current_branch}: Added {quantity_added} units of {product_name}.")
+            shades_list = get_catalog_shades(product_name)
+            if shades_list and (not shade or shade.lower() in ('default', 'standard shade', 'none', 'n/a')):
+                flash(f"Shade selection is required for '{product_name}'. Please select a valid shade.", 'error')
+                return redirect(url_for('inventory_view'))
+
+            db_update_inventory_stock(current_branch, brand, product_name, int(quantity_added), subcategory_name=subcategory)
+            shade_msg = f" (Shade: {shade})" if shade and shade.lower() not in ('default', 'standard shade', 'none', 'n/a') else ""
+            flash(f"Stock ledger updated for Branch {current_branch}: Added {quantity_added} units of {product_name}{shade_msg}.")
             return redirect(url_for('inventory_view'))
 
     inventory_items = db_load_inventory(branch=current_branch)
@@ -707,12 +719,21 @@ def update_catalog():
         b_id = request.form.get('store_id', 'S001').strip()
         p_id = request.form.get('product_id', '').strip()
         brand = request.form.get('brand', '').strip()
+        if not brand:
+            brand = request.form.get('brand_new', '').strip() or request.form.get('brand_existing', '').strip()
         p_name = request.form.get('product_name', '').strip()
         subcat = request.form.get('subcategory', '').strip()
+        if not subcat:
+            subcat = request.form.get('subcategory_new', '').strip() or request.form.get('subcategory_existing', '').strip()
         price = request.form.get('price', '25.00').strip()
+        shades = request.form.getlist('shades')
 
         db_update_inventory_stock(b_id, brand, p_name, 25, product_id=p_id, subcategory_name=subcat, price=price)
-        flash(f"Master product catalog expanded. Added '{p_name}' (ID: {p_id}) under brand '{brand}'.")
+        db_save_product_shades(p_id, shades)
+
+        valid_shades = [s.strip() for s in shades if s and isinstance(s, str) and s.strip()]
+        shade_note = f" with {len(valid_shades)} shade(s)" if valid_shades else ""
+        flash(f"Master product catalog expanded. Added '{p_name}' (ID: {p_id}) under brand '{brand}'{shade_note}.")
         return redirect(url_for('update_catalog'))
 
     # fetch brands and subcategories for dropdowns
@@ -956,6 +977,18 @@ def stock_transfers():
                 p_row = conn.execute("SELECT product_id FROM products WHERE product_name = ?;", (product_name,)).fetchone()
                 if p_row:
                     product_id = p_row['product_id']
+
+        # validate required shade for transfers if product has shades
+        lookup_name = product_name
+        if not lookup_name and product_id:
+            with get_db() as conn:
+                p_row = conn.execute("SELECT product_name FROM products WHERE product_id = ?;", (product_id,)).fetchone()
+                if p_row: lookup_name = p_row['product_name']
+        if lookup_name:
+            shades_list = get_catalog_shades(lookup_name)
+            if shades_list and (not shade or shade.lower() in ('default', 'standard shade', 'none', 'n/a', '')):
+                flash(f"Shade selection is required for transfer of '{lookup_name}'. Please choose a valid shade.", 'error')
+                return redirect(url_for('stock_transfers'))
 
         # attach shade details to notes if present
         if shade and shade.lower() not in ('default', 'standard shade', 'none', ''):

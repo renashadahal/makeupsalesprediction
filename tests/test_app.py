@@ -1207,3 +1207,112 @@ def test_switch_to_newly_created_branch(client):
     with client.session_transaction() as sess:
         assert sess['branch'] == new_id
 
+
+def test_add_catalog_product_with_multiple_shades(client):
+    """Admin can add a new product with multiple shades to master catalog."""
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    prod_id = f"P{uuid.uuid4().hex[:4].upper()}"
+    prod_name = f"Luminous Foundation {uuid.uuid4().hex[:4]}"
+
+    # Submit catalog product creation with 3 shades
+    resp = client.post('/admin/catalog', data={
+        'store_id': 'S001',
+        'product_id': prod_id,
+        'brand': 'M·A·C Cosmetics',
+        'subcategory': 'Foundation',
+        'product_name': prod_name,
+        'price': '38.50',
+        'shades': ['NC15', 'NC20', 'NC25']
+    }, follow_redirects=True)
+    assert resp.status_code == 200
+
+    # Verify shades are fetched via get_catalog_shades API
+    from src.utils import get_catalog_shades
+    shades = get_catalog_shades(prod_name)
+    assert 'NC15' in shades
+    assert 'NC20' in shades
+    assert 'NC25' in shades
+
+
+def test_shade_selection_required_for_shaded_products(client):
+    """Fails checkout and stock intake if a shaded product has no shade selected."""
+    from src.database import db_save_product_shades, db_record_transaction
+
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    prod_name = f"Shaded Lipstick {uuid.uuid4().hex[:4]}"
+    prod_id = f"P{uuid.uuid4().hex[:4].upper()}"
+
+    # Register product in catalog with shades
+    client.post('/admin/catalog', data={
+        'store_id': 'S001',
+        'product_id': prod_id,
+        'brand': 'Maybelline',
+        'subcategory': 'Lipstick',
+        'product_name': prod_name,
+        'price': '22.00',
+        'shades': ['Ruby Woo', 'Velvet Teddy']
+    }, follow_redirects=True)
+
+    # Attempt checkout with 'Default' shade - should fail validation
+    cart_without_shade = [{
+        'brand': 'Maybelline',
+        'product_name': prod_name,
+        'shade': 'Default',
+        'price': 22.0,
+        'quantity': 1
+    }]
+    success, err_msg = db_record_transaction("TX-TEST-SHADE", "admin", "S001", cart_without_shade)
+    assert success is False
+    assert "Shade selection is required" in err_msg
+
+    # Checkout with valid shade - should succeed
+    cart_with_shade = [{
+        'brand': 'Maybelline',
+        'product_name': prod_name,
+        'shade': 'Ruby Woo',
+        'price': 22.0,
+        'quantity': 1
+    }]
+    success, receipt = db_record_transaction("TX-TEST-SHADE2", "admin", "S001", cart_with_shade)
+    assert success is True
+
+
+def test_inventory_intake_requires_subcategory(client):
+    """Requires subcategory when logging stock intake on /inventory route."""
+    with client.session_transaction() as sess:
+        sess['username'] = 'admin'
+        sess['role'] = 'admin'
+        sess['branch'] = 'S001'
+
+    # Attempt intake without subcategory -> fails with error message
+    resp = client.post('/inventory', data={
+        'brand': 'Maybelline',
+        'subcategory': '',
+        'product': 'Fit Me Foundation',
+        'quantity_received': '10'
+    }, follow_redirects=True)
+    assert resp.status_code == 200
+    assert b'Subcategory selection is required' in resp.data
+
+    # Intake with valid subcategory and shade -> succeeds
+    resp_success = client.post('/inventory', data={
+        'brand': 'Maybelline',
+        'subcategory': 'Foundation',
+        'product': 'Fit Me Foundation',
+        'shade': '128 Warm Nude',
+        'quantity_received': '10'
+    }, follow_redirects=True)
+    assert resp_success.status_code == 200
+    assert b'Stock ledger updated' in resp_success.data
+
+
+
+

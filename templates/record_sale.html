@@ -536,18 +536,28 @@ document.addEventListener("DOMContentLoaded", async () => {
         const shades = await shadeRes.json();
 
         if (shades && shades.length > 0) {
-            shadeSel.innerHTML = '<option value="" disabled selected>-- Select Shade --</option>' + 
+            shadeSel.innerHTML = '<option value="" disabled selected>-- Select Required Shade --</option>' + 
                 shades.map(sh => `<option value="${sh}">${sh}</option>`).join('');
             shadeSel.disabled = false;
+            shadeSel.required = true;
+            shadeSel.dataset.hasShades = "true";
         } else {
             shadeSel.innerHTML = '<option value="Default" selected>N/A (Standard / Non-Shaded)</option>';
             shadeSel.disabled = true;
+            shadeSel.required = false;
+            shadeSel.dataset.hasShades = "false";
         }
     });
 
     document.getElementById('addItemBtn').addEventListener('click', () => {
         if(!prodSel.value || !priceInput.value || priceInput.value === '...') {
             alert("Please select all catalog parameters first.");
+            return;
+        }
+
+        if (shadeSel.dataset.hasShades === "true" && (!shadeSel.value || shadeSel.value === "" || shadeSel.value === "Default")) {
+            alert(`Shade selection is required for ${prodSel.value}. Please pick a valid shade.`);
+            shadeSel.focus();
             return;
         }
         

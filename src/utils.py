@@ -81,8 +81,21 @@ def get_catalog_shades(product_name, db_path=None):
     if not product_name:
         return []
 
-    # check custom shades from transaction history first
+    # check registered product shades or custom transaction shades first
     with get_db(db_path) as conn:
+        # 1. check registered shades in product_shades table
+        reg_rows = conn.execute("""
+        SELECT DISTINCT ps.shade_name FROM product_shades ps
+        JOIN products p ON ps.product_id = p.product_id
+        WHERE p.product_name = ? AND ps.shade_name IS NOT NULL AND ps.shade_name != ''
+          AND LOWER(ps.shade_name) NOT IN ('default', 'standard shade', 'none', 'n/a');
+        """, (product_name,)).fetchall()
+
+        registered_shades = [r['shade_name'] for r in reg_rows if r['shade_name']]
+        if registered_shades:
+            return sorted(list(set(registered_shades)))
+
+        # 2. check custom shades from transaction history
         rows = conn.execute("""
         SELECT DISTINCT ti.shade FROM transaction_items ti
         JOIN products p ON ti.product_id = p.product_id
