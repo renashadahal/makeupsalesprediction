@@ -16,7 +16,7 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs tracking-wide">
 
-                <!-- Branch ID: auto-filled from session, read-only display -->
+                <!-- branch id -->
                 <div class="flex flex-col gap-1">
                     <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Branch</label>
                     <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/60 border border-noireText/10 text-noireText">
@@ -27,7 +27,7 @@
                     <p class="text-[10px] text-noireText/40 mt-0.5">Reflects the branch currently selected in the header. Switch branches from there to add stock to a different location.</p>
                 </div>
 
-                <!-- Product ID: auto-suggested next ID, editable -->
+                <!-- product id -->
                 <div class="flex flex-col gap-1">
                     <label for="product_id" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Product ID (SKU)</label>
                     <div class="relative">
@@ -38,7 +38,7 @@
                     <p class="text-[10px] text-noireText/40 mt-0.5">Auto-generated as the next available ID. You can edit this if needed.</p>
                 </div>
 
-                <!-- 1. Brand: toggle between existing dropdown or new text input -->
+                <!-- brand select or new -->
                 <div class="flex flex-col gap-1 md:col-span-2" id="brandField">
                     <div class="flex items-center justify-between mb-1.5">
                         <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Brand</label>
@@ -56,7 +56,7 @@
                         </div>
                     </div>
 
-                    <!-- Existing brand dropdown -->
+                    <!-- existing brand -->
                     <div id="brandExistingWrap">
                         <select id="brand_existing" name="brand_existing"
                             class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
@@ -67,17 +67,17 @@
                         </select>
                     </div>
 
-                    <!-- New brand text input (hidden by default) -->
+                    <!-- new brand input -->
                     <div id="brandNewWrap" class="hidden">
                         <input type="text" id="brand_new" placeholder="e.g. Fenty Beauty"
                             class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
                     </div>
 
-                    <!-- Hidden unified brand input submitted to server -->
+                    <!-- hidden brand field -->
                     <input type="hidden" id="brand" name="brand">
                 </div>
 
-                <!-- 2. Subcategory: toggle between existing dropdown or new text input -->
+                <!-- subcategory select or new -->
                 <div class="flex flex-col gap-1 md:col-span-2">
                     <div class="flex items-center justify-between mb-1.5">
                         <label class="block font-semibold uppercase text-noireText/70 tracking-widest">Subcategory</label>
@@ -95,7 +95,7 @@
                         </div>
                     </div>
 
-                    <!-- Existing subcategory dropdown -->
+                    <!-- existing subcategory -->
                     <div id="subcatExistingWrap">
                         <select id="subcategory_existing"
                             class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all capitalize">
@@ -106,31 +106,31 @@
                         </select>
                     </div>
 
-                    <!-- New subcategory text input (hidden by default) -->
+                    <!-- new subcategory input -->
                     <div id="subcatNewWrap" class="hidden">
                         <input type="text" id="subcategory_new" placeholder="e.g. Highlighter"
                             class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
                     </div>
 
-                    <!-- Hidden unified subcategory input submitted to server -->
+                    <!-- hidden subcategory field -->
                     <input type="hidden" id="subcategory" name="subcategory">
                 </div>
 
-                <!-- 3. Product Name -->
+                <!-- product name -->
                 <div class="flex flex-col gap-1 md:col-span-2">
                     <label for="product_name" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Product Name</label>
                     <input type="text" id="product_name" name="product_name" placeholder="e.g. Fit Me Foundation" required
                         class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
                 </div>
 
-                <!-- 4. Base Price -->
+                <!-- base price -->
                 <div class="flex flex-col gap-1 md:col-span-2">
                     <label for="price" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Base Price ($)</label>
                     <input type="number" step="0.01" id="price" name="price" placeholder="0.00" required
                         class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
                 </div>
 
-                <!-- 5. Product Shades (Multiple Shades option) -->
+                <!-- product shades -->
                 <div class="flex flex-col gap-2 md:col-span-2 pt-2 border-t border-noireText/10">
                     <div class="flex items-center justify-between">
                         <div>
@@ -144,7 +144,7 @@
                     </div>
 
                     <div id="shadesContainer" class="space-y-2.5 mt-1">
-                        <!-- Initial Shade row -->
+                        <!-- initial shade row -->
                         <div class="shade-row flex items-center gap-2">
                             <span class="shade-label font-mono text-[11px] text-noireText/60 w-16 shrink-0 font-semibold">Shade 1:</span>
                             <input type="text" name="shades" placeholder="e.g. Ruby Red / 128 Warm Nude / NC25"
@@ -170,7 +170,7 @@
 </div>
 
 <script>
-// --- Brand toggle logic ---
+// toggle existing or new brand
 function setBrandMode(mode) {
     const existingWrap = document.getElementById('brandExistingWrap');
     const newWrap = document.getElementById('brandNewWrap');
@@ -190,7 +190,7 @@ function setBrandMode(mode) {
     }
 }
 
-// --- Subcategory toggle logic ---
+// toggle existing or new subcategory
 function setSubcatMode(mode) {
     const existingWrap = document.getElementById('subcatExistingWrap');
     const newWrap = document.getElementById('subcatNewWrap');
@@ -210,9 +210,9 @@ function setSubcatMode(mode) {
     }
 }
 
-// --- On submit: consolidate hidden brand/subcategory fields ---
+// set brand and subcategory before submit
 document.getElementById('catalogForm').addEventListener('submit', function(e) {
-    // Brand
+    // brand value
     const brandNewWrap = document.getElementById('brandNewWrap');
     let brandValue;
     if (brandNewWrap.classList.contains('hidden')) {
@@ -227,7 +227,7 @@ document.getElementById('catalogForm').addEventListener('submit', function(e) {
     }
     document.getElementById('brand').value = brandValue;
 
-    // Subcategory
+    // subcategory value
     const subcatNewWrap = document.getElementById('subcatNewWrap');
     let subcatValue;
     if (subcatNewWrap.classList.contains('hidden')) {
@@ -243,7 +243,7 @@ document.getElementById('catalogForm').addEventListener('submit', function(e) {
     document.getElementById('subcategory').value = subcatValue;
 });
 
-// --- Shades dynamic list management ---
+// add or remove shade inputs
 function updateShadeLabels() {
     const container = document.getElementById('shadesContainer');
     if (!container) return;

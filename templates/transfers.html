@@ -3,7 +3,7 @@
 {% block content %}
 <div class="space-y-8 max-w-7xl mx-auto pb-12 px-4">
 
-    <!-- Top Header -->
+    <!-- top header -->
     <div class="border-b border-noireText/10 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h2 class="text-3xl sm:text-4xl text-noireText font-serif">Stock Transfers</h2>
@@ -15,10 +15,10 @@
         </div>
     </div>
 
-    <!-- Top Grid: Request Form Card + Quick Summary -->
+    <!-- transfer request form and guidelines -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- Left: Create Transfer Form (Spans 2 columns) -->
+        <!-- transfer request form -->
         <div class="lg:col-span-2 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
             <div class="border-b border-noireText/10 pb-3 mb-5">
                 <h3 class="text-2xl text-noireText font-serif">Initiate Transfer</h3>
@@ -27,7 +27,7 @@
             <form action="{{ url_for('stock_transfers') }}" method="POST" class="space-y-5 text-xs tracking-wide">
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <!-- Requesting Destination Branch -->
+                    <!-- destination branch -->
                     <div>
                         <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
                             Destination Branch (Requesting Stock)
@@ -47,7 +47,7 @@
                         {% endif %}
                     </div>
 
-                    <!-- Source Branch (Supplier Node) -->
+                    <!-- source branch -->
                     <div>
                         <label for="from_branch" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
                             Source Branch (Request From)
@@ -63,7 +63,7 @@
                     </div>
                 </div>
 
-                <!-- Cascading Catalog Level 1: Brand & Subcategory -->
+                <!-- brand and subcategory -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label for="transfer_brand" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
@@ -87,9 +87,9 @@
                     </div>
                 </div>
 
-                <!-- Cascading Catalog Level 2: Product, Shade & Quantity -->
+                <!-- product shade and quantity -->
                 <div class="grid grid-cols-1 sm:grid-cols-6 gap-4">
-                    <!-- Target Product -->
+                    <!-- product select -->
                     <div class="sm:col-span-3">
                         <label for="transfer_product" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
                             3. Select Product
@@ -100,7 +100,7 @@
                         <input type="hidden" id="transfer_product_id" name="product_id">
                     </div>
 
-                    <!-- Available Shades -->
+                    <!-- shade select -->
                     <div class="sm:col-span-2">
                         <label for="transfer_shade" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
                             4. Shade (If Applicable)
@@ -110,7 +110,7 @@
                         </select>
                     </div>
 
-                    <!-- Quantity -->
+                    <!-- quantity input -->
                     <div class="sm:col-span-1">
                         <label for="quantity" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
                             Quantity
@@ -120,7 +120,7 @@
                     </div>
                 </div>
 
-                <!-- Live Source Branch Availability Badge -->
+                <!-- source stock preview -->
                 <div id="source_stock_container" class="hidden flex items-center justify-between p-3 rounded-xl bg-velvet/50 border border-noireText/10 text-xs">
                     <span class="text-noireText/70 text-[11px] flex items-center gap-1.5">
                         <span id="source_stock_dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -131,7 +131,7 @@
                     </span>
                 </div>
 
-                <!-- Inline Overstock Warning (Red - Exceeds Stock) -->
+                <!-- overstock warning -->
                 <div id="overstock_warning" class="hidden flex items-start gap-3.5 bg-red-50 border-2 border-red-500 text-red-900 p-4 rounded-xl text-xs shadow-md ring-2 ring-red-200 transition-all duration-200">
                     <div class="p-1.5 bg-red-100 rounded-lg text-red-600 flex-shrink-0">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -149,7 +149,7 @@
                     </div>
                 </div>
 
-                <!-- Mini Yellow Depletion Warning (Yellow - Stock Requested == Stock Available) -->
+                <!-- depletion warning -->
                 <div id="depletion_warning" class="hidden flex items-start gap-3 bg-amber-50 border-2 border-amber-400 text-amber-900 p-3.5 rounded-xl text-xs shadow-sm ring-1 ring-amber-200 transition-all duration-200">
                     <div class="p-1 bg-amber-100 rounded-lg text-amber-700 flex-shrink-0 mt-0.5">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -167,7 +167,7 @@
                     </div>
                 </div>
 
-                <!-- Transfer Notes -->
+                <!-- transfer notes -->
                 <div>
                     <label for="notes" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
                         Transfer Notes & Reason
@@ -185,7 +185,7 @@
             </form>
         </div>
 
-        <!-- Right: Policy & Overview Guidelines -->
+        <!-- transfer policy guidelines -->
         <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-sm flex flex-col justify-between space-y-4 text-xs">
             <div>
                 <h3 class="text-xl font-serif text-noireText mb-2">Transfer Workflow Policy</h3>
@@ -223,15 +223,15 @@
 
     </div>
 
-    <!-- Transfer Records Audit Table -->
+    <!-- transfer history table -->
     <div class="bg-white rounded-2xl border border-noireText/10 shadow-md overflow-hidden">
         
-        <!-- Header Row -->
+        <!-- header row -->
         <div class="p-5 border-b border-noireText/10 bg-parchment/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
                 <h3 class="text-xl font-serif text-noireText">Transfer Ledger</h3>
             </div>
-            <!-- View Limit Tabs -->
+            <!-- view limit tabs -->
             <div class="inline-flex rounded-xl border border-noireText/10 overflow-hidden bg-white p-0.5 shadow-sm text-xs">
                 <button type="button" id="limit5Btn" onclick="setTransferLimit(5)" class="limit-tab py-1 px-3 rounded-lg font-medium transition-all bg-deepWine text-velvet">
                     Last 5 (Default)
@@ -246,7 +246,7 @@
         </div>
 
         {% if session.get('role') == 'admin' %}
-        <!-- Admin Branch Scope Control Bar -->
+        <!-- admin branch selector -->
         <div class="px-5 py-3 border-b border-noireText/10 bg-parchment/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-[10px] text-noireText/60 font-bold uppercase tracking-widest mr-1">Branch Scope:</span>
@@ -264,16 +264,16 @@
         </div>
         {% endif %}
 
-        <!-- Comprehensive Filter Controls -->
+        <!-- filter controls -->
         <div class="p-5 border-b border-noireText/10 bg-parchment/10 space-y-4 text-xs tracking-wide">
             <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                <!-- Search Input -->
+                <!-- search input -->
                 <div class="md:col-span-3 flex flex-col gap-1">
                     <label for="transferSearchInput" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">Search Transfers</label>
                     <input type="text" id="transferSearchInput" placeholder="Search ID, Product, User, Notes..." class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
                 </div>
 
-                <!-- Brand Filter -->
+                <!-- brand filter -->
                 <div class="md:col-span-2 flex flex-col gap-1">
                     <label for="transferFilterBrand" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">Brand</label>
                     <select id="transferFilterBrand" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs cursor-pointer">
@@ -284,7 +284,7 @@
                     </select>
                 </div>
 
-                <!-- Source Branch Filter -->
+                <!-- source branch filter -->
                 <div class="md:col-span-2 flex flex-col gap-1">
                     <label for="transferFilterFrom" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">From Branch</label>
                     <select id="transferFilterFrom" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-mono cursor-pointer">
@@ -295,7 +295,7 @@
                     </select>
                 </div>
 
-                <!-- Destination Branch Filter -->
+                <!-- destination branch filter -->
                 <div class="md:col-span-2 flex flex-col gap-1">
                     <label for="transferFilterTo" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">To Branch</label>
                     <select id="transferFilterTo" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-mono cursor-pointer">
@@ -306,7 +306,7 @@
                     </select>
                 </div>
 
-                <!-- Status Filter -->
+                <!-- status filter -->
                 <div class="md:col-span-2 flex flex-col gap-1">
                     <label for="transferFilterStatus" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">Status</label>
                     <select id="transferFilterStatus" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs cursor-pointer">
@@ -318,7 +318,7 @@
                     </select>
                 </div>
 
-                <!-- Reset Button -->
+                <!-- reset button -->
                 <div class="md:col-span-1 flex items-end">
                     <button type="button" id="resetTransferFilters" class="w-full py-2 bg-white hover:bg-velvet border border-noireText/20 rounded-xl text-noireText font-medium text-xs transition-all shadow-sm h-[34px] flex items-center justify-center">
                         Reset
@@ -326,7 +326,7 @@
                 </div>
             </div>
 
-            <!-- Date Range Row -->
+            <!-- date filters -->
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-noireText/10">
                 <div class="flex items-center gap-3 flex-wrap">
                     <div class="flex items-center gap-1.5">
@@ -348,34 +348,34 @@
             </div>
         </div>
 
-        <div class="w-full overflow-x-auto">
-            <table class="w-full text-left text-xs tracking-wide border-collapse min-w-[850px]" id="transfersTable">
+        <div class="w-full overflow-hidden">
+            <table class="w-full table-fixed text-left text-xs tracking-wide border-collapse" id="transfersTable">
                 <colgroup>
-                    <col class="w-[6%]">
-                    <col class="w-[12%]">
+                    <col class="w-[10%]">
+                    <col class="w-[15%]">
                     <col class="w-[11%]">
-                    <col class="w-[19%]">
-                    <col class="w-[5%]">
+                    <col class="w-[22%]">
+                    <col class="w-[6%]">
+                    <col class="w-[13%]">
+                    <col class="w-[11%]">
                     <col class="w-[12%]">
-                    <col class="w-[16%]">
-                    <col class="w-[19%]">
                 </colgroup>
                 <thead>
-                    <tr class="bg-parchment/20 border-b border-noireText/10 text-noireText/70 uppercase text-[10px] tracking-widest">
-                        <th class="py-3 px-3 font-semibold">ID</th>
-                        <th class="py-3 px-3 font-semibold">Date & Time</th>
+                    <tr class="bg-parchment/30 border-b border-noireText/10 text-noireText/70 uppercase text-[10px] tracking-widest">
+                        <th class="py-3 px-3 font-semibold">Transfer ID</th>
+                        <th class="py-3 px-3 font-semibold">Date &amp; Time</th>
                         <th class="py-3 px-3 font-semibold">Route</th>
-                        <th class="py-3 px-3 font-semibold">Product Description</th>
+                        <th class="py-3 px-3 font-semibold">Product</th>
                         <th class="py-3 px-3 font-semibold text-center">Qty</th>
                         <th class="py-3 px-3 font-semibold text-center">Status</th>
-                        <th class="py-3 px-3 font-semibold">Initiator / Notes</th>
+                        <th class="py-3 px-3 font-semibold">Actor / Notes</th>
                         <th class="py-3 px-3 font-semibold text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-noireText/5 text-noireText">
-                    {% if transfers %}
+                    {% if transfers is defined and transfers %}
                         {% for t in transfers %}
-                        <tr class="transfer-row hover:bg-velvet/20 transition-colors"
+                        <tr class="transfer-row border-b border-noireText/5 hover:bg-velvet/20 transition-colors"
                             data-id="{{ t.transfer_id }}"
                             data-date="{{ (t.created_at or '')[:10] }}"
                             data-from="{{ t.from_branch }}"
@@ -385,8 +385,8 @@
                             data-status="{{ t.status }}"
                             data-user="{{ (t.requested_by or '')|lower }}"
                             data-notes="{{ (t.notes or '')|lower }}">
-                            <td class="py-3 px-3 font-mono font-bold text-noireText truncate">#{{ t.transfer_id }}</td>
-                            <td class="py-3 px-3 font-mono text-[10px] text-noireText/70 truncate" title="{{ t.created_at }}">{{ t.created_at[:16] if t.created_at else '' }}</td>
+                            <td class="py-3 px-3 font-mono font-bold text-noireText truncate" title="{{ t.transfer_id }}">{{ t.transfer_id }}</td>
+                            <td class="py-3 px-3 text-noireText/80 font-mono text-[10px] truncate" title="{{ t.created_at }}">{{ t.created_at }}</td>
                             <td class="py-3 px-3 font-mono font-semibold truncate" title="{{ t.from_branch }} to {{ t.to_branch }}">
                                 <span class="text-[10px]">{{ t.from_branch }} <span class="text-dustyRose">→</span> {{ t.to_branch }}</span>
                             </td>
@@ -398,7 +398,7 @@
                             <td class="py-3 px-3 text-center truncate">
                                 {% if t.status == 'PENDING' %}
                                     <span class="text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-amber-200">
-                                        ⏳ Pending Approval
+                                        Pending Approval
                                     </span>
                                 {% elif t.status == 'IN_TRANSIT' %}
                                     <span class="text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-blue-200">
@@ -426,7 +426,7 @@
                             <td class="py-3 px-3 text-right">
                                 {% if t.status == 'PENDING' %}
                                     <div class="inline-flex max-w-full items-center justify-end gap-1">
-                                        <!-- Step 2: Approve & Dispatch (Source Branch or Admin) -->
+                                        <!-- approve and dispatch button -->
                                         {% if session.get('role') == 'admin' or current_branch == t.from_branch %}
                                         <form action="{{ url_for('dispatch_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
                                             <button type="submit" class="px-2 py-1 bg-deepWine hover:bg-noireText text-white rounded-lg text-[10px] leading-tight font-semibold transition-all shadow-sm">
@@ -435,11 +435,11 @@
                                         </form>
                                         {% else %}
                                         <span class="text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200" title="Awaiting source branch staff or admin approval">
-                                            ⏳ Awaiting Branch {{ t.from_branch }} Dispatch
+                                            Awaiting Branch {{ t.from_branch }} Dispatch
                                         </span>
                                         {% endif %}
 
-                                        <!-- Cancel action for PENDING -->
+                                        <!-- cancel button for pending transfer -->
                                         {% if session.get('role') == 'admin' or current_branch == t.from_branch or current_branch == t.to_branch %}
                                         <form action="{{ url_for('cancel_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
                                             <button type="submit" onclick="return confirm('Cancel this transfer request?');" class="inline-flex h-7 w-7 items-center justify-center bg-white hover:bg-rose-50 hover:text-rose-700 text-noireText/60 border border-noireText/15 rounded-lg transition-all" title="Cancel transfer" aria-label="Cancel transfer">
@@ -450,7 +450,7 @@
                                     </div>
                                 {% elif t.status == 'IN_TRANSIT' %}
                                     <div class="inline-flex max-w-full items-center justify-end gap-1">
-                                        <!-- Step 3: Confirm Receipt (Destination Branch or Admin) -->
+                                        <!-- confirm receipt button -->
                                         {% if session.get('role') == 'admin' or current_branch == t.to_branch %}
                                         <form action="{{ url_for('complete_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
                                             <button type="submit" class="px-2 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[10px] leading-tight font-semibold transition-all shadow-sm">
@@ -463,7 +463,7 @@
                                         </span>
                                         {% endif %}
 
-                                        <!-- Cancel action for IN_TRANSIT (Reverses debit) -->
+                                        <!-- cancel button for in-transit transfer -->
                                         {% if session.get('role') == 'admin' or current_branch == t.from_branch %}
                                         <form action="{{ url_for('cancel_transfer_route', transfer_id=t.transfer_id) }}" method="POST" class="inline">
                                             <button type="submit" onclick="return confirm('Cancel this in-transit shipment? Debited units will be restored to source branch.');" class="inline-flex h-7 w-7 items-center justify-center bg-white hover:bg-rose-50 hover:text-rose-700 text-noireText/60 border border-noireText/15 rounded-lg transition-all" title="Recall/cancel shipment and return stock to source" aria-label="Recall and cancel shipment">
@@ -480,18 +480,12 @@
                             </td>
                         </tr>
                         {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="8" class="py-10 text-center text-noireText/40 italic text-xs">
-                                No stock transfer records found.
-                            </td>
-                        </tr>
                     {% endif %}
                 </tbody>
             </table>
         </div>
 
-        <!-- Show More Records Footer Control -->
+        <!-- show more button -->
         <div id="transferShowMoreContainer" class="hidden p-3 bg-parchment/20 border-t border-noireText/10 text-center">
             <button type="button" id="transferShowMoreBtn" onclick="setTransferLimit('all')"
                 class="px-5 py-2 bg-white hover:bg-velvet border border-noireText/20 text-noireText rounded-xl font-medium text-xs shadow-sm transition-all inline-flex items-center gap-2 cursor-pointer">
@@ -530,10 +524,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const fromBranchVal = fromBranchSel && fromBranchSel.value ? `Branch ${fromBranchSel.value}` : 'the selected source branch';
 
         if (requested > availableStock) {
-            // High-visibility red quantity input
+            // highlight quantity input red
             qtyInput.className = 'w-full px-3 py-2.5 rounded-xl bg-red-50 border-2 border-red-500 text-red-900 font-mono focus:outline-none ring-2 ring-red-300 transition-all text-xs font-bold text-center';
             
-            // Show bold red alert banner with explicit details
+            // show warning banner
             if (overstockWarning && overstockText) {
                 overstockText.innerHTML = `Requested <strong class="underline font-bold text-red-950">${requested} units</strong>, but ${fromBranchVal} only has <strong class="underline font-bold text-red-950">${availableStock} units</strong> available in stock. Cannot transfer more stock than available.`;
                 overstockWarning.classList.remove('hidden');
@@ -549,10 +543,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.className = 'w-full sm:w-auto px-8 py-3 bg-red-700/85 hover:bg-red-800 text-white font-bold uppercase tracking-widest text-xs rounded-xl cursor-not-allowed opacity-90 transition-all shadow-md';
-                submitBtn.innerText = ' Exceeds Source Stock';
+                submitBtn.innerText = 'Exceeds Source Stock';
             }
         } else if (requested === availableStock && availableStock > 0) {
-            // Mini Yellow Warning: Stock Requested == Available Stock
+            // warning if drawing 100% of available stock
             qtyInput.className = 'w-full px-3 py-2.5 rounded-xl bg-amber-50 border-2 border-amber-400 text-amber-900 font-mono focus:outline-none ring-2 ring-amber-200 text-xs font-bold text-center transition-all';
             
             if (overstockWarning) overstockWarning.classList.add('hidden');
@@ -573,7 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 submitBtn.innerText = 'Submit Transfer Request (Full Stock)';
             }
         } else {
-            // Restore normal quantity input styling
+            // restore normal input styling
             qtyInput.className = 'w-full px-3 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-medium text-center';
             if (overstockWarning) overstockWarning.classList.add('hidden');
             if (depletionWarning) depletionWarning.classList.add('hidden');
@@ -666,7 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Ensure Brands dropdown is populated on load
+    // populate brand options on load
     async function loadInitialBrands() {
         if (!brandSel) return;
         if (brandSel.options.length <= 1) {
@@ -824,7 +818,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Transfer Ledger Filtering & Default Last 5 Display Logic
+    // filter and limit logic
     let currentTransferLimit = 5;
     const currentBranchVal = "{{ current_branch }}";
     const isAdminUser = {{ 'true' if session.get('role') == 'admin' else 'false' }};
@@ -878,7 +872,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fromDate = transferFromDate?.value || '';
         let toDate = transferToDate?.value || '';
 
-        // If starting date is picked and toDate is empty, default toDate to today
+        // default to date to today if start date picked
         if (fromDate && !toDate) {
             const now = new Date();
             const pad = n => String(n).padStart(2, '0');
@@ -902,7 +896,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const notes = row.dataset.notes || '';
             const fullText = (row.innerText || '').toLowerCase();
 
-            // Admin Scope Filter: 'current' (default) shows only transfers involving active branch unless an explicit branch filter is chosen
+            // filter scope by current branch for admin view
             let matchesScope = true;
             if (isAdminUser && !hasExplicitBranchFilter) {
                 if (adminBranchScope === 'current') {
@@ -929,7 +923,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Respect limit (default 5 recent/matching ones, unless limit == 'all')
+        // apply limit
         const limit = currentTransferLimit === 'all' ? matchedRows.length : parseInt(currentTransferLimit, 10);
 
         transferRows.forEach(row => {
@@ -1041,7 +1035,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Initial default filter on page load (shows last 5 transfers)
+    // initial transfer filter on load
     filterTransfers();
 });
 </script>

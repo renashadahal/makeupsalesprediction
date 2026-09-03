@@ -2,7 +2,7 @@
 {% block content %}
 <div class="space-y-8 max-w-7xl mx-auto pb-12 px-4">
     
-    <!-- Top Header -->
+    <!-- header -->
     <div class="border-b border-noireText/10 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <h2 class="text-3xl sm:text-4xl text-noireText font-serif">Discounts &amp; Promotions</h2>
@@ -14,7 +14,7 @@
         </div>
     </div>
 
-    <!-- 4-Card KPI Summary Metrics -->
+    <!-- metrics summary -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-parchment p-4 rounded-2xl border border-noireText/5 shadow-sm">
             <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Total Campaigns</span>
@@ -52,10 +52,10 @@
         </div>
     </div>
 
-    <!-- Main Workspace Grid: Create Form on Left, Catalog Table on Right -->
+    <!-- discount form and table -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        <!-- Left Panel: Create Discount Form -->
+        <!-- create discount form -->
         <div class="lg:col-span-4 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md h-fit space-y-5">
             <div>
                 <h3 class="text-2xl text-noireText font-serif">Create Discount Code</h3>
@@ -65,7 +65,7 @@
             <form action="{{ url_for('manage_discounts') }}" method="POST" class="space-y-4 text-xs tracking-wide" id="createDiscountForm">
                 <input type="hidden" name="action" value="create">
 
-                <!-- Promo Code -->
+                <!-- promo code -->
                 <div>
                     <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">
                         Promo Code <span class="text-rose-600">*</span>
@@ -75,7 +75,7 @@
                     <p class="text-[10px] text-noireText/40 mt-1 font-mono">Alphanumeric, uppercase coupon code.</p>
                 </div>
 
-                <!-- Discount Value -->
+                <!-- discount value -->
                 <div>
                     <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">
                         Discount Type <span class="text-rose-600">*</span>
@@ -92,7 +92,7 @@
                     <p id="create_discount_help" class="text-[10px] text-noireText/40 mt-1">Enter any percentage from 0.01% to 100% (for example, 15%).</p>
                 </div>
 
-                <!-- Valid From (Date & Time Limit) -->
+                <!-- valid from -->
                 <div>
                     <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">
                         Valid From (Start Date &amp; Time) <span class="text-rose-600">*</span>
@@ -102,7 +102,7 @@
                     <p class="text-[10px] text-noireText/40 mt-1">Specify day and time start (e.g. Aug 25, 2026 00:00).</p>
                 </div>
 
-                <!-- Valid To (Date & Time Limit) -->
+                <!-- valid to -->
                 <div>
                     <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">
                         Valid To (End Date &amp; Time) <span class="text-rose-600">*</span>
@@ -112,7 +112,7 @@
                     <p class="text-[10px] text-noireText/40 mt-1">Specify day and time cutoff (e.g. Sep 04, 2026 23:59).</p>
                 </div>
 
-                <!-- Quick Date Presets Helper -->
+                <!-- quick presets -->
                 <div class="pt-1">
                     <span class="text-[10px] text-noireText/60 font-semibold uppercase tracking-wider block mb-1.5">Quick Validity Presets:</span>
                     <div class="flex flex-wrap gap-1.5">
@@ -123,14 +123,14 @@
                     </div>
                 </div>
 
-                <!-- Description / Campaign Notes -->
+                <!-- campaign notes -->
                 <div>
                     <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Description / Note</label>
                     <textarea name="description" rows="2" placeholder="e.g. Festive Holiday 15% discount for retail customers"
                               class="w-full px-4 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all"></textarea>
                 </div>
 
-                <!-- Active Status Toggle -->
+                <!-- active status checkbox -->
                 <div class="flex items-center gap-3 pt-1">
                     <input type="checkbox" name="is_active" id="create_is_active" checked value="1"
                            class="w-4 h-4 rounded text-deepWine focus:ring-dustyRose border-noireText/20 cursor-pointer">
@@ -139,7 +139,7 @@
                     </label>
                 </div>
 
-                <!-- Submit Button -->
+                <!-- submit button -->
                 <button type="submit" class="w-full bg-deepWine hover:bg-noireText text-velvet py-3 rounded-xl font-medium uppercase tracking-widest transition-colors shadow-md mt-2 flex items-center justify-center gap-2">
                     <span>Commit Discount Code</span>
                     <span>→</span>
@@ -147,7 +147,7 @@
             </form>
         </div>
 
-        <!-- Right Panel: Live Discounts Table -->
+        <!-- discounts table -->
         <div class="lg:col-span-8 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md overflow-hidden flex flex-col">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div>
@@ -161,7 +161,7 @@
                 </div>
             </div>
 
-            <!-- Table Container -->
+            <!-- table container -->
             <div class="overflow-x-auto -mx-6 px-6">
                 <table class="w-full text-left text-xs tracking-wide">
                     <thead>
@@ -177,7 +177,7 @@
                         {% if discounts %}
                             {% for d in discounts %}
                             <tr class="hover:bg-velvet/40 transition-colors">
-                                <!-- Code & Rate -->
+                                <!-- code and rate -->
                                 <td class="py-3 px-3 whitespace-nowrap">
                                     <div class="flex flex-col">
                                         <div class="flex items-center gap-1.5">
@@ -187,7 +187,7 @@
                                     </div>
                                 </td>
 
-                                <!-- Validity Window -->
+                                <!-- validity dates -->
                                 <td class="py-3 px-3 whitespace-nowrap">
                                     <div class="flex flex-col font-mono text-[11px] leading-tight">
                                         <div class="flex items-center gap-1 text-noireText/80">
@@ -201,7 +201,7 @@
                                     </div>
                                 </td>
 
-                                <!-- Status Badge -->
+                                <!-- status badge -->
                                 <td class="py-3 px-3 whitespace-nowrap">
                                     {% if d.status_code == 'ACTIVE' %}
                                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -224,16 +224,16 @@
                                     {% endif %}
                                 </td>
 
-                                <!-- Description -->
+                                <!-- description -->
                                 <td class="py-3 px-3 max-w-[180px] truncate text-[11px] text-noireText/70" title="{{ d.description or 'No notes provided' }}">
                                     {{ d.description or '—' }}
                                 </td>
 
-                                <!-- Actions -->
+                                <!-- action buttons -->
                                 <td class="py-3 px-3 text-right whitespace-nowrap">
                                     <div class="inline-flex items-center gap-1.5">
                                         
-                                        <!-- Toggle Status Button -->
+                                        <!-- toggle status -->
                                         <form action="{{ url_for('toggle_discount_direct', discount_id=d.discount_id) }}" method="POST" class="inline">
                                             <button type="submit" 
                                                     title="{% if d.is_active %}Deactivate Code{% else %}Activate Code{% endif %}"
@@ -242,14 +242,14 @@
                                             </button>
                                         </form>
 
-                                        <!-- Edit Button -->
+                                        <!-- edit button -->
                                         <button type="button" 
                                                 onclick='openEditModal({{ d|tojson|safe }})'
                                                 class="px-2.5 py-1 bg-white hover:bg-deepWine hover:text-velvet text-noireText border border-noireText/15 rounded-lg text-xs font-medium transition-all shadow-sm">
                                             Edit
                                         </button>
 
-                                        <!-- Delete Button -->
+                                        <!-- delete button -->
                                         <button type="button" 
                                                 onclick="openDeleteModal('{{ d.discount_id }}', '{{ d.code }}')"
                                                 class="px-2.5 py-1 bg-rose-50 hover:bg-rose-700 hover:text-white text-rose-800 border border-rose-200 rounded-lg text-xs font-medium transition-all shadow-sm">
@@ -273,7 +273,7 @@
     </div>
 </div>
 
-<!-- EDIT DISCOUNT MODAL POPUP -->
+<!-- edit discount modal -->
 <div id="editModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4 overflow-y-auto">
     <div class="bg-parchment w-full max-w-lg rounded-2xl border border-noireText/10 shadow-2xl p-6 relative my-auto max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between border-b border-noireText/10 pb-3 mb-4 sticky top-0 bg-parchment z-10">
@@ -284,14 +284,14 @@
         <form action="{{ url_for('edit_discount_direct') }}" method="POST" class="space-y-4 text-xs tracking-wide" id="editForm">
             <input type="hidden" name="discount_id" id="edit_discount_id">
 
-            <!-- Code -->
+            <!-- code -->
             <div>
                 <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Promo Code</label>
                 <input type="text" name="code" id="edit_code" required
                        class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono font-bold uppercase focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
             </div>
 
-            <!-- Discount Value -->
+            <!-- discount value -->
             <div>
                 <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Discount Type</label>
                 <div class="grid grid-cols-2 gap-2 mb-2">
@@ -306,28 +306,28 @@
                 <p id="edit_discount_help" class="text-[10px] text-noireText/40 mt-1"></p>
             </div>
 
-            <!-- Valid From -->
+            <!-- valid from -->
             <div>
                 <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Valid From (Date &amp; Time)</label>
                 <input type="datetime-local" name="valid_from" id="edit_valid_from" required
                        class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
             </div>
 
-            <!-- Valid To -->
+            <!-- valid to -->
             <div>
                 <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Valid To (Date &amp; Time)</label>
                 <input type="datetime-local" name="valid_to" id="edit_valid_to" required
                        class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
             </div>
 
-            <!-- Description -->
+            <!-- description -->
             <div>
                 <label class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest">Description</label>
                 <textarea name="description" id="edit_description" rows="2"
                           class="w-full px-4 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all"></textarea>
             </div>
 
-            <!-- Is Active -->
+            <!-- active status -->
             <div class="flex items-center gap-3">
                 <input type="checkbox" name="is_active" id="edit_is_active" value="1"
                        class="w-4 h-4 rounded text-deepWine focus:ring-dustyRose border-noireText/20 cursor-pointer">
@@ -348,7 +348,7 @@
     </div>
 </div>
 
-<!-- DELETE CONFIRMATION MODAL -->
+<!-- delete confirmation modal -->
 <div id="deleteModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
     <div class="bg-white w-full max-w-sm rounded-2xl border border-rose-200 shadow-2xl p-6 text-center space-y-4">
         <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-xl font-bold">
@@ -372,7 +372,7 @@
 </div>
 
 <script>
-    // Initialize default timestamps on Create form
+    // set default date inputs
     document.addEventListener('DOMContentLoaded', () => {
         const now = new Date();
         const startIso = formatLocalDateTime(now);

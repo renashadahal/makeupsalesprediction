@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Noire | Advanced Retail Intelligence</title>
-    <!-- Premium Editorial Typography Stack -->
+    <!-- fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500&display=swap" rel="stylesheet">
-    <!-- Tailwind CSS CDN Engine -->
+    <!-- tailwind setup -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -38,11 +38,11 @@
 </head>
 <body class="min-h-screen flex flex-col bg-velvet text-noireText antialiased">
 
-    <!-- Fully Responsive Global Header -->
+    <!-- top navbar -->
     <header class="bg-deepWine text-velvet shadow-md w-full border-b border-noireText/10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             
-            <!-- System Branding Node & Branch Selection -->
+            <!-- brand logo and branch picker -->
             <div class="flex items-center justify-between gap-4">
                 <a href="{{ url_for('dashboard') }}" class="group block select-none focus:outline-none transition-all duration-200">
                     <h1 class="text-3xl font-serif tracking-wide text-dustyRose group-hover:text-white transition-colors duration-200">
@@ -50,7 +50,7 @@
                     </h1>
                 </a>
 
-                <!-- Branch Selector Context: Dropdown for Admin, Locked Static Badge for Staff -->
+                <!-- branch dropdown for admin or locked tag for staff -->
                 {% if session.get('username') %}
                 <div class="flex items-center gap-2 bg-velvet/10 px-3 py-1.5 rounded-xl border border-dustyRose/30 text-xs">
                     <span class="text-[10px] text-dustyRose uppercase font-bold tracking-widest">Branch:</span>
@@ -75,7 +75,7 @@
                 </div>
             </div>
 
-            <!-- Primary navigation plus a compact admin tools menu -->
+            <!-- main nav links -->
             <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 text-xs font-medium tracking-wide">
                 <nav aria-label="Primary navigation" class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 md:gap-2">
                     <a href="{{ url_for('dashboard') }}" class="px-2.5 py-1.5 rounded-lg bg-velvet/5 hover:bg-parchment/10 hover:text-dustyRose transition-all text-center whitespace-nowrap">Dashboard</a>
@@ -100,7 +100,7 @@
                     {% endif %}
                 </nav>
 
-                <!-- Operator Session Utilities -->
+                <!-- user profile and logout -->
                 <div class="flex items-center justify-between md:justify-end gap-2.5 border-t border-velvet/10 pt-3 md:pt-0 md:border-t-0 pl-1 flex-shrink-0">
                     <div class="hidden lg:flex items-center gap-2 bg-velvet/10 px-2.5 py-1 rounded-xl border border-dustyRose/25 max-w-[160px] xl:max-w-[220px]" title="{{ session.get('username', 'Guest') }} ({{ session.get('role', 'staff') }})">
                         <div class="w-5 h-5 rounded-full bg-dustyRose/30 text-velvet flex items-center justify-center text-[10px] font-bold uppercase flex-shrink-0">
@@ -122,7 +122,7 @@
         </div>
     </header>
 
-    <!-- Custom Error Block for Admin 403 -->
+    <!-- admin error notice -->
     {% if custom_error %}
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full">
         <div class="bg-rose-100 border border-rose-400 text-rose-800 px-4 py-3 rounded-xl text-sm font-semibold">
@@ -131,7 +131,7 @@
     </div>
     {% endif %}
 
-    <!-- Flash Notification Pipeline -->
+    <!-- flash messages -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -168,12 +168,12 @@
         {% endwith %}
     </div>
 
-    <!-- Main Viewport Context -->
+    <!-- page content -->
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer System -->
+    <!-- footer -->
     <footer class="py-4 text-center text-[10px] text-noireText/50 uppercase tracking-widest border-t border-noireText/10 bg-white/40 mt-auto">
         &copy; 2026 Noire Intelligence Module Matrix.
     </footer>
@@ -187,6 +187,7 @@
             const progress = document.getElementById('training-progress');
             let polling = false;
 
+            // show popup when training finishes
             function showCompletionPopup(message, isError) {
                 const overlay = document.createElement('div');
                 overlay.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4';
@@ -201,6 +202,7 @@
                 document.body.appendChild(overlay);
             }
 
+            // poll training status from server
             async function checkTrainingStatus() {
                 if (polling) return;
                 polling = true;
@@ -225,7 +227,7 @@
                         run.status === 'FAILED'
                     );
                 } catch (_) {
-                    // A brief network error should not interrupt normal store work.
+                    // ignore network error
                 } finally {
                     polling = false;
                 }

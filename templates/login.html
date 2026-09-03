@@ -4,22 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>System Authentication Portal | Noire</title>
-    <!-- Editorial Typography Stack -->
+    <!-- fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Tailwind CSS Engine -->
+    <!-- tailwind setup -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        velvet: '#f3e9e9',       /* Muted Rose-Tinted Cream */
-                        parchment: '#eae0e0',    /* Warm Tinted Plates */
-                        noireText: '#2e2528',    /* Vintage Charcoal Wine */
-                        dustyRose: '#a88189',    /* Muted Rose Accent */
-                        deepWine: '#423338'      /* Primary Deep Wine */
+                        velvet: '#f3e9e9',
+                        parchment: '#eae0e0',
+                        noireText: '#2e2528',
+                        dustyRose: '#a88189',
+                        deepWine: '#423338'
                     },
                     fontFamily: {
                         serif: ['Cormorant Garamond', 'serif'],
@@ -38,14 +38,14 @@
 
     <div class="w-full max-w-md bg-white rounded-3xl border border-noireText/10 shadow-2xl p-8 sm:p-10 transition-all">
         
-        <!-- Header & Branding -->
+        <!-- header and title -->
         <div class="text-center pb-6 border-b border-noireText/10">
             <h1 class="text-4xl sm:text-5xl font-serif font-bold text-deepWine tracking-wide">Noire</h1>
             <p class="text-xs uppercase tracking-widest text-dustyRose font-semibold mt-1">Retail Intelligence Network</p>
             <p class="text-xs text-noireText/60 mt-2">Enter your operator credentials to authenticate session</p>
         </div>
 
-        <!-- Flash Notification Pipeline -->
+        <!-- flash message -->
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 <div class="mt-5 bg-rose-50 border border-rose-300 text-rose-800 px-4 py-3 rounded-xl text-xs font-medium leading-relaxed">
@@ -54,7 +54,7 @@
             {% endif %}
         {% endwith %}
 
-        <!-- Authentication Form -->
+        <!-- login form -->
         <form action="{{ url_for('login') }}" method="POST" class="mt-6 space-y-4 text-xs tracking-wide">
             <div>
                 <label for="username" class="block font-semibold mb-1.5 uppercase text-noireText/70 tracking-widest text-[10px]">
@@ -80,6 +80,7 @@
 
     </div>
     <script>
+        // autofill helper
         function fillCredentials(u, p) {
             document.getElementById('username').value = u;
             document.getElementById('password').value = p;

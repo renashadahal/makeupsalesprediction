@@ -3,7 +3,7 @@
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
 
-    <!-- Title and Navigation Header -->
+    <!-- title header -->
     <div class="border-b border-noireText/10 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h2 class="text-4xl text-noireText font-serif">Sales History</h2>
@@ -12,16 +12,16 @@
             ← Back to Dashboard
         </a>
     </div>
-    <!-- Search & Filter Controls -->
+    <!-- search and filter controls -->
     <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md space-y-4 text-xs tracking-wide">
         <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-            <!-- Keyword Search -->
+            <!-- keyword search -->
             <div class="md:col-span-4 flex flex-col gap-1.5">
                 <label for="searchInput" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">Search Transactions</label>
                 <input type="text" id="searchInput" placeholder="Search by Tx ID, Staff, Promo, Product..." class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs">
             </div>
 
-            <!-- Product Selection Filter -->
+            <!-- product filter -->
             <div class="md:col-span-3 flex flex-col gap-1.5">
                 <label for="productFilter" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">Filter by Product</label>
                 <select id="productFilter" class="w-full px-3 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs cursor-pointer">
@@ -29,19 +29,19 @@
                 </select>
             </div>
 
-            <!-- Date From -->
+            <!-- from date -->
             <div class="md:col-span-2 flex flex-col gap-1.5">
                 <label for="fromDate" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">From Date</label>
                 <input type="date" id="fromDate" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-mono">
             </div>
 
-            <!-- Date To -->
+            <!-- to date -->
             <div class="md:col-span-2 flex flex-col gap-1.5">
                 <label for="toDate" class="font-semibold uppercase text-noireText/70 tracking-widest text-[10px]">To Date</label>
                 <input type="date" id="toDate" class="w-full px-3 py-2 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all text-xs font-mono">
             </div>
 
-            <!-- Reset Action -->
+            <!-- reset button -->
             <div class="md:col-span-1 flex items-end">
                 <button type="button" id="resetSalesFilters" class="w-full py-2.5 bg-white hover:bg-velvet border border-noireText/20 hover:border-noireText/40 text-noireText font-medium text-xs rounded-xl transition-all shadow-sm h-[38px] flex items-center justify-center">
                     Reset
@@ -49,7 +49,7 @@
             </div>
         </div>
 
-        <!-- Quick Date Range Presets & Branch Scope -->
+        <!-- quick date presets and branch scope -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-noireText/10 text-xs">
             <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-[10px] text-noireText/60 font-bold uppercase tracking-widest mr-1">Quick Date:</span>
@@ -57,7 +57,7 @@
                 <button type="button" onclick="setQuickDate('7d')" class="px-2.5 py-1 bg-white hover:bg-velvet border border-noireText/10 rounded-lg text-[10px] font-mono transition-colors">Last 7 Days</button>
             </div>
 
-            <!-- Branch Scope: Quick Filter Pills for Admin, Locked Scope for Staff -->
+            <!-- branch selector pills -->
             <div class="flex items-center gap-2 flex-wrap text-xs">
                 <span class="text-[10px] text-noireText/60 font-bold uppercase tracking-widest mr-1">Branch Scope:</span>
                 {% if session.get('role') == 'admin' %}
@@ -78,11 +78,11 @@
         </div>
     </div>
 
-    <!-- Results Status Count Bar & Limit Tabs -->
+    <!-- results count and display tabs -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-noireText/60 px-1">
         <span id="salesMatchCount">Showing {{ [5, transactions|length]|min }} of {{ transactions|length if transactions else 0 }} transaction records</span>
         
-        <!-- View Limit Selector Tabs -->
+        <!-- limit options -->
         <div class="inline-flex rounded-xl border border-noireText/10 overflow-hidden bg-white p-0.5 shadow-sm text-xs self-start sm:self-auto">
             <button type="button" id="salesLimit5Btn" onclick="setSalesLimit(5)" class="sales-limit-tab py-1 px-3 rounded-lg font-medium transition-all bg-deepWine text-velvet">
                 Recent 5 (Default)
@@ -96,7 +96,7 @@
         </div>
     </div>
 
-    <!-- Sales Table -->
+    <!-- sales table -->
     <div class="bg-white rounded-2xl border border-noireText/10 shadow-md overflow-hidden">
         <div class="w-full overflow-hidden">
             <table class="w-full table-fixed text-left text-xs tracking-wide border-collapse" id="salesTable">
@@ -157,7 +157,7 @@
                                 </button>
                             </td>
                         </tr>
-                        <!-- Expandable Item Detail Row -->
+                        <!-- expandable item breakdown row -->
                         <tr id="details-{{ loop.index }}" class="details-row hidden bg-parchment/20 border-b border-noireText/10">
                             <td colspan="8" class="p-4">
                                 <div class="bg-white p-4 rounded-xl border border-noireText/10 shadow-inner">
@@ -175,7 +175,7 @@
                                         </thead>
                                         <tbody>
                                             {% for item in tx.transaction_items %}
-                                            <tr class="border-b border-noireText/5">
+                                             <tr class="border-b border-noireText/5">
                                                 <td class="py-2 px-3 font-semibold">{{ item.brand_name }}</td>
                                                 <td class="py-2 px-3">{{ item.product_name }}</td>
                                                 <td class="py-2 px-3"><span class="bg-velvet/40 px-2 py-0.5 rounded text-[10px]">{{ item.shade }}</span></td>
@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const rows = Array.from(document.querySelectorAll('#salesTable tbody tr.sale-row'));
     const noMatchesRow = document.getElementById('noMatchesRow');
 
-    // Populate Product Dropdown dynamically from table records
+    // populate product dropdown options
     const productSet = new Set();
     document.querySelectorAll('#salesTable tbody tr.details-row table tbody tr').forEach(r => {
         const pNameCell = r.querySelector('td:nth-child(2)');
@@ -259,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fromDate = fromDateInput.value;
         const toDate = toDateInput.value;
 
-        // If no explicit fromDate is chosen in the date picker, enforce 7-day maximum lookback for quick buttons & default view
+        // fallback to 7 days lookback if no explicit from date
         const effectiveMinDate = fromDate ? fromDate : get7DaysAgoDate();
 
         const hasCustomFilter = query !== '' || selectedProd !== '' || fromDate !== '' || toDate !== '';
@@ -275,13 +275,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const products = row.dataset.products || '';
             const fullText = (row.innerText || '').toLowerCase();
 
-            // Match keyword
+            // match search keyword
             const matchesQuery = query === '' || fullText.includes(query) || txId.toLowerCase().includes(query) || user.includes(query) || promo.includes(query) || products.includes(query);
 
-            // Match Product Selection
+            // match product filter
             const matchesProduct = selectedProd === '' || products.includes(selectedProd);
 
-            // Match Date Range (Requires date selection to view sales prior to 7 days ago)
+            // match date range
             let matchesDate = true;
             if (rowDate < effectiveMinDate) matchesDate = false;
             if (toDate && rowDate > toDate) matchesDate = false;
@@ -363,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setSalesLimit(5);
     });
 
-    // Initial filter execution to show recent 5 within last 7 days by default
+    // initial sales filter on load
     filterSales();
 });
 </script>

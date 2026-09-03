@@ -66,10 +66,10 @@
     </div>
 
     <div class="bg-white rounded-2xl border border-noireText/10 shadow-md overflow-hidden">
-        <!-- Search, Filter & Sort Controls -->
+        <!-- filters and search -->
         <div class="p-5 border-b border-noireText/10 bg-parchment/30 space-y-4 text-xs tracking-wide">
             
-            <!-- Upper Row: Search, Brand Filter, Subcategory Filter, Reset -->
+            <!-- search inputs -->
             <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-end">
                 <div class="flex-grow flex flex-col gap-1">
                     <label for="table_search" class="font-medium uppercase text-noireText/70 tracking-widest text-[10px]">Search Ledger</label>
@@ -97,9 +97,9 @@
                 </button>
             </div>
 
-            <!-- Lower Row: Status Tabs & Inline Sort Control -->
+            <!-- status tabs and sort -->
             <div class="flex flex-col md:flex-row gap-3 md:items-center justify-between pt-2 border-t border-noireText/10">
-                <!-- Status Tabs & Display Limit -->
+                <!-- status filter buttons -->
                 <div class="flex flex-wrap items-center gap-3">
                     <div class="flex items-center gap-2">
                         <span class="font-medium uppercase text-noireText/60 tracking-widest text-[10px] hidden sm:inline-block mr-1">Status:</span>
@@ -129,7 +129,7 @@
                     </div>
                 </div>
 
-                <!-- Compact Inline Sort Control & Match Count -->
+                <!-- sort options -->
                 <div class="flex items-center gap-3 self-start md:self-auto">
                     <span id="inventoryMatchCount" class="text-[11px] text-noireText/60 font-medium hidden sm:inline">
                         Showing 10 items
@@ -207,7 +207,7 @@
             </table>
         </div>
 
-        <!-- Show More Items Footer Control -->
+        <!-- show more button -->
         <div id="inventoryShowMoreContainer" class="hidden p-3 bg-parchment/20 border-t border-noireText/10 text-center">
             <button type="button" id="inventoryShowMoreBtn" onclick="setInventoryLimit('all')"
                 class="px-5 py-2 bg-white hover:bg-velvet border border-noireText/20 text-noireText rounded-xl font-medium text-xs shadow-sm transition-all inline-flex items-center gap-2 cursor-pointer">
@@ -365,7 +365,7 @@ document.addEventListener("DOMContentLoaded", () => {
         applySortAndFilters();
     };
 
-    // Populate Brand and Subcategory filter dropdowns dynamically
+    // populate brand and category options
     const brandsSet = new Set();
     const subcatsSet = new Set();
     tableRows.forEach(row => {
@@ -397,7 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const selectedSubcat = (subcatFilterSelect?.value || '').toLowerCase().trim();
         const sortBy = sortSelect.value;
 
-        // 1. Filter matching items
+        // filter rows
         let matchedRows = [];
         tableRows.forEach(row => {
             const brand = (row.dataset.brand || '').toLowerCase();
@@ -415,7 +415,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        // 2. Sort matching rows
+        // sort rows
         matchedRows.sort((a, b) => {
             if (sortBy === 'recent') {
                 const dateA = a.dataset.updated || '';
@@ -450,10 +450,10 @@ document.addEventListener("DOMContentLoaded", () => {
             return 0;
         });
 
-        // 3. Respect 10-item limit specification unless 'all' or user is searching/filtering
+        // handle item limit
         const limit = (query !== "" || currentInventoryLimit === 'all') ? matchedRows.length : parseInt(currentInventoryLimit, 10);
 
-        // 4. Update display visibility
+        // update table display
         tableRows.forEach(row => {
             row.style.display = "none";
         });
@@ -539,7 +539,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setInventoryLimit(10);
     });
 
-    // Initial sort and filter application on page load (defaults to low stock)
+    // initial table filter on load
     applySortAndFilters();
 });
 </script>

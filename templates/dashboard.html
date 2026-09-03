@@ -3,13 +3,13 @@
 {% block content %}
 <div class="space-y-8 max-w-7xl mx-auto pb-12 px-2 sm:px-4">
     
-    <!-- Top Header Title & Branch Scope Context -->
+    <!-- header and branch filter -->
     <div class="border-b border-noireText/10 pb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h2 class="text-3xl sm:text-4xl text-noireText font-serif tracking-tight">Executive Dashboard</h2>
         </div>
         
-        <!-- Branch Context / Admin Filter -->
+        <!-- branch dropdown for admin -->
         <div class="flex items-center gap-3">
             {% if session.get('role') == 'admin' %}
             <a href="{{ url_for('manage_discounts') }}" class="inline-flex items-center gap-2 bg-dustyRose/15 hover:bg-dustyRose/25 text-deepWine border border-dustyRose/30 px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wider uppercase transition-all shadow-xs">
@@ -37,7 +37,7 @@
         </div>
     </div>
 
-    <!-- Transfer Notification Inbox -->
+    <!-- transfer notifications -->
     <section class="bg-white rounded-2xl border border-noireText/10 shadow-xs overflow-hidden" aria-labelledby="notifications-heading">
         <div class="px-6 py-4 bg-deepWine text-velvet flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div class="flex items-center gap-3.5">
@@ -92,10 +92,10 @@
         </div>
     </section>
 
-    <!-- 4-Card KPI Metric Matrix -->
+    <!-- kpi summary cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         
-        <!-- KPI 1: Today's Registered POS Sales -->
+        <!-- today sales -->
         <div class="bg-white p-5 rounded-2xl border border-noireText/10 shadow-xs flex flex-col justify-between hover:border-dustyRose/40 transition-colors">
             <div>
                 <div class="flex items-center justify-between">
@@ -113,7 +113,7 @@
             </div>
         </div>
 
-        <!-- KPI 2: Active Shelf Inventory & Low Stock Alerts -->
+        <!-- current stock units -->
         <div class="bg-white p-5 rounded-2xl border border-noireText/10 shadow-xs flex flex-col justify-between hover:border-dustyRose/40 transition-colors">
             <div>
                 <div class="flex items-center justify-between">
@@ -141,7 +141,7 @@
             </div>
         </div>
 
-        <!-- KPI 3: Total Shelf Inventory Value -->
+        <!-- stock valuation -->
         <div class="bg-white p-5 rounded-2xl border border-noireText/10 shadow-xs flex flex-col justify-between hover:border-dustyRose/40 transition-colors">
             <div>
                 <span class="block text-[10px] font-bold tracking-widest uppercase text-noireText/50">Stock Valuation</span>
@@ -155,7 +155,7 @@
             </div>
         </div>
 
-        <!-- KPI 4: Total POS Sales to Date -->
+        <!-- total pos sales to date -->
         <div class="bg-deepWine text-velvet p-5 rounded-2xl border border-deepWine shadow-sm flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between">
@@ -179,7 +179,7 @@
     </div>
 
     {% if low_stock_count > 0 %}
-    <!-- Basic Low Stock Alert Banner -->
+    <!-- low stock banner -->
     <div class="bg-white border border-amber-200/90 rounded-2xl p-4 px-5 shadow-xs text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div class="flex items-center gap-3">
             <div class="p-2 bg-amber-50 text-amber-700 border border-amber-200/80 rounded-xl flex-shrink-0">
@@ -200,10 +200,10 @@
     </div>
     {% endif %}
 
-    <!-- Analytics Charts Grid System -->
+    <!-- sales and stock charts -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <!-- 14-Day Sales Activity Timeline (Spans 2 columns) -->
+        <!-- 14 day sales trend -->
         <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-xs lg:col-span-2 flex flex-col justify-between">
             <div class="flex items-center justify-between mb-4">
                 <div>
@@ -219,7 +219,7 @@
             </div>
         </div>
 
-        <!-- Real Brand Inventory Distribution (Doughnut Chart) -->
+        <!-- brand donut chart -->
         <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-xs col-span-1 flex flex-col justify-between">
             <div class="mb-4">
                 <h4 class="text-base font-serif tracking-wide text-noireText">Brand Shelf Stock Share</h4>
@@ -230,7 +230,7 @@
             </div>
         </div>
 
-        <!-- Real Subcategory Stock Distribution (Bar Chart - Spans 3 columns) -->
+        <!-- category bar chart -->
         <div class="bg-white p-6 rounded-2xl border border-noireText/10 shadow-xs lg:col-span-3">
             <div class="flex items-center justify-between mb-4">
                 <div>
@@ -247,7 +247,7 @@
 
 </div>
 
-<!-- Modal Dialog: Low Stock Products Detailed Inspection -->
+<!-- low stock modal -->
 <div id="lowStockModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-noireText/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-3xl w-full border border-noireText/10 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-150">
         
@@ -341,7 +341,7 @@
     </div>
 </div>
 
-<!-- Dynamic Charts Rendering Engine & Modal Handlers -->
+<!-- chart scripts and modal handlers -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 function openLowStockModal() {
@@ -365,7 +365,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Luxury Editorial Color Palette
+    // chart colors
     const primaryWine = '#4A2835';
     const accentRose = '#B87D8B';
     const softCharcoal = '#2E2528';
@@ -382,7 +382,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const catLabels = {{ subcategory_labels | tojson }} || [];
     const catData = {{ subcategory_stock_data | tojson }} || [];
 
-    // --- CHART 1: 14-DAY POS SALES ACTIVITY TREND ---
+    // 14 day sales trend
     const ctxTrend = document.getElementById('trendChart');
     if (ctxTrend && dateLabels.length > 0) {
         new Chart(ctxTrend, {
@@ -442,7 +442,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // --- CHART 2: REAL BRAND INVENTORY DISTRIBUTION (DOUGHNUT) ---
+    // brand donut chart
     const ctxBrand = document.getElementById('brandChart');
     if (ctxBrand && brandLabels.length > 0) {
         new Chart(ctxBrand, {
@@ -492,7 +492,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // --- CHART 3: SUBCATEGORY SHELF STOCK (BAR) ---
+    // category bar chart
     const ctxCat = document.getElementById('categoryChart');
     if (ctxCat && catLabels.length > 0) {
         new Chart(ctxCat, {

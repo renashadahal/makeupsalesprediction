@@ -135,7 +135,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         activeProductId = '';
     }
 
-    // 1. Load brands
+    // load brands
     try {
         const res = await fetch('/api/catalog/brands');
         const brands = await res.json();
@@ -145,7 +145,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         brandSel.innerHTML = '<option value="" disabled>Error loading brands</option>';
     }
 
-    // 2. Brand → Subcategory cascade
+    // load subcategories for selected brand
     brandSel.addEventListener('change', async () => {
         resetSubcat();
         try {
@@ -163,7 +163,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
 
-    // 3. Subcategory → Product cascade
+    // load products for selected subcategory
     subcatSel.addEventListener('change', async () => {
         resetProd();
         try {
@@ -181,7 +181,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
 
-    // 4. Product → auto-fill price & stock
+    // autofill price and stock
     prodSel.addEventListener('change', async () => {
         priceInput.value = '...';
         stockInput.value = '...';
@@ -198,7 +198,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
 
-    // 4. Submit prediction request to backend ML model
+    // submit form and get prediction
     forecastForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -242,26 +242,23 @@ document.addEventListener("DOMContentLoaded", async () => {
             eventBadge.innerText = result.event_title || "Standard Sales";
             eventBadge.className = "text-xs px-3 py-1 rounded-full font-medium tracking-wide bg-velvet/50 text-noireText border border-noireText/10";
 
-            // COLOR LOGIC:
-            // 1. Predicted stock < Stock on hand -> GREEN (Sufficient)
-            // 2. Predicted stock == Stock on hand -> YELLOW (Just Enough / Equal)
-            // 3. Stock on hand < Predicted stock -> RED (Shortage / Restock Needed)
+            // pick color and status based on stock vs predicted demand
             if (predUnits < stockUnits) {
-                // GREEN - Sufficient Stock
+                // sufficient stock
                 resultCard.className = "max-w-2xl mx-auto p-6 rounded-2xl border shadow-lg transition-all duration-300 bg-emerald-50/90 border-emerald-300";
                 statusBadge.innerText = "Stock is Sufficient";
                 statusBadge.className = "text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300";
                 unitsEl.className = "text-4xl font-mono font-bold text-emerald-700";
                 adviceBox.className = "mt-4 p-4 rounded-xl text-center text-sm font-medium leading-relaxed bg-white/90 text-emerald-900 border border-emerald-200 shadow-sm";
             } else if (predUnits === stockUnits) {
-                // YELLOW - Just Enough
+                // just enough stock
                 resultCard.className = "max-w-2xl mx-auto p-6 rounded-2xl border shadow-lg transition-all duration-300 bg-amber-50/90 border-amber-300";
                 statusBadge.innerText = "Stock is Just Enough";
                 statusBadge.className = "text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300";
                 unitsEl.className = "text-4xl font-mono font-bold text-amber-700";
                 adviceBox.className = "mt-4 p-4 rounded-xl text-center text-sm font-medium leading-relaxed bg-white/90 text-amber-900 border border-amber-200 shadow-sm";
             } else {
-                // RED - Stock Shortage
+                // restock needed
                 resultCard.className = "max-w-2xl mx-auto p-6 rounded-2xl border shadow-lg transition-all duration-300 bg-rose-50/90 border-rose-300";
                 statusBadge.innerText = "Restock Needed";
                 statusBadge.className = "text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300";

@@ -2,7 +2,7 @@
 {% block content %}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
     
-    <!-- Left Panel Card: Provision Engine Module -->
+    <!-- add new user form -->
     <div class="lg:col-span-1 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md h-fit">
         <h2 class="text-3xl text-noireText mb-2">Access Allocation</h2>
         <p class="text-xs text-noireText/60 mb-6 font-light leading-relaxed">Register new operator credentials and assign branch permissions.</p>
@@ -37,7 +37,7 @@
         </form>
     </div>
 
-    <!-- Right Panel Card: Live Registered Users Table -->
+    <!-- registered users table -->
     <div class="lg:col-span-2 bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md overflow-hidden">
         <div class="flex items-center justify-between mb-2">
             <h2 class="text-3xl text-noireText">Active System Accounts</h2>
@@ -70,31 +70,35 @@
                                     {% endif %}
                                 </span>
                             </td>
-                            <td class="py-3 px-3 font-mono font-bold text-noireText/70 whitespace-nowrap">{{ u.branch or 'S001' }}</td>
-                            <td class="py-3 px-3 whitespace-nowrap">
+                            <td class="py-3.5 px-3 font-mono font-bold text-noireText/70 whitespace-nowrap">{{ u.branch or 'S001' }}</td>
+                            <td class="py-3.5 px-3 whitespace-nowrap">
                                 {% if u.role == 'admin' %}
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider bg-deepWine text-velvet uppercase border border-noireText/10">Admin</span>
+                                    <span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-deepWine text-velvet">Admin</span>
                                 {% else %}
-                                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider bg-white text-noireText/80 uppercase border border-noireText/10">Staff</span>
+                                    <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-dustyRose/20 text-deepWine">Staff</span>
                                 {% endif %}
                             </td>
-                            <td class="py-3 px-3 text-right whitespace-nowrap">
-                                <div class="inline-flex items-center gap-1.5">
-                                    <!-- Edit Trigger Button -->
+                            <td class="py-3.5 px-3 text-right whitespace-nowrap">
+                                <div class="inline-flex items-center gap-2">
+                                    <!-- edit button -->
                                     <button type="button" 
-                                            onclick="openEditModal('{{ u.username }}', '{{ u.role }}', '{{ u.branch or 'S001' }}')" 
+                                            data-username="{{ u.username }}"
+                                            data-role="{{ u.role }}"
+                                            data-branch="{{ u.branch or 'S001' }}"
+                                            onclick="openEditModal(this.dataset.username, this.dataset.role, this.dataset.branch)" 
                                             class="px-2.5 py-1 bg-white hover:bg-deepWine hover:text-velvet text-noireText border border-noireText/15 rounded-lg text-xs font-medium transition-all shadow-sm">
                                         Edit
                                     </button>
-
-                                    <!-- Delete Trigger Button -->
+                                    
+                                    <!-- delete button -->
                                     {% if u.username == session.get('username') %}
                                         <button type="button" disabled title="Self-deletion prohibited for active session" class="px-2.5 py-1 bg-noireText/5 text-noireText/30 border border-noireText/5 rounded-lg text-xs cursor-not-allowed">
                                             Delete
                                         </button>
                                     {% else %}
                                         <button type="button" 
-                                                onclick="openDeleteModal('{{ u.username }}')" 
+                                                data-username="{{ u.username }}"
+                                                onclick="openDeleteModal(this.dataset.username)" 
                                                 class="px-2.5 py-1 bg-rose-50 hover:bg-rose-700 hover:text-white text-rose-800 border border-rose-200 rounded-lg text-xs font-medium transition-all shadow-sm">
                                             Delete
                                         </button>
@@ -114,7 +118,7 @@
     </div>
 </div>
 
-<!-- ================= EDIT USER MODAL ================= -->
+<!-- edit modal -->
 <div id="editUserModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 hidden">
     <div class="bg-parchment rounded-2xl border border-noireText/15 shadow-2xl max-w-md w-full p-6 text-xs tracking-wide space-y-5 animate-fadeIn">
         <div class="flex items-center justify-between border-b border-noireText/10 pb-3">
@@ -163,12 +167,12 @@
     </div>
 </div>
 
-<!-- ================= DELETE CONFIRMATION MODAL ================= -->
+<!-- delete confirmation modal -->
 <div id="deleteUserModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 hidden">
     <div class="bg-white rounded-2xl border border-rose-200 shadow-2xl max-w-md w-full p-6 text-xs tracking-wide space-y-4 animate-fadeIn">
         <div class="flex items-center gap-3 text-rose-800">
             <div class="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-lg font-bold">
-                ️
+                !
             </div>
             <div>
                 <h3 class="text-xl font-serif text-noireText">Confirm Account Deletion</h3>
@@ -185,7 +189,7 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 6 12 12M18 6 6 18"/></svg>
             </button>
             <button type="submit" class="px-5 py-2.5 bg-rose-700 hover:bg-rose-800 text-white font-medium uppercase tracking-widest text-[11px] rounded-xl transition-all shadow-md">
-                Confirm Delete
+                Delete Account
             </button>
         </form>
     </div>
@@ -216,7 +220,7 @@ function closeDeleteModal() {
     document.getElementById('deleteUserModal').classList.add('hidden');
 }
 
-// Close modals when clicking on backdrop
+// close modal when clicking outside
 window.addEventListener('click', function(event) {
     const editModal = document.getElementById('editUserModal');
     const deleteModal = document.getElementById('deleteUserModal');

@@ -142,7 +142,7 @@ def init_db(db_path=None):
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS transactions (
             transaction_id TEXT PRIMARY KEY,
-            username TEXT NOT NULL,
+            username TEXT NOT NULL REFERENCES users(username) ON UPDATE CASCADE,
             branch_id TEXT NOT NULL REFERENCES branches(branch_id),
             promo_code TEXT,
             discount_rate REAL DEFAULT 1.0,
@@ -190,6 +190,8 @@ def init_db(db_path=None):
             status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'IN_TRANSIT', 'COMPLETED', 'CANCELLED')),
             requested_by TEXT NOT NULL,
             approved_by TEXT,
+            dispatched_by TEXT,
+            received_by TEXT,
             notes TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             dispatched_at DATETIME,
@@ -279,12 +281,14 @@ def init_db(db_path=None):
         existing_cols = [row[1] for row in cursor.execute("PRAGMA table_info(inventory_transfers);").fetchall()]
         if 'approved_by' not in existing_cols:
             cursor.execute("ALTER TABLE inventory_transfers ADD COLUMN approved_by TEXT;")
+        if 'dispatched_by' not in existing_cols:
+            cursor.execute("ALTER TABLE inventory_transfers ADD COLUMN dispatched_by TEXT;")
+        if 'received_by' not in existing_cols:
+            cursor.execute("ALTER TABLE inventory_transfers ADD COLUMN received_by TEXT;")
         if 'dispatched_at' not in existing_cols:
             cursor.execute("ALTER TABLE inventory_transfers ADD COLUMN dispatched_at DATETIME;")
         if 'completed_at' not in existing_cols:
             cursor.execute("ALTER TABLE inventory_transfers ADD COLUMN completed_at DATETIME;")
-        if 'dispatched_by' in existing_cols:
-            cursor.execute("UPDATE inventory_transfers SET approved_by = dispatched_by WHERE approved_by IS NULL AND dispatched_by IS NOT NULL;")
 
         training_cols = [row[1] for row in cursor.execute("PRAGMA table_info(model_training_runs);").fetchall()]
         if 'completed_at' not in training_cols:

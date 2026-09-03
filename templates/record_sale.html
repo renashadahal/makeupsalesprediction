@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- PDF Generation Libraries -->
+<!-- pdf generation libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
-/* Print Stylesheet for Printable Receipt */
+/* print styling for receipt */
 @media print {
     body * {
         visibility: hidden;
@@ -35,12 +35,12 @@
 
 <div class="space-y-10 max-w-6xl mx-auto">
     
-    <!-- Top Meta Panel Header -->
+    <!-- header -->
     <div class="border-b border-noireText/10 pb-4">
         <h2 class="text-4xl text-noireText font-serif">Record Sale</h2>
     </div>
     
-    <!-- Catalog Item Selection Matrix Card -->
+    <!-- product selector -->
     <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
         <div class="border-b border-noireText/10 pb-3 mb-6">
             <h3 class="text-2xl text-noireText font-serif">Select Products</h3>
@@ -49,7 +49,7 @@
         <div class="space-y-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 text-xs tracking-wide">
                 
-                <!-- Step 1: Brand -->
+                <!-- brand select -->
                 <div>
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">1. Select Brand</label>
                     <select id="cart_brand" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
@@ -57,7 +57,7 @@
                     </select>
                 </div>
 
-                <!-- Step 2: Subcategory Tier -->
+                <!-- subcategory select -->
                 <div>
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">2. Subcategory</label>
                     <select id="cart_subcat" disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all disabled:opacity-50 disabled:cursor-not-allowed">
@@ -65,7 +65,7 @@
                     </select>
                 </div>
 
-                <!-- Step 3: Product Name -->
+                <!-- product name select -->
                 <div class="md:col-span-2 lg:col-span-1">
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">3. Product Name</label>
                     <select id="cart_product" disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose truncate transition-all disabled:opacity-50 disabled:cursor-not-allowed">
@@ -73,7 +73,7 @@
                     </select>
                 </div>
 
-                <!-- Step 4: Shade Profile -->
+                <!-- shade select -->
                 <div>
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">4. Shade Variation</label>
                     <select id="cart_shade" disabled class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all disabled:opacity-50">
@@ -81,7 +81,7 @@
                     </select>
                 </div>
 
-                <!-- Step 5: Unit Price -->
+                <!-- unit price -->
                 <div>
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Unit Price ($)</label>
                     <div class="relative">
@@ -90,7 +90,7 @@
                     </div>
                 </div>
 
-                <!-- Step 6: Quantity -->
+                <!-- quantity -->
                 <div>
                     <label class="block font-medium mb-1.5 uppercase text-noireText/70 tracking-widest">Quantity</label>
                     <input type="number" id="cart_qty" min="1" value="1" class="w-full px-4 py-2.5 rounded-xl bg-white border border-noireText/10 text-noireText font-mono focus:outline-none focus:border-dustyRose focus:ring-1 focus:ring-dustyRose transition-all">
@@ -98,7 +98,16 @@
 
             </div>
 
-            <!-- Action Button -->
+            <!-- out of stock warning -->
+            <div id="stock_warning_banner" class="hidden flex items-start gap-3 px-4 py-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 shrink-0 mt-0.5"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>
+                <div>
+                    <span class="font-semibold uppercase tracking-wide">Out of Stock</span>
+                    <span id="stock_warning_text" class="block mt-0.5 text-rose-700/80"></span>
+                </div>
+            </div>
+
+            <!-- add to cart button -->
             <div class="flex justify-center pt-2 border-t border-noireText/5">
                 <button type="button" id="addItemBtn" class="w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md">
                     Append to Transaction Cart
@@ -107,7 +116,7 @@
         </div>
     </div>
 
-    <!-- Active Cart Table Ledger Card -->
+    <!-- active cart table -->
     <div class="bg-parchment p-6 rounded-2xl border border-noireText/5 shadow-md">
         <div class="border-b border-noireText/10 pb-3 mb-4">
             <h3 class="text-2xl text-noireText font-serif">Active Multi-Item Cart Ledger</h3>
@@ -132,10 +141,10 @@
             </table>
         </div>
 
-        <!-- Promo Code & Financial Totals Breakdown -->
+        <!-- promo code and total -->
         <div class="mt-8 pt-6 border-t border-noireText/10 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
             
-            <!-- Left: Promo Code Entry with HTML Datalist Suggestions -->
+            <!-- promo code input -->
             <div class="space-y-3">
                 <label class="block font-medium uppercase text-noireText/70 tracking-widest">Apply Promotional Code</label>
                 <div class="flex items-center gap-3">
@@ -150,11 +159,11 @@
                 </div>
                 <p id="promoMessage" class="text-[11px] font-mono font-medium hidden"></p>
                 <div class="text-[10px] text-noireText/50 space-y-0.5" id="activePromoContainer">
-                    <p id="activePromoList"> Loading active promotions...</p>
+                    <p id="activePromoList">Loading active promotions...</p>
                 </div>
             </div>
 
-            <!-- Right: Subtotal & Grand Total Summary Card -->
+            <!-- subtotal and grand total -->
             <div class="bg-velvet/40 p-4 rounded-xl border border-noireText/5 space-y-2 text-noireText font-mono">
                 <div class="flex justify-between items-center text-xs">
                     <span class="text-noireText/60">Cart Subtotal:</span>
@@ -171,7 +180,7 @@
             </div>
         </div>
 
-        <!-- Checkout Action Button -->
+        <!-- checkout button -->
         <div class="mt-6 pt-4 border-t border-noireText/5 flex justify-end">
             <button id="checkoutBtn" class="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800 text-white font-medium uppercase tracking-widest px-8 py-3.5 rounded-xl transition-colors shadow-lg text-xs">
                 Commit Cart & Finalize Checkout
@@ -180,22 +189,22 @@
     </div>
 </div>
 
-<!-- PRINTABLE RECEIPT MODAL (INLINE STYLES FOR FIXED VIEWPORT OVERRIDE) -->
+<!-- receipt modal -->
 <div id="receiptModal" style="display: none; position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 1rem;">
     
     <div style="background-color: #ffffff; color: #1a1a1a; width: 100%; max-width: 520px; max-height: 85vh; border-radius: 1rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; overflow: hidden;">
         
-        <!-- Modal Printable Area (Scrollable container) -->
+        <!-- printable receipt content -->
         <div id="printableReceipt" style="padding: 1.5rem 2rem; overflow-y: auto; flex-grow: 1;">
             
-            <!-- Receipt Header -->
+            <!-- receipt header -->
             <div style="text-align: center; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 1rem; margin-bottom: 1rem;">
                 <h2 style="font-size: 1.5rem; font-family: serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin: 0;">Noire Beauty Store</h2>
                 <p style="font-size: 0.75rem; font-family: monospace; opacity: 0.6; margin: 0.25rem 0 0 0;">Retail Intelligence POS Network</p>
                 <p style="font-size: 0.7rem; font-family: monospace; opacity: 0.5; margin: 0;">Branch Node: <span id="r_branch" style="font-weight: 700;">S001</span></p>
             </div>
 
-            <!-- Receipt Meta Info -->
+            <!-- receipt info -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-family: monospace; font-size: 0.75rem; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 1rem; margin-bottom: 1rem;">
                 <div>
                     <p style="opacity: 0.5; font-size: 0.65rem; text-transform: uppercase; margin: 0;">Transaction ID</p>
@@ -215,7 +224,7 @@
                 </div>
             </div>
 
-            <!-- Receipt Items Table -->
+            <!-- receipt items -->
             <div style="margin-bottom: 1rem;">
                 <p style="font-size: 0.65rem; font-family: monospace; text-transform: uppercase; opacity: 0.5; letter-spacing: 0.05em; margin-bottom: 0.5rem;">Purchased Items</p>
                 <table style="width: 100%; font-size: 0.75rem; font-family: monospace; border-collapse: collapse;">
@@ -232,7 +241,7 @@
                 </table>
             </div>
 
-            <!-- Receipt Financial Totals -->
+            <!-- receipt totals -->
             <div style="border-top: 1px solid rgba(0,0,0,0.1); padding-top: 0.75rem; font-family: monospace; font-size: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; opacity: 0.8;">
                     <span>Subtotal:</span>
@@ -248,13 +257,13 @@
                 </div>
             </div>
 
-            <!-- Receipt Footer -->
+            <!-- receipt footer -->
             <div style="text-align: center; margin-top: 1rem; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 0.75rem; font-size: 0.7rem; opacity: 0.6;">
                 <p style="font-family: serif; font-style: italic; margin: 0;">Thank you for shopping at Noire Beauty!</p>
                 <p style="font-family: monospace; font-size: 0.65rem; margin: 0.25rem 0 0 0;">Please retain this receipt for returns or exchanges.</p>
             </div>
         </div>
-        <!-- Modal Action Footer (Always pinned at bottom, hidden on print) -->
+        <!-- modal action buttons -->
         <div class="no-print" style="background-color: #f9fafb; padding: 1rem 1.5rem; border-top: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-shrink: 0;">
             <button type="button" id="closeReceiptBtn" style="padding: 0.6rem 1.2rem; border-radius: 0.75rem; border: 1px solid rgba(0,0,0,0.2); background: transparent; cursor: pointer; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
                 Close & Next Sale
@@ -274,14 +283,14 @@
 <script>
 let lastReceiptData = null;
 
-// Pure Procedural Vector jsPDF Receipt Generator (100% Reliable, Zero Blank Pages)
+// generates receipt pdf
 function autoSaveReceiptPDF(dataOrTxId) {
     let r = lastReceiptData;
     if (dataOrTxId && typeof dataOrTxId === 'object') {
         r = dataOrTxId;
     }
 
-    // Scrape data if not provided directly
+    // fallback scrape if data object not passed
     if (!r) {
         const items = [];
         document.querySelectorAll('#r_items_body tr').forEach(row => {
@@ -325,7 +334,7 @@ function autoSaveReceiptPDF(dataOrTxId) {
                 format: [80, dynamicHeight]
             });
 
-            // Receipt Header
+            // receipt header
             doc.setFont("courier", "bold");
             doc.setFontSize(11);
             doc.setTextColor(30, 20, 25);
@@ -337,12 +346,12 @@ function autoSaveReceiptPDF(dataOrTxId) {
             doc.text("Retail Intelligence POS Network", 40, 14, { align: "center" });
             doc.text(`Branch Node: ${r.branch_id || 'S001'}`, 40, 17.5, { align: "center" });
 
-            // Dotted divider
+            // divider
             doc.setLineDashPattern([1, 1], 0);
             doc.setDrawColor(160, 160, 160);
             doc.line(5, 20, 75, 20);
 
-            // Metadata block
+            // metadata
             let y = 24;
             doc.setFontSize(6.5);
             doc.setTextColor(40, 40, 40);
@@ -355,7 +364,7 @@ function autoSaveReceiptPDF(dataOrTxId) {
             doc.text(`Payment:  PAID (Verified)`, 5, y);
             y += 3.5;
 
-            // Line items header
+            // items table header
             doc.line(5, y, 75, y);
             y += 4;
 
@@ -370,7 +379,7 @@ function autoSaveReceiptPDF(dataOrTxId) {
             doc.line(5, y, 75, y);
             y += 3.5;
 
-            // Line items body
+            // items list
             doc.setFont("courier", "normal");
             doc.setFontSize(6);
             if (r.items && r.items.length > 0) {
@@ -390,7 +399,7 @@ function autoSaveReceiptPDF(dataOrTxId) {
                 });
             }
 
-            // Financial breakdown
+            // summary totals
             doc.line(5, y, 75, y);
             y += 4;
 
@@ -420,7 +429,7 @@ function autoSaveReceiptPDF(dataOrTxId) {
             doc.text(`$${Number(r.grand_total || 0).toFixed(2)}`, 75, y, { align: "right" });
             y += 6;
 
-            // Receipt Footer
+            // footer note
             doc.setLineDashPattern([1, 1], 0);
             doc.setDrawColor(160, 160, 160);
             doc.line(5, y, 75, y);
@@ -442,7 +451,7 @@ function autoSaveReceiptPDF(dataOrTxId) {
         console.error("jsPDF generation error, attempting html2pdf fallback:", err);
     }
 
-    // HTML2PDF fallback directly on the visible element
+    // fallback to html2pdf if needed
     const element = document.getElementById('printableReceipt');
     if (element) {
         const opt = {
@@ -495,7 +504,33 @@ document.addEventListener("DOMContentLoaded", async () => {
         brandSel.innerHTML = '<option value="" disabled>Error loading brands</option>';
     }
 
+    const stockWarningBanner = document.getElementById('stock_warning_banner');
+    const stockWarningText = document.getElementById('stock_warning_text');
+    const addItemBtn = document.getElementById('addItemBtn');
+
+    function clearStockWarning() {
+        if (stockWarningBanner) stockWarningBanner.classList.add('hidden');
+        if (addItemBtn) {
+            addItemBtn.disabled = false;
+            addItemBtn.className = 'w-full sm:w-auto px-8 py-3 bg-deepWine hover:bg-noireText text-velvet font-medium uppercase tracking-widest text-xs rounded-xl transition-all shadow-md';
+            addItemBtn.textContent = 'Append to Transaction Cart';
+        }
+    }
+
+    function showStockWarning(productName, stock) {
+        if (stockWarningBanner && stockWarningText) {
+            stockWarningText.textContent = `${productName} has no stock at this branch (${stock} units available). Cannot add to cart.`;
+            stockWarningBanner.classList.remove('hidden');
+        }
+        if (addItemBtn) {
+            addItemBtn.disabled = true;
+            addItemBtn.className = 'w-full sm:w-auto px-8 py-3 bg-rose-700/70 text-white font-medium uppercase tracking-widest text-xs rounded-xl cursor-not-allowed opacity-80 shadow-md';
+            addItemBtn.textContent = 'Out of Stock — Cannot Add';
+        }
+    }
+
     brandSel.addEventListener('change', async () => {
+        clearStockWarning();
         subcatSel.innerHTML = '<option value="" disabled selected>-- Loading --</option>';
         subcatSel.disabled = false;
         prodSel.innerHTML = '<option value="" disabled selected>-- Select Subcat First --</option>';
@@ -511,6 +546,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     subcatSel.addEventListener('change', async () => {
+        clearStockWarning();
         prodSel.innerHTML = '<option value="" disabled selected>-- Loading --</option>';
         prodSel.disabled = false;
         shadeSel.innerHTML = '<option value="" disabled selected>-- Select Product First --</option>';
@@ -524,16 +560,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     prodSel.addEventListener('change', async () => {
+        clearStockWarning();
         shadeSel.innerHTML = '<option value="" disabled selected>-- Loading Shades --</option>';
         shadeSel.disabled = true;
         priceInput.value = '...';
 
-        const detailRes = await fetch(`/api/catalog/product_details?product_name=${encodeURIComponent(prodSel.value)}`);
+        // fetch price and stock simultaneously
+        const [detailRes, shadeRes] = await Promise.all([
+            fetch(`/api/catalog/product_details?product_name=${encodeURIComponent(prodSel.value)}`),
+            fetch(`/api/catalog/shades?product_name=${encodeURIComponent(prodSel.value)}`)
+        ]);
         const details = await detailRes.json();
-        priceInput.value = details.price.toFixed(2);
-
-        const shadeRes = await fetch(`/api/catalog/shades?product_name=${encodeURIComponent(prodSel.value)}`);
         const shades = await shadeRes.json();
+
+        priceInput.value = details.price ? details.price.toFixed(2) : '0.00';
+
+        // show out-of-stock warning immediately if stock is 0
+        if (details.stock !== undefined && details.stock <= 0) {
+            showStockWarning(prodSel.value, details.stock);
+        }
 
         if (shades && shades.length > 0) {
             shadeSel.innerHTML = '<option value="" disabled selected>-- Select Required Shade --</option>' + 
@@ -641,7 +686,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 promoMsg.classList.remove('hidden');
             }
         } catch (err) {
-            // Fallback to client check if offline/error
+            // fallback client check if validation request fails
             if (promoVal === "FESTIVE10") {
                 currentDiscountRate = 0.90;
                 promoMsg.className = "text-[11px] font-mono font-medium text-emerald-700 flex items-center gap-1";
@@ -695,7 +740,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <td class="py-3 px-2 font-mono">${item.quantity}</td>
                 <td class="py-3 px-2 text-right font-mono font-medium text-noireText">$${(item.price * item.quantity).toFixed(2)}</td>
                 <td class="py-3 px-2 text-center">
-                    <button onclick="removeItemFromCart(${item.id})" class="text-rose-600 hover:text-rose-800 font-bold px-2 py-1 text-xs"></button>
+                    <button onclick="removeItemFromCart(${item.id})" title="Remove item" class="inline-flex items-center gap-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 hover:border-rose-400 font-semibold px-2.5 py-1 rounded-lg text-[10px] uppercase tracking-wide transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg>
+                        Remove
+                    </button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -767,13 +815,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }
                 document.getElementById('r_grand_total').textContent = `$${r.grand_total.toFixed(2)}`;
 
-                // Retain data for PDF generation & printing
+                // save receipt data for pdf or print
                 lastReceiptData = r;
 
-                // Display Modal via inline styling block
+                // show receipt popup
                 receiptModal.style.display = 'flex';
 
-                // Reset Interface
+                // reset cart
                 activeCart = [];
                 currentDiscountRate = 1.0;
                 promoInput.value = '';
